@@ -16,19 +16,14 @@ export default function Login() {
     const dropdownRef = useRef(null);
     const inputRef = useRef(null);
 
-    // Load saved logins + inject defaults from screenshot if empty
+    // Load saved logins from browser storage
     useEffect(() => {
         const loadLogins = () => {
             const saved = localStorage.getItem('bonthus_saved_logins');
             if (saved) {
                 setSuggestions(JSON.parse(saved));
             } else {
-                const defaults = [
-                    { identifier: 'pingilisakethreddy@gmail.com', password: '' },
-                    { identifier: 'jntu@thelenscare.in', password: '' }
-                ];
-                localStorage.setItem('bonthus_saved_logins', JSON.stringify(defaults));
-                setSuggestions(defaults);
+                setSuggestions([]);
             }
         };
         loadLogins();
@@ -56,12 +51,6 @@ export default function Login() {
             setPassword(item.password);
         }
         setShowSuggestions(false);
-    };
-
-    const deleteSuggestion = (idToDelete) => {
-        const updated = suggestions.filter(item => item.identifier !== idToDelete);
-        localStorage.setItem('bonthus_saved_logins', JSON.stringify(updated));
-        setSuggestions(updated);
     };
 
     const handleLogin = async (e) => {
@@ -121,27 +110,27 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F8F9FB] bg-[radial-gradient(#e5e7eb_1.5px,transparent_1.5px)] [background-size:24px_24px] flex items-center justify-center p-4">
-            <div className="max-w-md w-full bg-white rounded-[24px] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] border-2 border-black overflow-hidden transition-all duration-300 hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5">
+        <div className="min-h-screen bg-[#F8F9FB] bg-[radial-gradient(#64748b_1.5px,transparent_1.5px)] [background-size:24px_24px] flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-white rounded-2xl sm:rounded-[24px] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] sm:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] border-2 border-black overflow-hidden transition-all duration-300 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] sm:hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5">
                 {/* Header */}
-                <div className="bg-gradient-to-b from-gray-50 to-white px-8 py-10 flex flex-col items-center justify-center relative overflow-hidden text-center border-b-2 border-black">
+                <div className="bg-gradient-to-b from-gray-50 to-white px-6 py-8 sm:px-8 sm:py-10 flex flex-col items-center justify-center relative overflow-hidden text-center border-b-2 border-black">
                     {/* Decorative subtle dot grid inside header for premium depth */}
-                    <div className="absolute inset-0 bg-[radial-gradient(#000000_1px,transparent_1px)] [background-size:16px_16px] opacity-[0.03] pointer-events-none" />
+                    <div className="absolute inset-0 bg-[radial-gradient(#000000_1px,transparent_1px)] [background-size:16px_16px] opacity-[0.08] pointer-events-none" />
 
                     {/* Glassy Neo-Brutalist badge */}
-                    <div className="mb-6 px-5 py-2 bg-white/80 border-2 border-black text-black rounded-full backdrop-blur-md shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] select-none">
+                    <div className="mb-5 px-5 py-2 bg-white/80 border-2 border-black text-black rounded-full backdrop-blur-md shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] select-none">
                         <span className="text-[10px] font-black uppercase tracking-[0.25em] block leading-none">Store</span>
                     </div>
 
-                    <div className="relative mb-6">
-                        <img src={logoImg} alt="LensCare Logo" className="h-20 relative z-10" />
+                    <div className="relative mb-5">
+                        <img src={logoImg} alt="LensCare Logo" className="h-16 sm:h-20 relative z-10" />
                     </div>
-                    <h2 className="text-black text-2xl font-black tracking-tight relative z-10">Store Portal Access</h2>
-                    <p className="text-black/60 text-sm font-semibold mt-1.5 relative z-10">Sign in to manage your store</p>
+                    <h2 className="text-black text-xl sm:text-2xl font-black tracking-tight relative z-10">Store Portal Access</h2>
+                    <p className="text-black/60 text-xs sm:text-sm font-semibold mt-1.5 relative z-10">Sign in to manage your store</p>
                 </div>
 
                 {/* Form */}
-                <div className="p-8">
+                <div className="p-6 sm:p-8">
                     {error && (
                         <div className="mb-6 p-4 bg-red-50 border-2 border-black text-red-700 text-xs font-bold rounded-xl flex items-start gap-2.5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-slideDown">
                             <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
@@ -159,13 +148,14 @@ export default function Login() {
                                 <input
                                     ref={inputRef}
                                     type="text"
-                                    id="identifier"
-                                    name="identifier"
+                                    id="user_id_field"
+                                    name="user_id_field"
                                     autoComplete="off"
                                     value={identifier}
                                     onChange={(e) => setIdentifier(e.target.value)}
                                     onFocus={() => setShowSuggestions(true)}
                                     placeholder="Email, 10-digit Phone, or 6-digit Employee ID"
+                                    style={{ WebkitBoxShadow: '0 0 0 1000px white inset' }}
                                     className="w-full pl-11 pr-4 py-3.5 bg-white border-2 border-black rounded-xl text-sm font-semibold focus:outline-none focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all duration-150 placeholder:text-gray-400"
                                     required
                                 />
@@ -181,32 +171,20 @@ export default function Login() {
                                         </div>
                                         <div className="max-h-48 overflow-y-auto">
                                             {suggestions.map((item, index) => (
-                                                <div 
+                                                <button
                                                     key={index}
-                                                    className="w-full flex items-center justify-between hover:bg-black hover:text-white transition-colors duration-150 text-left divide-x-2 divide-black/10 hover:divide-white/20"
+                                                    type="button"
+                                                    onClick={() => selectSuggestion(item)}
+                                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-black hover:text-white transition-colors duration-150 text-left group"
                                                 >
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => selectSuggestion(item)}
-                                                        className="flex-grow px-4 py-3 flex items-center gap-3 text-left group/btn"
-                                                    >
-                                                        <User size={16} className="text-black group-hover/btn:text-white shrink-0" />
-                                                        <div>
-                                                            <p className="text-sm font-black leading-tight">{item.identifier}</p>
-                                                            <p className="text-[10px] font-bold text-black/40 group-hover/btn:text-white/60 leading-none mt-1">
-                                                                {item.password ? "••••••••" : "no saved password"}
-                                                            </p>
-                                                        </div>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => deleteSuggestion(item.identifier)}
-                                                        className="px-4 py-3.5 text-black hover:text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors shrink-0"
-                                                        title="Delete suggestion"
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </div>
+                                                    <User size={16} className="text-black group-hover:text-white shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm font-black leading-tight truncate max-w-[180px] sm:max-w-[280px]">{item.identifier}</p>
+                                                        <p className="text-[10px] font-bold text-black/40 group-hover:text-white/60 leading-none mt-1">
+                                                            {item.password ? "••••••••" : "no saved password"}
+                                                        </p>
+                                                    </div>
+                                                </button>
                                             ))}
                                         </div>
                                     </div>
@@ -221,13 +199,17 @@ export default function Login() {
                                     <Lock size={18} strokeWidth={2.5} />
                                 </span>
                                 <input
-                                    type={showPassword ? "text" : "password"}
-                                    id="current-password"
-                                    name="password"
+                                    type="text"
+                                    id="pass_key_field"
+                                    name="pass_key_field"
                                     autoComplete="off"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
+                                    style={{ 
+                                        WebkitTextSecurity: showPassword ? 'none' : 'disc',
+                                        WebkitBoxShadow: '0 0 0 1000px white inset'
+                                    }}
                                     className="w-full pl-11 pr-12 py-3.5 bg-white border-2 border-black rounded-xl text-sm font-semibold focus:outline-none focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all duration-150 placeholder:text-gray-400"
                                     required
                                 />
