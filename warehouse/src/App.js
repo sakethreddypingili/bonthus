@@ -20,6 +20,7 @@ import EditOrder from "./pages/EditOrder";
 import PasswordReset from "./pages/PasswordReset";
 import Reminders from "./pages/Reminders";
 import Notifications from "./pages/Notifications";
+import Warehouse from "./pages/Warehouse";
 import BoardSidebar from "./components/common/BoardSidebar";
 
 const PROFILE_CACHE_KEY = "lenscare_profile_cache_v1";
@@ -405,6 +406,14 @@ function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default App;
+
+
+
+   </div>
   );
 }
 

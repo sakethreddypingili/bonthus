@@ -17,6 +17,7 @@ const iconImg = '/assets/images/icon.webp';
 
 const navItems = [
   { to: "/", label: "Dashboard", role: ["admin", "super_admin", "store_manager"], icon: LayoutDashboard },
+  { to: "/warehouse", label: "Warehouse", role: ["admin", "super_admin"], icon: Package },
   { to: "/orders", label: "Orders", role: ["admin", "super_admin", "store_manager"], icon: ShoppingBag },
   { to: "/products", label: "Products", role: ["admin", "super_admin", "store_manager"], icon: Package },
   { to: "/customers", label: "Customers", role: ["admin", "super_admin", "store_manager"], icon: Users },
