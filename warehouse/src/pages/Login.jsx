@@ -110,7 +110,7 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F8F9FB] bg-[radial-gradient(#64748b_1.5px,transparent_1.5px)] [background-size:24px_24px] flex items-center justify-center p-4">
+        <div className="min-h-screen bg-[#E2E8F0] bg-[radial-gradient(#64748b_1.5px,transparent_1.5px)] [background-size:24px_24px] flex items-center justify-center p-4">
             <div className="max-w-md w-full bg-white rounded-2xl sm:rounded-[24px] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] sm:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] border-2 border-black overflow-hidden transition-all duration-300 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] sm:hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5">
                 {/* Header */}
                 <div className="bg-gradient-to-b from-gray-50 to-white px-6 py-8 sm:px-8 sm:py-10 flex flex-col items-center justify-center relative overflow-hidden text-center border-b-2 border-black">

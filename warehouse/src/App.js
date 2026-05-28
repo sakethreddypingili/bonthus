@@ -105,15 +105,15 @@ function App() {
       if (!data) {
         console.log("Not found in auth_users, trying employees table...");
         console.log("Looking for user_id:", activeSession.user.id);
-        
+
         let { data: employeeData, error: empError } = await supabaseAdmin
           .from("employees")
           .select("id, name, employee_id, store_id, department, role, email, phone, status, joined_on, user_id")
           .eq("user_id", activeSession.user.id)
           .maybeSingle();
-        
+
         console.log("Employee query result:", { employeeData, empError });
-        
+
         // Fallback to email lookup if user_id is missing
         if (!employeeData && activeSession.user.email) {
           console.log("Not found by user_id, trying email:", activeSession.user.email);
@@ -122,7 +122,7 @@ function App() {
             .select("id, name, employee_id, store_id, department, role, email, phone, status, joined_on, user_id")
             .ilike("email", activeSession.user.email)
             .maybeSingle();
-            
+
           if (emailData) {
             employeeData = emailData;
             // Update the user_id for future logins
@@ -136,7 +136,7 @@ function App() {
         if (empError) {
           console.error("Error querying employees:", empError);
         }
-        
+
         if (employeeData) {
           // Fetch store name separately using admin client
           const { data: storeData } = await supabaseAdmin
@@ -144,7 +144,7 @@ function App() {
             .select("name")
             .eq("id", employeeData.store_id)
             .maybeSingle();
-          
+
           // Map employee data to same format as auth_users
           data = {
             id: activeSession.user.id,
@@ -413,7 +413,7 @@ export default App;
 
 
 
-   </div>
+   </div >
   );
 }
 
