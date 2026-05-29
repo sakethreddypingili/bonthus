@@ -33,7 +33,7 @@ export default function Login() {
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (
-                dropdownRef.current && 
+                dropdownRef.current &&
                 !dropdownRef.current.contains(event.target) &&
                 inputRef.current &&
                 !inputRef.current.contains(event.target)
@@ -65,7 +65,7 @@ export default function Login() {
             if (/^\d{10}$/.test(loginEmail)) {
                 const { data: resolvedEmail, error: rpcErr } = await supabase
                     .rpc('get_email_by_phone', { p_phone: loginEmail });
-                
+
                 if (rpcErr) throw rpcErr;
                 if (!resolvedEmail) throw new Error("This phone number is not registered.");
                 loginEmail = resolvedEmail;
@@ -74,7 +74,7 @@ export default function Login() {
             else if (/^\d{6}$/.test(loginEmail)) {
                 const { data: resolvedEmail, error: rpcErr } = await supabase
                     .rpc('get_email_by_employee_id', { p_employee_id: loginEmail });
-                
+
                 if (rpcErr) throw rpcErr;
                 if (!resolvedEmail) throw new Error("This employee ID is not registered.");
                 loginEmail = resolvedEmail;
@@ -96,7 +96,7 @@ export default function Login() {
             if (!exists) {
                 updated = [...currentSaved, { identifier, password }].slice(-5);
             } else {
-                updated = currentSaved.map(item => 
+                updated = currentSaved.map(item =>
                     item.identifier === identifier ? { identifier, password } : item
                 );
             }
@@ -162,7 +162,7 @@ export default function Login() {
 
                                 {/* Custom Autofill Dropdown */}
                                 {showSuggestions && suggestions.length > 0 && (
-                                    <div 
+                                    <div
                                         ref={dropdownRef}
                                         className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] z-30 overflow-hidden divide-y-2 divide-black animate-slideDown"
                                     >
@@ -206,7 +206,7 @@ export default function Login() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
-                                    style={{ 
+                                    style={{
                                         WebkitTextSecurity: showPassword ? 'none' : 'disc',
                                         WebkitBoxShadow: '0 0 0 1000px white inset'
                                     }}

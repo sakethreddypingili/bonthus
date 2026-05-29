@@ -5,10 +5,7 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    box-sizing: border-box;
-  }
-
+  * { box-sizing: border-box; }
   body {
     font-family: 'Plus Jakarta Sans', sans-serif;
     background-color: #F8F9FB;
@@ -18,87 +15,42 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-
-  ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: #f1f1f1;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 10px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: #000000;
-  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #f1f1f1; }
+  ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: #000000; }
 }
 
 @layer components {
   .stat-card {
     @apply bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition-shadow duration-200;
   }
-
   .btn-primary {
     @apply bg-primaryNavy text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-opacity-90 transition-all shadow-md cursor-pointer;
   }
-
   .btn-secondary {
     @apply bg-white text-primaryNavy border border-primaryNavy px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-all cursor-pointer;
   }
-
   .btn-teal {
     @apply bg-accentTeal text-white px-4 py-2 rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity cursor-pointer;
   }
-
   .btn-outline {
     @apply border border-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors cursor-pointer;
   }
-
-  .badge-success {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700;
-  }
-
-  .badge-warning {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700;
-  }
-
-  .badge-danger {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700;
-  }
-
-  .badge-info {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700;
-  }
-
-  .badge-neutral {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600;
-  }
-
+  .badge-success { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700; }
+  .badge-warning { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700; }
+  .badge-danger  { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700; }
+  .badge-info    { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700; }
+  .badge-neutral { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600; }
   .input-field {
     @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accentTeal/30 focus:border-accentTeal transition-all bg-white;
   }
-
-  .page-title {
-    @apply text-xl font-bold text-primaryNavy;
-  }
-
-  .page-subtitle {
-    @apply text-sm text-gray-500 mt-0.5;
-  }
-
-  .section-card {
-    @apply bg-white rounded-xl border border-gray-200 overflow-hidden;
-  }
-
+  .page-title { @apply text-xl font-bold text-primaryNavy; }
+  .page-subtitle { @apply text-sm text-gray-500 mt-0.5; }
+  .section-card { @apply bg-white rounded-xl border border-gray-200 overflow-hidden; }
   .lenskart-card {
     @apply bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-float transition-all duration-300;
   }
-
   .text-outline {
     -webkit-text-stroke: 1px #333333;
     color: transparent;
@@ -110,7 +62,6 @@
   .table-row {
     @apply border-b border-gray-100 hover:bg-gray-50 transition-colors;
   }
-
   .table-row:last-child {
     @apply border-b-0;
   }
@@ -122,7 +73,6 @@
     opacity: 0;
     transform: translateY(-10px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
@@ -134,13 +84,8 @@
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .animate-fadeIn {
@@ -149,7 +94,7 @@
 
 /* Custom Autofill Styles for Black & White Theme */
 input:-webkit-autofill,
-input:-webkit-autofill:hover,
+input:-webkit-autofill:hover, 
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 1000px white inset !important;
@@ -157,3 +102,4 @@ input:-webkit-autofill:active {
   border-color: black !important;
   transition: background-color 5000s ease-in-out 0s;
 }
+

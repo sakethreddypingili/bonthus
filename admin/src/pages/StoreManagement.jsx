@@ -26,7 +26,8 @@ export default function StoreManagement({ userProfile }) {
 
     const [creating, setCreating] = useState(false);
     const [newUser, setNewUser] = useState({
-        email: '',
+        emailPrefix: '',
+        domain: '@lenscare.in',
         password: 'Welcome@123',
         useDefaultPassword: true,
         role: 'store_manager',
@@ -224,8 +225,9 @@ export default function StoreManagement({ userProfile }) {
         e.preventDefault();
         setCreating(true);
         try {
+            const finalEmail = `${newUser.emailPrefix}${newUser.domain}`.toLowerCase();
             const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-                email: newUser.email,
+                email: finalEmail,
                 password: newUser.password,
                 email_confirm: true
             });
@@ -246,14 +248,15 @@ export default function StoreManagement({ userProfile }) {
                     console.error("Could not set final role:", updateError.message);
                     showNotification("Account created, but updating role failed. Please edit manually.", "warning");
                 } else {
-                    showNotification(`User ${newUser.email} successfully created!`, "success");
+                    showNotification(`User ${finalEmail} successfully created!`, "success");
                     setCreatingNewUser(false);
                     fetchUsers();
                 }
 
                 setCreating(false);
                 setNewUser({ 
-                    email: '', 
+                    emailPrefix: '', 
+                    domain: '@lenscare.in',
                     password: 'Welcome@123', 
                     useDefaultPassword: true, 
                     role: 'store_manager', 
@@ -1041,7 +1044,7 @@ export default function StoreManagement({ userProfile }) {
                                 <h3 className="text-2xl font-black text-black uppercase tracking-tighter">New Operator</h3>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Access Credential Generation</p>
                             </div>
-                            <button onClick={() => { setCreatingNewUser(false); setNewUser({ email: '', password: '', role: 'store_manager', store_id: stores[0]?.id || '' }); }} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-all">
+                            <button onClick={() => { setCreatingNewUser(false); setNewUser({ emailPrefix: '', domain: '@lenscare.in', password: 'Welcome@123', useDefaultPassword: true, role: 'store_manager', store_id: stores[0]?.id || '' }); }} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-all">
                                 <X size={24} strokeWidth={3} />
                             </button>
                         </div>
@@ -1049,14 +1052,33 @@ export default function StoreManagement({ userProfile }) {
                             <form onSubmit={handleCreateUser} className="space-y-8">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Email Designation</label>
-                                    <input
-                                        type="email"
-                                        required
-                                        value={newUser.email}
-                                        onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-                                        placeholder="operator@lenscare.in"
-                                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                    />
+                                    <div className="flex bg-gray-50 border border-gray-100 rounded-2xl focus-within:ring-2 focus-within:ring-black/5 focus-within:border-black focus-within:bg-white transition-all overflow-hidden">
+                                        <input
+                                            type="text"
+                                            required
+                                            value={newUser.emailPrefix}
+                                            onChange={e => setNewUser({ ...newUser, emailPrefix: e.target.value })}
+                                            placeholder="operator"
+                                            className="w-full px-6 py-4 bg-transparent text-[11px] font-bold tracking-widest outline-none"
+                                        />
+                                        <div className="bg-gray-100 px-4 py-4 flex items-center justify-center border-l border-gray-200">
+                                            <span className="text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                                                {newUser.domain}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Domain</label>
+                                    <select
+                                        value={newUser.domain}
+                                        onChange={e => setNewUser({ ...newUser, domain: e.target.value })}
+                                        className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all appearance-none cursor-pointer"
+                                    >
+                                        <option value="@lenscare.in">@lenscare.in</option>
+                                        <option value="@warehouse.lenscare.in">@warehouse.lenscare.in</option>
+                                    </select>
                                 </div>
                                 <div className="space-y-6 p-6 bg-gray-50 rounded-[32px] border border-gray-100 shadow-inner">
                                     <div className="flex items-center justify-between">

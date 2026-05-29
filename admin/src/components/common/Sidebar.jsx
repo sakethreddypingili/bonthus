@@ -59,22 +59,54 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
               );
           
           return (
-            <NavLink
-              key={to}
-              to={to}
-              className={`
-                flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-                ${isActive
-                  ? "bg-black text-white shadow-md"
-                  : "text-gray-600 hover:text-black hover:bg-gray-100"
-                }
-                ${collapsed ? "justify-center" : ""}
-              `}
-              title={collapsed ? label : undefined}
-            >
-              <Icon size={18} className="flex-shrink-0" />
-              {!collapsed && <span>{label}</span>}
-            </NavLink>
+            <div key={to} className="w-full">
+              <NavLink
+                to={to}
+                className={`
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+                  ${isActive
+                    ? "bg-black text-white shadow-md"
+                    : "text-gray-600 hover:text-black hover:bg-gray-100"
+                  }
+                  ${collapsed ? "justify-center" : ""}
+                `}
+                title={collapsed ? label : undefined}
+              >
+                <Icon size={18} className="flex-shrink-0" />
+                {!collapsed && <span>{label}</span>}
+              </NavLink>
+
+              {/* Sub-menu for Board */}
+              {label === "Board" && isActive && (
+                <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
+                  {[
+                    { to: "/reminders", label: "Reminders", icon: Calendar },
+                    { to: "/notifications", label: "Notifications", icon: Bell }
+                  ].map((sub) => {
+                    const isSubActive = location.pathname === sub.to;
+                    const SubIcon = sub.icon;
+                    return (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={`
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all w-full
+                          ${isSubActive
+                            ? "bg-black text-white shadow-sm"
+                            : "text-gray-500 hover:text-black hover:bg-gray-50"
+                          }
+                          ${collapsed ? "justify-center" : ""}
+                        `}
+                        title={collapsed ? sub.label : undefined}
+                      >
+                        <SubIcon size={15} className="flex-shrink-0" />
+                        {!collapsed && <span>{sub.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
 

@@ -7,7 +7,8 @@ import {
   Layout,
   Bell,
   Calendar,
-  ChevronDown
+  ChevronDown,
+  Store
 } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "../../server/supabase/supabase";
@@ -16,14 +17,13 @@ const logoImg = '/assets/images/logo.webp';
 const iconImg = '/assets/images/icon.webp';
 
 const navItems = [
-  { to: "/", label: "Dashboard", role: ["admin", "super_admin", "store_manager"], icon: LayoutDashboard },
-  { to: "/warehouse", label: "Warehouse", role: ["admin", "super_admin"], icon: Package },
-  { to: "/orders", label: "Orders", role: ["admin", "super_admin", "store_manager"], icon: ShoppingBag },
-  { to: "/products", label: "Products", role: ["admin", "super_admin", "store_manager"], icon: Package },
-  { to: "/customers", label: "Customers", role: ["admin", "super_admin", "store_manager"], icon: Users },
+  { to: "/warehouse", label: "Warehouse", role: ["admin", "super_admin", "store_manager"], icon: Package },
+  { to: "/store", label: "Store Insight", role: ["admin", "super_admin", "store_manager"], icon: Store },
+  { to: "/products", label: "Master Catalog", role: ["admin", "super_admin", "store_manager"], icon: Package },
+  { to: "/analytics", label: "Analytics", role: ["admin", "super_admin", "store_manager"], icon: BarChart2 },
+  { to: "/staff", label: "Staff", role: ["admin", "super_admin"], icon: Users },
   { to: "/reminders", label: "Board", role: ["admin", "super_admin", "store_manager", "employee"], icon: Layout },
   { to: "/attendance", label: "Attendance", role: ["admin", "super_admin", "store_manager", "employee"], icon: ClipboardCheck },
-  { to: "/analytics", label: "Analytics", role: ["admin", "super_admin", "store_manager"], icon: BarChart2 },
 ];
 
 export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile }) {
@@ -52,51 +52,64 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 mb-2">Menu</p>
         )}
         {navItems.filter(item => item.role.includes(userProfile?.role)).map(({ to, label, icon: Icon }) => {
-          const isActive = to === "/" 
-            ? location.pathname === "/" 
+          const isActive = to === "/warehouse"
+            ? location.pathname === "/warehouse" || location.pathname === "/"
             : (to === "/reminders" 
                 ? (location.pathname === "/reminders" || location.pathname === "/notifications")
                 : location.pathname.startsWith(to)
               );
           
           return (
-            <NavLink
-              key={to}
-              to={to}
-              className={`
-                flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-                ${isActive
-                  ? "bg-black text-white shadow-md"
-                  : "text-gray-600 hover:text-black hover:bg-gray-100"
-                }
-                ${collapsed ? "justify-center" : ""}
-              `}
-              title={collapsed ? label : undefined}
-            >
-              <Icon size={18} className="flex-shrink-0" />
-              {!collapsed && <span>{label}</span>}
-            </NavLink>
+            <div key={to} className="w-full">
+              <NavLink
+                to={to}
+                className={`
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+                  ${isActive
+                    ? "bg-black text-white shadow-md"
+                    : "text-gray-600 hover:text-black hover:bg-gray-100"
+                  }
+                  ${collapsed ? "justify-center" : ""}
+                `}
+                title={collapsed ? label : undefined}
+              >
+                <Icon size={18} className="flex-shrink-0" />
+                {!collapsed && <span>{label}</span>}
+              </NavLink>
+
+              {/* Sub-menu for Board */}
+              {label === "Board" && isActive && (
+                <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
+                  {[
+                    { to: "/reminders", label: "Reminders", icon: Calendar },
+                    { to: "/notifications", label: "Notifications", icon: Bell }
+                  ].map((sub) => {
+                    const isSubActive = location.pathname === sub.to;
+                    const SubIcon = sub.icon;
+                    return (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={`
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all w-full
+                          ${isSubActive
+                            ? "bg-black text-white shadow-sm"
+                            : "text-gray-500 hover:text-black hover:bg-gray-50"
+                          }
+                          ${collapsed ? "justify-center" : ""}
+                        `}
+                        title={collapsed ? sub.label : undefined}
+                      >
+                        <SubIcon size={15} className="flex-shrink-0" />
+                        {!collapsed && <span>{sub.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
-
-        {/* Admin Features */}
-        {isAdmin && (
-          <NavLink
-            to="/store-management"
-            className={`
-              flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${location.pathname.startsWith("/store-management")
-                ? "bg-black text-white shadow-md"
-                : "text-gray-600 hover:text-black hover:bg-gray-100"
-              }
-              ${collapsed ? "justify-center" : ""}
-            `}
-            title={collapsed ? "Store" : undefined}
-          >
-            <UserPlus size={18} className="flex-shrink-0" />
-            {!collapsed && <span>Store</span>}
-          </NavLink>
-        )}
       </nav>
 
       {/* Footer Actions */}

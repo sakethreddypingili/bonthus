@@ -774,16 +774,20 @@ export default function Dashboard({ userProfile }) {
             </div>
             <div className="px-2 py-1 bg-black text-white text-[9px] font-black uppercase rounded">Live</div>
           </div>
-          <div className="flex-1 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={todayOrdersChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={12}>
-                <CartesianGrid strokeDasharray="4 4" stroke="#f1f1f1" vertical={false} />
-                <XAxis dataKey="hour" tick={{ fontSize: 8, fontWeight: 900, fill: "#000" }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f9f9f9' }} />
-                <Bar dataKey="orders" fill="#000" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex-1 w-full relative">
+            {todayOrdersChartData.length === 0 ? (
+              <NoDataOverlay message="No Order Activity Today" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={todayOrdersChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={12}>
+                  <CartesianGrid strokeDasharray="4 4" stroke="#f1f1f1" vertical={false} />
+                  <XAxis dataKey="hour" tick={{ fontSize: 8, fontWeight: 900, fill: "#000" }} axisLine={false} tickLine={false} />
+                  <YAxis hide />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f9f9f9' }} />
+                  <Bar dataKey="orders" fill="#000" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -828,14 +832,29 @@ export default function Dashboard({ userProfile }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {todayOrderHistory.map((o) => (
-                  <tr key={o.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">{o.time}</td>
-                    <td className="px-6 py-4 text-[11px] font-bold text-black">{o.customer}</td>
-                    <td className="px-6 py-4 text-right text-[11px] font-black text-black tracking-tight">₹{o.amount.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-center">{statusBadge(o.status)}</td>
+                {todayOrderHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-20 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="p-4 bg-black rounded-2xl mb-3 shadow-lg transform rotate-3 inline-block">
+                          <LayoutDashboard size={24} className="text-white" />
+                        </div>
+                        <p className="text-[10px] font-black text-black uppercase tracking-[0.2em]">
+                          No transactions recorded today
+                        </p>
+                      </div>
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  todayOrderHistory.map((o) => (
+                    <tr key={o.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">{o.time}</td>
+                      <td className="px-6 py-4 text-[11px] font-bold text-black">{o.customer}</td>
+                      <td className="px-6 py-4 text-right text-[11px] font-black text-black tracking-tight">₹{o.amount.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-center">{statusBadge(o.status)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -858,14 +877,29 @@ export default function Dashboard({ userProfile }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {recentOrders.map((o) => (
-                  <tr key={o.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-mono text-[10px] font-black text-gray-400">#{o.id.substring(0, 6)}</td>
-                    <td className="px-6 py-4 text-[11px] font-bold text-black">{o.customer}</td>
-                    <td className="px-6 py-4 text-right text-[11px] font-black text-black tracking-tight">₹{o.amount.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-center">{statusBadge(o.status)}</td>
+                {recentOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-20 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="p-4 bg-black rounded-2xl mb-3 shadow-lg transform rotate-3 inline-block">
+                          <LayoutDashboard size={24} className="text-white" />
+                        </div>
+                        <p className="text-[10px] font-black text-black uppercase tracking-[0.2em]">
+                          No orders in the past 24 hours
+                        </p>
+                      </div>
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  recentOrders.map((o) => (
+                    <tr key={o.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 font-mono text-[10px] font-black text-gray-400">#{o.id.substring(0, 6)}</td>
+                      <td className="px-6 py-4 text-[11px] font-bold text-black">{o.customer}</td>
+                      <td className="px-6 py-4 text-right text-[11px] font-black text-black tracking-tight">₹{o.amount.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-center">{statusBadge(o.status)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

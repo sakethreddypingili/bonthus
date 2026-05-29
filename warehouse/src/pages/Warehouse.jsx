@@ -42,7 +42,7 @@ export default function Warehouse({ userProfile }) {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
         <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Warehouse</h1>
+          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Dashboard</h1>
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Central Inventory & Distribution</p>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-xl shadow-lg">
@@ -84,7 +84,7 @@ export default function Warehouse({ userProfile }) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm hover:border-black transition-colors">
               <div className="flex justify-between items-center mb-8 border-b border-gray-50 pb-6">
                 <div>
                   <h3 className="text-xl font-black text-black uppercase tracking-tighter">Action Required</h3>
@@ -108,7 +108,7 @@ export default function Warehouse({ userProfile }) {
               </div>
             </div>
 
-            <div className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm hover:border-black transition-colors">
               <div className="flex justify-between items-center mb-8 border-b border-gray-50 pb-6">
                 <div>
                   <h3 className="text-xl font-black text-black uppercase tracking-tighter">Stock Deficits</h3>
