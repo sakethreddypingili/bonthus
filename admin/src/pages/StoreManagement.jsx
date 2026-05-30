@@ -484,7 +484,7 @@ export default function StoreManagement({ userProfile }) {
     };
 
     return (
-        <div className="space-y-10 relative animate-in fade-in duration-500 pb-20">
+        <div className="space-y-10 relative animate-fast-slide pb-20">
             <div className="flex flex-col gap-10">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
                     <div>
@@ -858,7 +858,7 @@ export default function StoreManagement({ userProfile }) {
             </div>
 
             {(editingUser || editingTaxCat || editingStore !== null) && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden relative animate-in zoom-in-95 duration-300 border border-white/20">
                         {editingUser && (
                             <>
@@ -1037,7 +1037,7 @@ export default function StoreManagement({ userProfile }) {
             )}
 
             {creatingNewUser && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden relative animate-in zoom-in-95 duration-300 border border-white/20 max-h-[90vh] overflow-y-auto">
                         <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 sticky top-0 z-10">
                             <div>
@@ -1167,7 +1167,7 @@ export default function StoreManagement({ userProfile }) {
             )}
 
             {transferringStock && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden relative animate-in zoom-in-95 duration-300 border border-white/20 max-h-[90vh] overflow-y-auto">
                         <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 sticky top-0 z-10">
                             <div>

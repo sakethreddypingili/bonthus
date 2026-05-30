@@ -6,7 +6,15 @@ import Sidebar from "./components/common/Sidebar";
 import Topbar from "./components/common/Topbar";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
-import Products from "./pages/Products";
+import InventoryEntities from "./pages/InventoryEntities";
+import EntityDetails from "./pages/EntityDetails";
+import Categories from "./pages/Categories";
+import BarcodeCreator from "./pages/BarcodeCreator";
+import Barcodes from "./pages/Barcodes";
+import WarehouseDashboard from "./pages/WarehouseDashboard";
+import WarehouseAnalytics from "./pages/WarehouseAnalytics";
+import WarehouseStoreInsight from "./pages/WarehouseStoreInsight";
+import WarehouseShipment from "./pages/WarehouseShipment";
 import Customers from "./pages/Customers";
 import CustomerProfile from "./pages/CustomerProfile";
 import Analytics from "./pages/Analytics";
@@ -352,7 +360,15 @@ function App() {
       <Route path="/orders" element={<Orders userProfile={userProfile} />} />
       <Route path="/orders/new" element={<CreateOrder userProfile={userProfile} />} />
       <Route path="/orders/edit/:id" element={<EditOrder userProfile={userProfile} />} />
-      <Route path="/products" element={<Products userProfile={userProfile} />} />
+      <Route path="/inventory-entities" element={<InventoryEntities userProfile={userProfile} />} />
+      <Route path="/inventory-entities/:id" element={<EntityDetails userProfile={userProfile} />} />
+      <Route path="/categories" element={<Categories userProfile={userProfile} />} />
+      <Route path="/barcode-creator" element={<BarcodeCreator userProfile={userProfile} />} />
+      <Route path="/barcodes" element={<Barcodes userProfile={userProfile} />} />
+      <Route path="/warehouse" element={<WarehouseDashboard userProfile={userProfile} />} />
+      <Route path="/warehouse/analytics" element={<WarehouseAnalytics userProfile={userProfile} />} />
+      <Route path="/warehouse/store" element={<WarehouseStoreInsight userProfile={userProfile} />} />
+      <Route path="/warehouse/shipment" element={<WarehouseShipment userProfile={userProfile} />} />
       <Route path="/customers" element={<Customers userProfile={userProfile} />} />
       <Route path="/customers/:id" element={<CustomerProfile userProfile={userProfile} />} />
       <Route path="/analytics" element={<Analytics userProfile={userProfile} />} />

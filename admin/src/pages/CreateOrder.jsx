@@ -1057,7 +1057,7 @@ export default function CreateOrder({ userProfile }) {
         setShowPaymentModal(true);
     };
     return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
+        <div className="max-w-6xl mx-auto space-y-8 animate-fast-slide pb-20">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
                 <div className="flex items-center gap-4">
                     <button
@@ -1420,8 +1420,8 @@ export default function CreateOrder({ userProfile }) {
 
             {/* Add Product Modal */}
             {showAddProductModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-fast-zoom">
                         <div className="p-8 space-y-6">
                             <div className="flex justify-between items-center">
                                 <h2 className="text-2xl font-black text-black uppercase tracking-tighter">New Entity</h2>
@@ -1477,8 +1477,8 @@ export default function CreateOrder({ userProfile }) {
 
             {/* Prescription Modal */}
             {showPrescriptionModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+                <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-fast-zoom">
                         <div className="p-8 space-y-8">
                             <div className="flex justify-between items-center border-b border-gray-50 pb-6">
                                 <div>
@@ -1608,8 +1608,8 @@ export default function CreateOrder({ userProfile }) {
 
             {/* Payment Details Modal */}
             {showPaymentModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[120] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+                <div className="fixed inset-0 bg-black/60 z-[120] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl overflow-hidden animate-fast-zoom">
                         <div className="p-8 space-y-8">
                             <div className="flex justify-between items-center border-b border-gray-50 pb-6">
                                 <div>

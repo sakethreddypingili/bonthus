@@ -546,7 +546,7 @@ export default function EditOrder({ userProfile }) {
     const grossTotal = subtotal - totalDiscount;
 
     return (
-        <div className="max-w-6xl mx-auto space-y-10 pb-20 animate-in fade-in duration-500">
+        <div className="max-w-6xl mx-auto space-y-10 pb-20 animate-fast-slide">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-10 border-b border-gray-100">
                 <div className="flex items-center gap-6">
@@ -878,7 +878,7 @@ export default function EditOrder({ userProfile }) {
 
             {/* Prescription Modal */}
             {showPrescriptionModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-[32px] w-full max-w-2xl shadow-2xl relative overflow-hidden border border-white/20">
                         <div className="p-8 border-b border-gray-100 flex items-center justify-between">
                             <div>
@@ -994,7 +994,7 @@ export default function EditOrder({ userProfile }) {
 
             {/* Eye Power Modal - Order Level */}
             {showEyePowerModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-[32px] w-full max-w-[700px] shadow-2xl overflow-hidden border border-white/20">
                         <div className="p-6 border-b border-gray-100 flex items-center justify-between">
                             <div>
@@ -1168,7 +1168,7 @@ export default function EditOrder({ userProfile }) {
 
             {/* Disable Order Modal */}
             {showDisableModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-[32px] w-full max-w-md p-10 shadow-2xl border border-white/20">
                         <div className="flex items-center justify-center w-20 h-20 rounded-[24px] bg-black mx-auto mb-8 shadow-xl">
                             <AlertCircle className="text-white" size={40} strokeWidth={3} />
@@ -1202,7 +1202,7 @@ export default function EditOrder({ userProfile }) {
 
             {/* Add Product Modal */}
             {showAddProductModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden border border-white/20">
                         <div className="p-10">
                             <div className="flex justify-between items-start mb-10">

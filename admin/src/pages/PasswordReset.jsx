@@ -59,7 +59,7 @@ export default function PasswordReset({ userProfile, onPasswordReset }) {
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-[32px] shadow-2xl border border-gray-100 overflow-hidden animate-in zoom-in duration-500">
+      <div className="max-w-md w-full bg-white rounded-[32px] shadow-2xl border border-gray-100 overflow-hidden animate-fast-zoom">
         <div className="p-10">
           <div className="flex flex-col items-center text-center mb-10">
             <div className="w-20 h-20 bg-black text-white rounded-[24px] flex items-center justify-center mb-6 shadow-xl">

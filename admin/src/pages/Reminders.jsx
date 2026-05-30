@@ -63,7 +63,7 @@ export default function Reminders({ userProfile }) {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-8 animate-fast-slide pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
         <div>
           <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Board</h1>
@@ -118,7 +118,7 @@ export default function Reminders({ userProfile }) {
 
       {/* Append Schedule Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden border border-white/20">
             <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div>

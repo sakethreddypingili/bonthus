@@ -93,7 +93,7 @@ export default function Customers({ userProfile }) {
   function handleSearch(e) { setSearch(e.target.value); setPage(1); }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-fast-slide">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
         <div>

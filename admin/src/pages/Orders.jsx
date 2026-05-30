@@ -250,7 +250,7 @@ export default function Orders({ userProfile }) {
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-fast-slide">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
         <div>
@@ -446,7 +446,7 @@ export default function Orders({ userProfile }) {
 
       {/* Modals - Simplified & Monochromatic */}
       {editingOrder && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-white/20">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <div>
@@ -544,7 +544,7 @@ export default function Orders({ userProfile }) {
 
       {/* Clear Due Payment Modal */}
       {showPaymentModal && editingOrder && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden border border-white/20">
             {/* Header */}
             <div className="bg-gray-50/50 px-8 py-6 border-b border-gray-100 flex justify-between items-start">
@@ -678,7 +678,7 @@ export default function Orders({ userProfile }) {
 
       {/* Disable/Enable Modal */}
       {showDisableModal && selectedOrderForAction && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden border border-white/20">
             {/* Header */}
             <div className="bg-gray-50/50 px-8 py-6 border-b border-gray-100 flex justify-between items-start">
@@ -746,7 +746,7 @@ export default function Orders({ userProfile }) {
 
       {/* Confirmation Modal */}
       {showConfirmModal && selectedOrderForAction && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden border border-white/20">
             {/* Header */}
             <div className="bg-gray-50/50 px-8 py-6 border-b border-gray-100">
@@ -831,7 +831,7 @@ export default function Orders({ userProfile }) {
 
       {/* Customer Lookup Modal */}
       {showCustomerModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-[32px] w-full max-w-sm shadow-2xl overflow-hidden p-8 border border-white/20">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-black rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl">

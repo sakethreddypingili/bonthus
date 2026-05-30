@@ -23,19 +23,19 @@
 
 @layer components {
   .stat-card {
-    @apply bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition-shadow duration-200;
+    @apply bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition-all duration-150;
   }
   .btn-primary {
-    @apply bg-primaryNavy text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-opacity-90 transition-all shadow-md cursor-pointer;
+    @apply bg-primaryNavy text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-opacity-90 shadow-md cursor-pointer transition-all duration-150;
   }
   .btn-secondary {
-    @apply bg-white text-primaryNavy border border-primaryNavy px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-all cursor-pointer;
+    @apply bg-white text-primaryNavy border border-primaryNavy px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-50 cursor-pointer transition-all duration-150;
   }
   .btn-teal {
-    @apply bg-accentTeal text-white px-4 py-2 rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity cursor-pointer;
+    @apply bg-accentTeal text-white px-4 py-2 rounded-lg font-semibold text-sm hover:opacity-90 cursor-pointer transition-opacity duration-150;
   }
   .btn-outline {
-    @apply border border-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors cursor-pointer;
+    @apply border border-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-50 cursor-pointer transition-colors duration-150;
   }
   .badge-success { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700; }
   .badge-warning { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700; }
@@ -43,13 +43,13 @@
   .badge-info    { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700; }
   .badge-neutral { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600; }
   .input-field {
-    @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accentTeal/30 focus:border-accentTeal transition-all bg-white;
+    @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accentTeal/30 focus:border-accentTeal bg-white transition-all duration-150;
   }
   .page-title { @apply text-xl font-bold text-primaryNavy; }
   .page-subtitle { @apply text-sm text-gray-500 mt-0.5; }
   .section-card { @apply bg-white rounded-xl border border-gray-200 overflow-hidden; }
   .lenskart-card {
-    @apply bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-float transition-all duration-300;
+    @apply bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-float transition-all duration-150;
   }
   .text-outline {
     -webkit-text-stroke: 1px #333333;
@@ -60,36 +60,39 @@
 /* Table styles */
 @layer components {
   .table-row {
-    @apply border-b border-gray-100 hover:bg-gray-50 transition-colors;
+    @apply border-b border-gray-100 hover:bg-gray-50 transition-colors duration-150;
   }
   .table-row:last-child {
     @apply border-b-0;
   }
 }
 
-/* Custom animations */
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-slideDown {
-  animation: slideDown 0.3s ease-out forwards;
-}
-
-@keyframes fadeIn {
+/* Lightning-Fast Animations (100-150ms) */
+@keyframes fastFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-.animate-fadeIn {
-  animation: fadeIn 0.2s ease-in forwards;
+@keyframes fastSlideUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fastZoom {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fast-fade {
+  animation: fastFadeIn 100ms ease-out forwards;
+}
+
+.animate-fast-slide {
+  animation: fastSlideUp 120ms cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+.animate-fast-zoom {
+  animation: fastZoom 100ms cubic-bezier(0, 0, 0.2, 1) forwards;
 }
 
 /* Custom Autofill Styles for Black & White Theme */
@@ -102,4 +105,3 @@ input:-webkit-autofill:active {
   border-color: black !important;
   transition: background-color 5000s ease-in-out 0s;
 }
-
