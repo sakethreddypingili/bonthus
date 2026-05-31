@@ -1,28 +1,61 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
-  QrCode, Search, Download, Printer, Settings2, 
-  Layers, ScanBarcode, CheckCircle2, AlertCircle, PieChart, BarChart
+  QrCode, Search, ScanBarcode, CheckCircle2
 } from 'lucide-react';
+import { supabase } from '../server/supabase/supabase';
 
-const MOCK_BARCODES = [
-  { id:"V-1001", barcode:"8901234567890", entityId:"W-10492", entityName:"RayBan Aviator Classic", status:"assigned", date:"2026-05-10" },
-  { id:"V-1002", barcode:"8901234567891", entityId:"W-10493", entityName:"Acuvue Oasys Monthly", status:"assigned", date:"2026-05-12" },
-  { id:"V-1003", barcode:"8901234567892", entityId:"W-10494", entityName:"Zeiss Anti-Reflective Lens", status:"assigned", date:"2026-05-15" },
-  { id:"V-1005", barcode:"8901234567894", entityId: null, entityName: null, status:"unassigned", date:"2026-05-20" },
-  { id:"V-1006", barcode:"8901234567895", entityId: null, entityName: null, status:"unassigned", date:"2026-05-20" },
-];
-
-export default function Barcodes() {
+export default function Barcodes({ userProfile }) {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [barcodes, setBarcodes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || userProfile?.store_name === 'All';
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchBarcodes = async () => {
+      setLoading(true);
+      setErrorMsg("");
+      try {
+        let query = supabase
+          .from("barcode_vectors")
+          .select("id, barcode, entity_id, entity_name, status, created_at, store_id")
+          .order("created_at", { ascending: false });
+
+        if (!isSuperAdmin && userProfile?.store_id) {
+          query = query.eq("store_id", userProfile.store_id);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        if (!isMounted) return;
+        setBarcodes((data || []).map((item) => ({
+          ...item,
+          entityId: item.entity_id,
+          entityName: item.entity_name,
+          date: item.created_at ? item.created_at.split("T")[0] : "-"
+        })));
+      } catch (err) {
+        if (!isMounted) return;
+        setErrorMsg(err.message || "Failed to fetch barcodes.");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchBarcodes();
+    return () => { isMounted = false; };
+  }, [isSuperAdmin, userProfile?.store_id]);
 
   const stats = {
-    total: MOCK_BARCODES.length,
-    assigned: MOCK_BARCODES.filter(b => b.status ==="assigned").length,
-    unassigned: MOCK_BARCODES.filter(b => b.status ==="unassigned").length
+    total: barcodes.length,
+    assigned: barcodes.filter(b => b.status === "assigned").length,
+    unassigned: barcodes.filter(b => b.status === "unassigned").length
   };
 
-  const filtered = MOCK_BARCODES.filter(b => {
+  const filtered = barcodes.filter(b => {
     if (activeTab !=="all" && b.status !== activeTab) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -112,7 +145,21 @@ export default function Barcodes() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map(b => (
+              {loading && (
+                <tr>
+                  <td colSpan={5} className="px-8 py-20 text-center">
+                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Loading vectors...</p>
+                  </td>
+                </tr>
+              )}
+              {!loading && errorMsg && (
+                <tr>
+                  <td colSpan={5} className="px-8 py-20 text-center">
+                    <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">{errorMsg}</p>
+                  </td>
+                </tr>
+              )}
+              {!loading && !errorMsg && filtered.map(b => (
                 <tr key={b.id} className="hover:bg-black hover:text-white   group text-black">
                   <td className="px-8 py-6 font-mono text-[11px] font-black">{b.id}</td>
                   <td className="px-8 py-6 font-mono text-[11px] font-black tracking-widest border-x border-transparent">
@@ -140,7 +187,7 @@ export default function Barcodes() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
+              {!loading && !errorMsg && filtered.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-8 py-20 text-center">
                     <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Zero vectors matched audit criteria</p>

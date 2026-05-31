@@ -1,36 +1,55 @@
 import React, { useState } from 'react';
-import { Plus, Search, Layers, ScanBarcode, QrCode, Download, Printer, CheckCircle2 } from 'lucide-react';
+import { Plus, QrCode, Download, Printer } from 'lucide-react';
+import { supabase } from '../server/supabase/supabase';
 
-const MOCK_BARCODES = [
-  { id:"V-1005", barcode:"8901234567894", status:"unassigned" },
-  { id:"V-1006", barcode:"8901234567895", status:"unassigned" },
-];
-
-export default function BarcodeCreator() {
+export default function BarcodeCreator({ userProfile }) {
   const [generateMode, setGenerateMode] = useState("bulk"); //"single" or"bulk"
   const [quantity, setQuantity] = useState(10);
   const [createdBarcodes, setCreatedBarcodes] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [notice, setNotice] = useState("");
 
-  const handleGenerate = (e) => {
+  const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || userProfile?.store_name === 'All';
+
+  const generateBarcodeValue = () => {
+    const randomDigits = Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
+    return `8901${randomDigits}`;
+  };
+
+  const handleGenerate = async (e) => {
     e.preventDefault();
+    setNotice("");
     setIsGenerating(true);
-    
-    // Simulate generation delay
-    setTimeout(() => {
-      const count = generateMode ==="single" ? 1 : parseInt(quantity, 10);
-      const newVectors = [];
-      for (let i = 0; i < count; i++) {
-        const newBarcodeVal ="8901" + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
-        newVectors.push({
-          id: `V-${Date.now() + i}`,
-          barcode: newBarcodeVal,
-          status:"unassigned"
-        });
+    try {
+      const targetStoreId = userProfile?.store_id;
+      if (!targetStoreId && !isSuperAdmin) throw new Error("Store not found for current user.");
+
+      const countRaw = generateMode === "single" ? 1 : parseInt(quantity, 10);
+      const count = Number.isNaN(countRaw) ? 1 : Math.max(1, Math.min(500, countRaw));
+      const generated = new Set();
+      while (generated.size < count) {
+        generated.add(generateBarcodeValue());
       }
-      setCreatedBarcodes(newVectors);
+
+      const payload = Array.from(generated).map((barcode) => ({
+        barcode,
+        status: "unassigned",
+        store_id: targetStoreId || null
+      }));
+
+      const { data, error } = await supabase
+        .from("barcode_vectors")
+        .insert(payload)
+        .select("id, barcode, status, created_at");
+
+      if (error) throw error;
+      setCreatedBarcodes(data || []);
+      setNotice(`Created ${data?.length || 0} barcode vectors.`);
+    } catch (err) {
+      setNotice(err.message || "Failed to create barcode vectors.");
+    } finally {
       setIsGenerating(false);
-    }, 800);
+    }
   };
 
   return (
@@ -39,6 +58,7 @@ export default function BarcodeCreator() {
         <div>
           <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Barcode Creator</h1>
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Deploy new operational barcode vectors</p>
+          {notice && <p className="text-[10px] font-black uppercase tracking-widest mt-2 text-gray-500">{notice}</p>}
         </div>
       </div>
 

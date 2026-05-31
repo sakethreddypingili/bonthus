@@ -85,6 +85,8 @@ CREATE TABLE IF NOT EXISTS attendance_qr_codes (
   id BIGSERIAL PRIMARY KEY,
   code TEXT UNIQUE NOT NULL,
   store_id TEXT REFERENCES store(id),
+  qr_type TEXT DEFAULT 'check_in',
+  valid_date DATE DEFAULT CURRENT_DATE,
   expires_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -214,6 +216,20 @@ CREATE TABLE IF NOT EXISTS shipments (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+-- Barcode Management
+CREATE TABLE IF NOT EXISTS barcode_vectors (
+  id TEXT PRIMARY KEY DEFAULT gen_id('V-', 6),
+  barcode TEXT UNIQUE NOT NULL,
+  store_id TEXT REFERENCES store(id),
+  entity_type TEXT,
+  entity_id TEXT,
+  entity_name TEXT,
+  status TEXT DEFAULT 'unassigned',
+  created_by UUID REFERENCES auth_users(id),
+  assigned_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
 -- Operational Scheduling
 CREATE TABLE IF NOT EXISTS tasks (
   id BIGSERIAL PRIMARY KEY,
@@ -236,6 +252,9 @@ CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_eye_power_customer ON eye_power(customer_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_qr_store_date_type ON attendance_qr_codes(store_id, valid_date, qr_type);
+CREATE INDEX IF NOT EXISTS idx_barcode_vectors_store ON barcode_vectors(store_id);
+CREATE INDEX IF NOT EXISTS idx_barcode_vectors_status ON barcode_vectors(status);
 
 -- 4. ROW LEVEL SECURITY (RLS)
 ALTER TABLE store ENABLE ROW LEVEL SECURITY;
@@ -253,6 +272,7 @@ ALTER TABLE eye_power ENABLE ROW LEVEL SECURITY;
 ALTER TABLE voucher ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shipments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE barcode_vectors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
 -- 5. POLICIES (AUTHENTICATED ACCESS)
