@@ -66,7 +66,7 @@ async function run() {
 
   const projectRef = getProjectRef(supabaseUrl);
   if (!projectRef) {
-    console.error(`Invalid SUPABASE_URL: ${supabaseUrl}`);
+    console.error('Invalid SUPABASE_URL format.');
     process.exit(1);
   }
 
