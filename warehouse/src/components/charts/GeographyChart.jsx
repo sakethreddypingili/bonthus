@@ -1,8 +1,8 @@
-import { useTheme } from "@mui/material";
-import { ResponsiveChoropleth } from "@nivo/geo";
-import { geoFeatures } from "../../server/database/mocks/mockGeoFeatures";
-import { tokens } from "../theme";
-import { mockGeographyData as data } from "../../server/database/mocks/mockData";
+import { useTheme } from"@mui/material";
+import { ResponsiveChoropleth } from"@nivo/geo";
+import { geoFeatures } from"../../server/database/mocks/mockGeoFeatures";
+import { tokens } from"../theme";
+import { mockGeographyData as data } from"../../server/database/mocks/mockData";
 
 const GeographyChart = ({ isDashboard = false }) => {
   const theme = useTheme();
@@ -53,23 +53,23 @@ const GeographyChart = ({ isDashboard = false }) => {
         !isDashboard
           ? [
               {
-                anchor: "bottom-left",
-                direction: "column",
+                anchor:"bottom-left",
+                direction:"column",
                 justify: true,
                 translateX: 20,
                 translateY: -100,
                 itemsSpacing: 0,
                 itemWidth: 94,
                 itemHeight: 18,
-                itemDirection: "left-to-right",
+                itemDirection:"left-to-right",
                 itemTextColor: colors.grey[100],
                 itemOpacity: 0.85,
                 symbolSize: 18,
                 effects: [
                   {
-                    on: "hover",
+                    on:"hover",
                     style: {
-                      itemTextColor: "#ffffff",
+                      itemTextColor:"#ffffff",
                       itemOpacity: 1,
                     },
                   },

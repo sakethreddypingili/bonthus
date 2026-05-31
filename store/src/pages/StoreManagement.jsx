@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { UserPlus, Edit2, X, Save, CheckCircle2, AlertCircle, Info, ArrowRightLeft, Search, Loader2, Plus, Building2, Percent, ChevronDown } from "lucide-react";
+import SlideDrawer from '../components/common/SlideDrawer';
 import { supabase } from "../server/supabase/supabase";
 import { supabaseAdmin } from "../server/supabase/supabaseAdmin";
 import { ROLES_FOR_SUPER_ADMIN, ROLES_FOR_ADMIN } from "../server/database/mocks/constants";
@@ -854,273 +855,43 @@ export default function StoreManagement({ userProfile }) {
                 </div>
             </div>
 
-            {(editingUser || editingTaxCat || editingStore !== null) && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden relative animate-in zoom-in-95 duration-300 border border-white/20">
-                        {editingUser && (
-                            <>
-                                <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                                    <div>
-                                        <h3 className="text-2xl font-black text-black uppercase tracking-tighter">Modify Access</h3>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{editingUser.email}</p>
-                                    </div>
-                                    <button onClick={handleCancelEdit} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-all">
-                                        <X size={24} strokeWidth={3} />
-                                    </button>
-                                </div>
-                                <div className="p-8">
-                                    <form onSubmit={handleUpdateUser} className="space-y-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Clearance Level</label>
-                                            <div className="relative group">
-                                                <select
-                                                    value={editingUser.role}
-                                                    onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
-                                                    className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
-                                                >
-                                                    {availableRoles.map(r => (
-                                                        <option key={r.value} value={r.value}>{r.label}</option>
-                                                    ))}
-                                                    {isSuperAdmin && (
-                                                        <option value="super_admin">Super Admin</option>
-                                                    )}
-                                                </select>
-                                                <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Deployment Zone</label>
-                                            <div className="relative group">
-                                                <select
-                                                    value={editingUser.store_id || ''}
-                                                    onChange={e => setEditingUser({ ...editingUser, store_id: e.target.value })}
-                                                    className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
-                                                >
-                                                    <option value="">Global Command</option>
-                                                    {stores.map(s => (
-                                                        <option key={s.id} value={s.id}>{s.name}</option>
-                                                    ))}
-                                                </select>
-                                                <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Operational State</label>
-                                            <div className="relative group">
-                                                <select
-                                                    value={editingUser.status || 'active'}
-                                                    onChange={e => setEditingUser({ ...editingUser, status: e.target.value })}
-                                                    className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
-                                                >
-                                                    <option value="active">Active Entity</option>
-                                                    <option value="inactive">Suspended State</option>
-                                                </select>
-                                                <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
-                                            </div>
-                                        </div>
-                                        <div className="pt-8 flex items-center gap-3 border-t border-gray-50">
-                                            <button type="button" onClick={handleCancelEdit} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
-                                            <button type="submit" className="flex-1 py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all">
-                                                Commit Specs
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </>
-                        )}
-
-                        {editingStore !== null && (
-                            <>
-                                <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                                    <div>
-                                        <h3 className="text-2xl font-black text-black uppercase tracking-tighter">{editingStore.id ? 'Edit Unit' : 'Initialize Unit'}</h3>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Infrastructure Configuration</p>
-                                    </div>
-                                    <button onClick={() => { setEditingStore(null); setNewStore({ name: '', address: '', gst_no: '', phone_no: '' }); }} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-all">
-                                        <X size={24} strokeWidth={3} />
-                                    </button>
-                                </div>
-                                <div className="p-8">
-                                    <form onSubmit={handleSaveStore} className="space-y-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Entity Name</label>
-                                            <input required type="text" value={newStore.name} onChange={e => setNewStore({ ...newStore, name: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all" placeholder="Store Identification..." />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">GST Identification</label>
-                                                <input type="text" value={newStore.gst_no} onChange={e => setNewStore({ ...newStore, gst_no: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all uppercase" placeholder="36AANCB..." />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Contact Link</label>
-                                                <input type="text" value={newStore.phone_no} onChange={e => setNewStore({ ...newStore, phone_no: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all" placeholder="+91 ..." />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Operational Address</label>
-                                            <input required type="text" value={newStore.address} onChange={e => setNewStore({ ...newStore, address: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all" placeholder="Physical location Link..." />
-                                        </div>
-                                        <div className="pt-8 flex items-center gap-3 border-t border-gray-50">
-                                            <button type="button" onClick={() => { setEditingStore(null); setNewStore({ name: '', address: '', gst_no: '', phone_no: '' }); }} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
-                                            <button type="submit" disabled={creatingStore} className="flex-1 py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all">
-                                                {creatingStore ? 'Syncing...' : (editingStore.id ? 'Update Unit' : 'Deploy Unit')}
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </>
-                        )}
-
-                        {editingTaxCat && (
-                            <>
-                                <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                                    <div>
-                                        <h3 className="text-2xl font-black text-black uppercase tracking-tighter">Tax Protocol</h3>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Classification: {editingTaxCat.name}</p>
-                                    </div>
-                                    <button onClick={() => setEditingTaxCat(null)} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-all">
-                                        <X size={24} strokeWidth={3} />
-                                    </button>
-                                </div>
-                                <div className="p-8">
-                                    <form onSubmit={handleSaveTax} className="space-y-8">
-                                        <div className="grid grid-cols-1 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">CGST Coefficient (%)</label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    required
-                                                    value={taxForm.cgst}
-                                                    onChange={e => setTaxForm({ ...taxForm, cgst: e.target.value })}
-                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[18px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">SGST Coefficient (%)</label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    required
-                                                    value={taxForm.sgst}
-                                                    onChange={e => setTaxForm({ ...taxForm, sgst: e.target.value })}
-                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[18px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">IGST Coefficient (%)</label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    required
-                                                    value={taxForm.igst}
-                                                    onChange={e => setTaxForm({ ...taxForm, igst: e.target.value })}
-                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[18px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="pt-8 flex items-center gap-3 border-t border-gray-50">
-                                            <button type="button" onClick={() => setEditingTaxCat(null)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Discard</button>
-                                            <button type="submit" disabled={savingTax} className="flex-1 py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all">
-                                                {savingTax ? "Syncing..." : "Update Vector"}
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {creatingNewUser && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden relative animate-in zoom-in-95 duration-300 border border-white/20 max-h-[90vh] overflow-y-auto">
-                        <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 sticky top-0 z-10">
-                            <div>
-                                <h3 className="text-2xl font-black text-black uppercase tracking-tighter">New Operator</h3>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Access Credential Generation</p>
-                            </div>
-                            <button onClick={() => { setCreatingNewUser(false); setNewUser({ email: '', password: '', role: 'store_manager', store_id: stores[0]?.id || '' }); }} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-all">
-                                <X size={24} strokeWidth={3} />
-                            </button>
-                        </div>
-                        <div className="p-8">
-                            <form onSubmit={handleCreateUser} className="space-y-8">
+            <SlideDrawer
+                isOpen={!!editingUser || !!editingTaxCat || editingStore !== null}
+                onClose={handleCancelEdit}
+                title={editingUser ? "Modify Access" : editingStore !== null ? (editingStore.id ? 'Edit Unit' : 'Initialize Unit') : "Tax Protocol"}
+                subtitle={editingUser ? editingUser.email : editingStore !== null ? "Infrastructure Configuration" : `Classification: ${editingTaxCat?.name}`}
+            >
+                <div className="flex flex-col h-full">
+                    {editingUser && (
+                        <div className="">
+                            <form onSubmit={handleUpdateUser} className="space-y-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Email Designation</label>
-                                    <input
-                                        type="email"
-                                        required
-                                        value={newUser.email}
-                                        onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-                                        placeholder="operator@lenscare.in"
-                                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                    />
-                                </div>
-                                <div className="space-y-6 p-6 bg-gray-50 rounded-[32px] border border-gray-100 shadow-inner">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-[10px] font-black text-black uppercase tracking-[0.2em]">Security Vector</label>
-                                        <div className="flex bg-white p-1 rounded-xl border border-gray-100 shadow-sm">
-                                            <button
-                                                type="button"
-                                                onClick={() => setNewUser({ ...newUser, useDefaultPassword: true, password: 'Welcome@123' })}
-                                                className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${newUser.useDefaultPassword ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}
-                                            >
-                                                Standard
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setNewUser({ ...newUser, useDefaultPassword: false, password: '' })}
-                                                className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${!newUser.useDefaultPassword ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}
-                                            >
-                                                Custom
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {newUser.useDefaultPassword ? (
-                                        <div className="flex items-center justify-between px-5 py-4 bg-white rounded-2xl border border-dashed border-gray-200">
-                                            <span className="text-[11px] font-mono font-black text-black uppercase tracking-widest">Welcome@123</span>
-                                            <span className="text-[8px] font-black text-white bg-black px-2 py-0.5 rounded-full uppercase tracking-tighter">System Standard</span>
-                                        </div>
-                                    ) : (
-                                        <input
-                                            required
-                                            type="password"
-                                            value={newUser.password}
-                                            onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-                                            placeholder="Assign private vector..."
-                                            className="w-full bg-white border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                                        />
-                                    )}
-                                    <p className="text-[9px] text-gray-400 italic font-bold uppercase tracking-tight text-center">Protocol: Reset required on initial access.</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Assigned Clearance</label>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Clearance Level</label>
                                     <div className="relative group">
                                         <select
-                                            value={newUser.role}
-                                            onChange={e => setNewUser({ ...newUser, role: e.target.value })}
+                                            value={editingUser.role}
+                                            onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
                                             className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
                                         >
-                                            <option value="" disabled>Select Clearance</option>
                                             {availableRoles.map(r => (
                                                 <option key={r.value} value={r.value}>{r.label}</option>
                                             ))}
+                                            {isSuperAdmin && (
+                                                <option value="super_admin">Super Admin</option>
+                                            )}
                                         </select>
                                         <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Assigned Unit</label>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Deployment Zone</label>
                                     <div className="relative group">
                                         <select
-                                            value={newUser.store_id || ''}
-                                            onChange={e => setNewUser({ ...newUser, store_id: e.target.value })}
+                                            value={editingUser.store_id || ''}
+                                            onChange={e => setEditingUser({ ...editingUser, store_id: e.target.value })}
                                             className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
                                         >
-                                            <option value="">No Unit Assigned</option>
+                                            <option value="">Global Command</option>
                                             {stores.map(s => (
                                                 <option key={s.id} value={s.id}>{s.name}</option>
                                             ))}
@@ -1128,152 +899,350 @@ export default function StoreManagement({ userProfile }) {
                                         <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
                                     </div>
                                 </div>
-                                <div className="pt-8 flex flex-col gap-3 border-t border-gray-50">
-                                    <button
-                                        type="submit"
-                                        disabled={creating || availableRoles.length === 0}
-                                        className="w-full py-5 bg-black text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20"
-                                    >
-                                        {creating ? "Syncing..." : "Initialize Account"}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Operational State</label>
+                                    <div className="relative group">
+                                        <select
+                                            value={editingUser.status || 'active'}
+                                            onChange={e => setEditingUser({ ...editingUser, status: e.target.value })}
+                                            className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
+                                        >
+                                            <option value="active">Active Entity</option>
+                                            <option value="inactive">Suspended State</option>
+                                        </select>
+                                        <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
+                                    </div>
+                                </div>
+                                <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
+                                    <button type="button" onClick={handleCancelEdit} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
+                                    <button type="submit" className="flex-1 py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all">
+                                        Commit Specs
                                     </button>
-                                    <button type="button" onClick={() => { setCreatingNewUser(false); setNewUser({ email: '', password: '', role: 'store_manager', store_id: stores[0]?.id || '' }); }} className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors">Discard Operation</button>
                                 </div>
                             </form>
                         </div>
-                    </div>
-                </div>
-            )}
+                    )}
 
-            {transferringStock && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden relative animate-in zoom-in-95 duration-300 border border-white/20 max-h-[90vh] overflow-y-auto">
-                        <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 sticky top-0 z-10">
-                            <div>
-                                <h3 className="text-2xl font-black text-black uppercase tracking-tighter">Inventory Vector</h3>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Cross-Unit Stock Transfer</p>
-                            </div>
-                            <button onClick={() => { setTransferringStock(false); setTransferData({ sourceStore: stores[0]?.id || 'All', destStore: '', destCategoryId: '', productId: '', productName: '', qty: 1 }); setProductSearch(''); setSearchResults([]); }} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-all">
-                                <X size={24} strokeWidth={3} />
-                            </button>
-                        </div>
-                        <div className="p-8">
-                            <form onSubmit={handleTransferStock} className="space-y-8">
-                                <div className="grid grid-cols-1 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Origin Entity</label>
-                                        <div className="relative group">
-                                            <select
-                                                value={transferData.sourceStore}
-                                                onChange={e => setTransferData({ ...transferData, sourceStore: e.target.value })}
-                                                className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
-                                                required
-                                            >
-                                                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                            </select>
-                                            <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Destination Entity</label>
-                                        <div className="relative group">
-                                            <select
-                                                value={transferData.destStore}
-                                                onChange={e => handleDestStoreChange(e.target.value)}
-                                                className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
-                                                required
-                                            >
-                                                <option value="" disabled>Select Target</option>
-                                                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                            </select>
-                                            <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
-                                        </div>
-                                    </div>
+                    {editingStore !== null && (
+                        <div className="">
+                            <form onSubmit={handleSaveStore} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Entity Name</label>
+                                    <input required type="text" value={newStore.name} onChange={e => setNewStore({ ...newStore, name: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all" placeholder="Store Identification..." />
                                 </div>
-                                {transferData.destStore && (
+                                <div className="grid grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Target Classification</label>
-                                        <div className="relative group">
-                                            <select
-                                                value={transferData.destCategoryId}
-                                                onChange={e => setTransferData({ ...transferData, destCategoryId: e.target.value })}
-                                                className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12 disabled:opacity-20"
-                                                disabled={destCategories.length === 0}
-                                                required
-                                            >
-                                                <option value="">Select Classification</option>
-                                                {destCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                            </select>
-                                            <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
-                                        </div>
-                                        {destCategories.length === 0 && (
-                                            <p className="text-[9px] text-black font-black uppercase tracking-widest mt-2 px-2 italic">Infrastructure Error: No Categories Linked.</p>
-                                        )}
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">GST Identification</label>
+                                        <input type="text" value={newStore.gst_no} onChange={e => setNewStore({ ...newStore, gst_no: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all uppercase" placeholder="36AANCB..." />
                                     </div>
-                                )}
-                                <div className="space-y-2 relative">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Entity Selection</label>
-                                    <div className="relative group">
-                                        <Search size={16} className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-black transition-colors" strokeWidth={3} />
-                                        <input
-                                            type="text"
-                                            value={productSearch}
-                                            onChange={e => handleProductSearch(e.target.value)}
-                                            placeholder="Identify Entity..."
-                                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                        />
-                                        {searchingProducts && <Loader2 size={16} className="absolute right-6 top-1/2 -translate-y-1/2 text-black animate-spin" strokeWidth={3} />}
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Contact Link</label>
+                                        <input type="text" value={newStore.phone_no} onChange={e => setNewStore({ ...newStore, phone_no: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all" placeholder="+91 ..." />
                                     </div>
-                                    {searchResults.length > 0 && (
-                                        <div className="absolute z-20 w-full mt-3 bg-white border border-gray-100 rounded-3xl shadow-2xl max-h-60 overflow-y-auto p-2 animate-in fade-in zoom-in-95 duration-200">
-                                            {searchResults.map(p => (
-                                                <div
-                                                    key={p.id}
-                                                    onClick={() => {
-                                                        setTransferData({ ...transferData, productId: p.id, productName: p.name });
-                                                        setProductSearch(p.name);
-                                                        setSearchResults([]);
-                                                    }}
-                                                    className="px-5 py-4 hover:bg-black hover:text-white rounded-2xl cursor-pointer transition-all flex justify-between items-center group"
-                                                >
-                                                    <span className="text-[11px] font-black uppercase tracking-tight">{p.name}</span>
-                                                    <span className="text-[9px] font-bold uppercase opacity-60 group-hover:opacity-100">Stock: {p.stock}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {transferData.productId && (
-                                        <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-black text-white rounded-full">
-                                            <div className="w-1 h-1 bg-white rounded-full animate-pulse" />
-                                            <span className="text-[9px] font-black uppercase tracking-widest">Locked: {transferData.productName}</span>
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Transfer Volume</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        required
-                                        value={transferData.qty}
-                                        onChange={e => setTransferData({ ...transferData, qty: parseInt(e.target.value) || 1 })}
-                                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[18px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                    />
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Operational Address</label>
+                                    <input required type="text" value={newStore.address} onChange={e => setNewStore({ ...newStore, address: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all" placeholder="Physical location Link..." />
                                 </div>
-                                <div className="pt-8 flex flex-col gap-3 border-t border-gray-50">
-                                    <button
-                                        type="submit"
-                                        disabled={transferring}
-                                        className="w-full py-5 bg-black text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20"
-                                    >
-                                        {transferring ? "Syncing..." : "Commit Vector Transfer"}
+                                <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
+                                    <button type="button" onClick={() => { setEditingStore(null); setNewStore({ name: '', address: '', gst_no: '', phone_no: '' }); }} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
+                                    <button type="submit" disabled={creatingStore} className="flex-1 py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all">
+                                        {creatingStore ? 'Syncing...' : (editingStore.id ? 'Update Unit' : 'Deploy Unit')}
                                     </button>
-                                    <button type="button" onClick={() => { setTransferringStock(false); setTransferData({ sourceStore: stores[0]?.id || 'All', destStore: '', destCategoryId: '', productId: '', productName: '', qty: 1 }); setProductSearch(''); setSearchResults([]); }} className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors">Abort Operation</button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    )}
+
+                    {editingTaxCat && (
+                        <div className="">
+                            <form onSubmit={handleSaveTax} className="space-y-8">
+                                <div className="grid grid-cols-1 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">CGST Coefficient (%)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            required
+                                            value={taxForm.cgst}
+                                            onChange={e => setTaxForm({ ...taxForm, cgst: e.target.value })}
+                                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[18px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">SGST Coefficient (%)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            required
+                                            value={taxForm.sgst}
+                                            onChange={e => setTaxForm({ ...taxForm, sgst: e.target.value })}
+                                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[18px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">IGST Coefficient (%)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            required
+                                            value={taxForm.igst}
+                                            onChange={e => setTaxForm({ ...taxForm, igst: e.target.value })}
+                                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[18px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
+                                    <button type="button" onClick={() => setEditingTaxCat(null)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Discard</button>
+                                    <button type="submit" disabled={savingTax} className="flex-1 py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all">
+                                        {savingTax ? "Syncing..." : "Update Vector"}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
                 </div>
-            )}
+            </SlideDrawer>
+
+            <SlideDrawer
+                isOpen={creatingNewUser}
+                onClose={() => { setCreatingNewUser(false); setNewUser({ emailPrefix: '', domain: '@lenscare.in', password: 'Welcome@123', useDefaultPassword: true, role: 'store_manager', store_id: stores[0]?.id || '' }); }}
+                title="New Operator"
+                subtitle="Access Credential Generation"
+            >
+                <div className="flex flex-col h-full">
+                    <form onSubmit={handleCreateUser} className="space-y-8">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Email Designation</label>
+                            <div className="flex bg-gray-50 border border-gray-100 rounded-2xl focus-within:ring-2 focus-within:ring-black/5 focus-within:border-black focus-within:bg-white transition-all overflow-hidden">
+                                <input
+                                    type="text"
+                                    required
+                                    value={newUser.emailPrefix}
+                                    onChange={e => setNewUser({ ...newUser, emailPrefix: e.target.value })}
+                                    placeholder="operator"
+                                    className="w-full px-6 py-4 bg-transparent text-[11px] font-bold tracking-widest outline-none"
+                                />
+                                <div className="bg-gray-100 px-4 py-4 flex items-center justify-center border-l border-gray-200">
+                                    <span className="text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                                        {newUser.domain}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Domain</label>
+                            <select
+                                value={newUser.domain}
+                                onChange={e => setNewUser({ ...newUser, domain: e.target.value })}
+                                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all appearance-none cursor-pointer"
+                            >
+                                <option value="@lenscare.in">@lenscare.in</option>
+                                <option value="@warehouse.lenscare.in">@warehouse.lenscare.in</option>
+                            </select>
+                        </div>
+                        <div className="space-y-6 p-6 bg-gray-50 rounded-[32px] border border-gray-100 shadow-inner">
+                            <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-black text-black uppercase tracking-[0.2em]">Security Vector</label>
+                                <div className="flex bg-white p-1 rounded-xl border border-gray-100 shadow-sm">
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewUser({ ...newUser, useDefaultPassword: true, password: 'Welcome@123' })}
+                                        className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${newUser.useDefaultPassword ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}
+                                    >
+                                        Standard
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewUser({ ...newUser, useDefaultPassword: false, password: '' })}
+                                        className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${!newUser.useDefaultPassword ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}
+                                    >
+                                        Custom
+                                    </button>
+                                </div>
+                            </div>
+
+                            {newUser.useDefaultPassword ? (
+                                <div className="flex items-center justify-between px-5 py-4 bg-white rounded-2xl border border-dashed border-gray-200">
+                                    <span className="text-[11px] font-mono font-black text-black uppercase tracking-widest">Welcome@123</span>
+                                    <span className="text-[8px] font-black text-white bg-black px-2 py-0.5 rounded-full uppercase tracking-tighter">System Standard</span>
+                                </div>
+                            ) : (
+                                <input
+                                    required
+                                    type="password"
+                                    value={newUser.password}
+                                    onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                                    placeholder="Assign private vector..."
+                                    className="w-full bg-white border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+                                />
+                            )}
+                            <p className="text-[9px] text-gray-400 italic font-bold uppercase tracking-tight text-center">Protocol: Reset required on initial access.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Assigned Clearance</label>
+                            <div className="relative group">
+                                <select
+                                    value={newUser.role}
+                                    onChange={e => setNewUser({ ...newUser, role: e.target.value })}
+                                    className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
+                                >
+                                    <option value="" disabled>Select Clearance</option>
+                                    {availableRoles.map(r => (
+                                        <option key={r.value} value={r.value}>{r.label}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Assigned Unit</label>
+                            <div className="relative group">
+                                <select
+                                    value={newUser.store_id || ''}
+                                    onChange={e => setNewUser({ ...newUser, store_id: e.target.value })}
+                                    className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
+                                >
+                                    <option value="">No Unit Assigned</option>
+                                    {stores.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
+                            </div>
+                        </div>
+                        <div className="pt-8 flex flex-col gap-3 border-t border-gray-50 mt-auto">
+                            <button
+                                type="submit"
+                                disabled={creating || availableRoles.length === 0}
+                                className="w-full py-5 bg-black text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20"
+                            >
+                                {creating ? "Syncing..." : "Initialize Account"}
+                            </button>
+                            <button type="button" onClick={() => { setCreatingNewUser(false); setNewUser({ email: '', password: '', role: 'store_manager', store_id: stores[0]?.id || '' }); }} className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors">Discard Operation</button>
+                        </div>
+                    </form>
+                </div>
+            </SlideDrawer>
+
+            <SlideDrawer
+                isOpen={transferringStock}
+                onClose={() => { setTransferringStock(false); setTransferData({ sourceStore: stores[0]?.id || 'All', destStore: '', destCategoryId: '', productId: '', productName: '', qty: 1 }); setProductSearch(''); setSearchResults([]); }}
+                title="Inventory Vector"
+                subtitle="Cross-Unit Stock Transfer"
+            >
+                <div className="flex flex-col h-full">
+                    <form onSubmit={handleTransferStock} className="space-y-8">
+                        <div className="grid grid-cols-1 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Origin Entity</label>
+                                <div className="relative group">
+                                    <select
+                                        value={transferData.sourceStore}
+                                        onChange={e => setTransferData({ ...transferData, sourceStore: e.target.value })}
+                                        className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
+                                        required
+                                    >
+                                        {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
+                                    <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Destination Entity</label>
+                                <div className="relative group">
+                                    <select
+                                        value={transferData.destStore}
+                                        onChange={e => handleDestStoreChange(e.target.value)}
+                                        className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
+                                        required
+                                    >
+                                        <option value="" disabled>Select Target</option>
+                                        {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
+                                    <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
+                                </div>
+                            </div>
+                        </div>
+                        {transferData.destStore && (
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Target Classification</label>
+                                <div className="relative group">
+                                    <select
+                                        value={transferData.destCategoryId}
+                                        onChange={e => setTransferData({ ...transferData, destCategoryId: e.target.value })}
+                                        className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12 disabled:opacity-20"
+                                        disabled={destCategories.length === 0}
+                                        required
+                                    >
+                                        <option value="">Select Classification</option>
+                                        {destCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                    <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
+                                </div>
+                                {destCategories.length === 0 && (
+                                    <p className="text-[9px] text-black font-black uppercase tracking-widest mt-2 px-2 italic">Infrastructure Error: No Categories Linked.</p>
+                                )}
+                            </div>
+                        )}
+                        <div className="space-y-2 relative">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Entity Selection</label>
+                            <div className="relative group">
+                                <Search size={16} className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-black transition-colors" strokeWidth={3} />
+                                <input
+                                    type="text"
+                                    value={productSearch}
+                                    onChange={e => handleProductSearch(e.target.value)}
+                                    placeholder="Identify Entity..."
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+                                />
+                                {searchingProducts && <Loader2 size={16} className="absolute right-6 top-1/2 -translate-y-1/2 text-black animate-spin" strokeWidth={3} />}
+                            </div>
+                            {searchResults.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl max-h-60 overflow-y-auto z-50">
+                                    {searchResults.map(p => (
+                                        <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setTransferData({ ...transferData, productId: p.id, productName: p.name });
+                                                setProductSearch(p.name);
+                                                setSearchResults([]);
+                                            }}
+                                            className="w-full text-left px-5 py-4 hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                                        >
+                                            <div className="text-[11px] font-black text-black uppercase tracking-tight">{p.name}</div>
+                                            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Avail: {p.stock} Units</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Transfer Volume</label>
+                            <input
+                                type="number"
+                                min="1"
+                                required
+                                value={transferData.qty}
+                                onChange={e => setTransferData({ ...transferData, qty: parseInt(e.target.value) || 1 })}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[18px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+                            />
+                        </div>
+                        <div className="pt-8 flex flex-col gap-3 border-t border-gray-50 mt-auto">
+                            <button
+                                type="submit"
+                                disabled={transferring}
+                                className="w-full py-5 bg-black text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20"
+                            >
+                                {transferring ? "Syncing..." : "Commit Vector Transfer"}
+                            </button>
+                            <button type="button" onClick={() => { setTransferringStock(false); setTransferData({ sourceStore: stores[0]?.id || 'All', destStore: '', destCategoryId: '', productId: '', productName: '', qty: 1 }); setProductSearch(''); setSearchResults([]); }} className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors">Abort Operation</button>
+                        </div>
+                    </form>
+                </div>
+            </SlideDrawer>
 
             {notification && (
                 <div className="fixed inset-0 flex items-center justify-center p-4 z-[70] pointer-events-none">

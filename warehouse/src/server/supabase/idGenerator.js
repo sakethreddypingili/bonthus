@@ -14,4 +14,6 @@ export const ID_RULES = {
     PRODUCTS: { prefix: 'PL-', digits: 6 },
     ORDERS: { prefix: 'OD-', digits: 6 },
     ORDER_ITEMS: { prefix: 'OL-', digits: 8 },
+    PROVIDERS: { prefix: 'PV-', digits: 6 },
+    SHIPMENTS: { prefix: 'SH-', digits: 6 },
 };

@@ -95,6 +95,23 @@
   animation: fastZoom 100ms cubic-bezier(0, 0, 0.2, 1) forwards;
 }
 
+/* New Modal Animations */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes slideInUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes scaleInCenter {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+.animate-slide-in-right  { animation: slideInRight  220ms cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+.animate-slide-in-up     { animation: slideInUp     200ms cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+.animate-scale-in-center { animation: scaleInCenter 180ms cubic-bezier(0, 0, 0.2, 1) forwards; }
+
 /* Custom Autofill Styles for Black & White Theme */
 input:-webkit-autofill,
 input:-webkit-autofill:hover, 
@@ -105,3 +122,55 @@ input:-webkit-autofill:active {
   border-color: black !important;
   transition: background-color 5000s ease-in-out 0s;
 }
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-in forwards;
+}
+
+/* New Modal Animations */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes slideInUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes scaleInCenter {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+.animate-slide-in-right  { animation: slideInRight  220ms cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+.animate-slide-in-up     { animation: slideInUp     200ms cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+.animate-scale-in-center { animation: scaleInCenter 180ms cubic-bezier(0, 0, 0.2, 1) forwards; }
+
+/* Custom Autofill Styles for Black & White Theme */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px white inset !important;
+  -webkit-text-fill-color: black !important;
+  border-color: black !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+

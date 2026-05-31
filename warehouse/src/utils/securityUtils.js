@@ -79,7 +79,7 @@ export const escapeSpecialChars = (str) => {
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
-    "'": '&#039;',
+"'": '&#039;',
     '/': '&#x2F;'
   };
   return str.replace(/[&<>"'\/]/g, (char) => map[char]);

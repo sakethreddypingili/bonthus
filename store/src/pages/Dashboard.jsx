@@ -62,11 +62,11 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const NoDataOverlay = ({ message = "No data available for this selection" }) => (
-  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm z-10 rounded-xl">
-    <div className="p-4 bg-black rounded-2xl mb-3 shadow-lg transform rotate-3">
-      <LayoutDashboard size={24} className="text-white" />
+  <div className="flex flex-col items-center justify-center h-full w-full py-12">
+    <div className="p-4 bg-gray-100 rounded-2xl mb-3">
+      <LayoutDashboard size={24} className="text-gray-400" />
     </div>
-    <p className="text-[10px] font-black text-black uppercase tracking-[0.2em]">{message}</p>
+    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center px-4">{message}</p>
   </div>
 );
 
@@ -716,7 +716,7 @@ export default function Dashboard({ userProfile }) {
             <div className="h-2 w-2 rounded-full bg-black animate-pulse" />
           </div>
           
-          <div className="flex-1 w-full overflow-hidden">
+          <div className="flex-1 w-full overflow-hidden relative min-h-[200px]">
             {loading ? (
               <div className="flex items-center justify-center h-full text-[10px] font-black text-gray-400 uppercase tracking-widest">Synthesizing...</div>
             ) : isRevenueDataEmpty ? (
@@ -744,7 +744,7 @@ export default function Dashboard({ userProfile }) {
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Revenue Distribution</p>
           </div>
           
-          <div className="flex-1 w-full">
+          <div className="flex-1 w-full relative min-h-[200px]">
             {loading ? (
               <div className="flex items-center justify-center h-full text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Calculating...</div>
             ) : (isSuperAdmin && selectedStoreId === "All" ? storeSales.length === 0 : categoryData.length === 0) ? (

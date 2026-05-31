@@ -1,9 +1,9 @@
-import { useState } from "react";
-import FullCalendar, { formatDate } from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import listPlugin from "@fullcalendar/list";
+import { useState } from"react";
+import FullCalendar, { formatDate } from"@fullcalendar/react";
+import dayGridPlugin from"@fullcalendar/daygrid";
+import timeGridPlugin from"@fullcalendar/timegrid";
+import interactionPlugin from"@fullcalendar/interaction";
+import listPlugin from"@fullcalendar/list";
 import {
   Box,
   List,
@@ -11,9 +11,9 @@ import {
   ListItemText,
   Typography,
   useTheme,
-} from "@mui/material";
-import Header from "../../components/common/Header";
-import { tokens } from "../../theme";
+} from"@mui/material";
+import Header from"../../components/common/Header";
+import { tokens } from"../../theme";
 
 const Calendar = () => {
   const theme = useTheme();
@@ -65,8 +65,8 @@ const Calendar = () => {
                 key={event.id}
                 sx={{
                   backgroundColor: colors.greenAccent[500],
-                  margin: "10px 0",
-                  borderRadius: "2px",
+                  margin:"10px 0",
+                  borderRadius:"2px",
                 }}
               >
                 <ListItemText
@@ -74,9 +74,9 @@ const Calendar = () => {
                   secondary={
                     <Typography>
                       {formatDate(event.start, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
+                        year:"numeric",
+                        month:"short",
+                        day:"numeric",
                       })}
                     </Typography>
                   }
@@ -97,9 +97,9 @@ const Calendar = () => {
               listPlugin,
             ]}
             headerToolbar={{
-              left: "prev,next today",
-              center: "title",
-              right: "dayGridMonth,timeGridWeek,timeGridDay,listMonth",
+              left:"prev,next today",
+              center:"title",
+              right:"dayGridMonth,timeGridWeek,timeGridDay,listMonth",
             }}
             initialView="dayGridMonth"
             editable={true}
@@ -111,14 +111,14 @@ const Calendar = () => {
             eventsSet={(events) => setCurrentEvents(events)}
             initialEvents={[
               {
-                id: "12315",
-                title: "All-day event",
-                date: "2022-09-14",
+                id:"12315",
+                title:"All-day event",
+                date:"2022-09-14",
               },
               {
-                id: "5123",
-                title: "Timed event",
-                date: "2022-09-28",
+                id:"5123",
+                title:"Timed event",
+                date:"2022-09-28",
               },
             ]}
           />

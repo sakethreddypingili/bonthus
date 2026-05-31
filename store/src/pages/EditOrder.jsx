@@ -5,6 +5,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../server/supabase/supabase";
 import { generateId, ID_RULES } from "../server/supabase/idGenerator";
 
+import SlideDrawer from '../components/common/SlideDrawer';
+import CommandDialog from '../components/common/CommandDialog';
+import ConfirmSheet from '../components/common/ConfirmSheet';
+
 const pickBestEyePower = (eyePowerRows) => {
     if (!Array.isArray(eyePowerRows) || eyePowerRows.length === 0) return null;
 
@@ -877,419 +881,373 @@ export default function EditOrder({ userProfile }) {
             </div>
 
             {/* Prescription Modal */}
-            {showPrescriptionModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[32px] w-full max-w-2xl shadow-2xl relative overflow-hidden border border-white/20">
-                        <div className="p-8 border-b border-gray-100 flex items-center justify-between">
-                            <div>
-                                <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Technical Specs</h2>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Optometric Data Interface</p>
+            {/* Prescription Modal */}
+            <SlideDrawer
+                isOpen={showPrescriptionModal}
+                onClose={() => setShowPrescriptionModal(false)}
+                title="Technical Specs"
+                subtitle="Optometric Data Interface"
+            >
+                <div className="space-y-10 flex flex-col h-full">
+                    <div className="space-y-10">
+                        {!isAdmin && (
+                            <div className="bg-black text-white p-5 rounded-2xl flex items-start gap-4">
+                                <AlertCircle size={20} className="text-gray-400 shrink-0 mt-0.5" />
+                                <p className="text-[11px] font-bold uppercase tracking-wide leading-relaxed">
+                                    Administrative Privileges Required. This interface is in read-only state.
+                                </p>
                             </div>
-                            {!isAdmin ? (
-                                <span className="px-4 py-2 bg-gray-50 border border-gray-100 text-gray-400 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Lock size={12} strokeWidth={3} /> Immutable</span>
-                            ) : (
-                                <button onClick={() => setShowPrescriptionModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={24} strokeWidth={3} /></button>
-                            )}
-                        </div>
+                        )}
 
-                        <div className="p-8 space-y-10">
-                            {!isAdmin && (
-                                <div className="bg-black text-white p-5 rounded-2xl flex items-start gap-4">
-                                    <AlertCircle size={20} className="text-gray-400 shrink-0 mt-0.5" />
-                                    <p className="text-[11px] font-bold uppercase tracking-wide leading-relaxed">
-                                        Administrative Privileges Required. This interface is in read-only state.
-                                    </p>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-12">
-                                <div className="space-y-6">
-                                    <h4 className="text-[10px] font-black text-black uppercase tracking-[0.3em] border-l-4 border-black pl-4">Distance Vision — RE</h4>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH</label>
-                                            <input type="text" value={tempPrescription.re.sph} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
-                                            <input type="text" value={tempPrescription.re.cyl} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
-                                            <input type="text" value={tempPrescription.re.axis} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
-                                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                            <div className="space-y-6">
+                                <h4 className="text-[10px] font-black text-black uppercase tracking-[0.3em] border-l-4 border-black pl-4">Distance Vision — RE</h4>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH</label>
+                                        <input type="text" value={tempPrescription.re.sph} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
                                     </div>
-                                </div>
-                                <div className="space-y-6">
-                                    <h4 className="text-[10px] font-black text-black uppercase tracking-[0.3em] border-l-4 border-black pl-4">Distance Vision — LE</h4>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH</label>
-                                            <input type="text" value={tempPrescription.le.sph} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
-                                            <input type="text" value={tempPrescription.le.cyl} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
-                                            <input type="text" value={tempPrescription.le.axis} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
-                                        </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
+                                        <input type="text" value={tempPrescription.re.cyl} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
+                                        <input type="text" value={tempPrescription.re.axis} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
                                     </div>
                                 </div>
                             </div>
-
-                            {tempPrescription.hasAdditionalPower && (
-                                <div className="bg-gray-50 rounded-3xl p-8 border border-gray-100 space-y-8 animate-in slide-in-from-top-4 duration-300">
-                                    <div className="flex items-center gap-8 border-b border-gray-200/50 pb-6">
-                                        <div className="w-32 space-y-2">
-                                            <label className="text-[9px] font-black text-black uppercase tracking-widest ml-1">ADD Power</label>
-                                            <input type="text" value={tempPrescription.add} disabled={!isAdmin} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[14px] font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
-                                        </div>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic pt-6">Calculated Addition Vectoring</p>
+                            <div className="space-y-6">
+                                <h4 className="text-[10px] font-black text-black uppercase tracking-[0.3em] border-l-4 border-black pl-4">Distance Vision — LE</h4>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH</label>
+                                        <input type="text" value={tempPrescription.le.sph} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-12">
-                                        <div className="space-y-6">
-                                            <h4 className="text-[10px] font-black text-black opacity-40 uppercase tracking-[0.3em] border-l-4 border-gray-300 pl-4">Near Vision — RE</h4>
-                                            <div className="grid grid-cols-3 gap-4">
-                                                <input type="text" value={tempPrescription.adl_re.sph} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
-                                                <input type="text" value={tempPrescription.adl_re.cyl} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
-                                                <input type="text" value={tempPrescription.adl_re.axis} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-6">
-                                            <h4 className="text-[10px] font-black text-black opacity-40 uppercase tracking-[0.3em] border-l-4 border-gray-300 pl-4">Near Vision — LE</h4>
-                                            <div className="grid grid-cols-3 gap-4">
-                                                <input type="text" value={tempPrescription.adl_le.sph} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
-                                                <input type="text" value={tempPrescription.adl_le.cyl} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
-                                                <input type="text" value={tempPrescription.adl_le.axis} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
-                                            </div>
-                                        </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
+                                        <input type="text" value={tempPrescription.le.cyl} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
+                                        <input type="text" value={tempPrescription.le.axis} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
                                     </div>
                                 </div>
-                            )}
-
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Observation Notes</label>
-                                <textarea disabled={!isAdmin} value={tempPrescription.notes} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold h-24 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all disabled:opacity-50" placeholder="Vectoring constraints / Laboratory instructions..."></textarea>
                             </div>
                         </div>
 
-                        <div className="p-8 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-                            <label className="flex items-center gap-4 cursor-pointer group">
-                                <div className={`w-12 h-6 rounded-full relative transition-all duration-500 ${tempPrescription.hasAdditionalPower ? 'bg-black' : 'bg-gray-200'}`}>
-                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-500 ${tempPrescription.hasAdditionalPower ? 'left-7 shadow-lg' : 'left-1'}`} />
+                        {tempPrescription.hasAdditionalPower && (
+                            <div className="bg-gray-50 rounded-3xl p-8 border border-gray-100 space-y-8 animate-in slide-in-from-top-4 duration-300">
+                                <div className="flex items-center gap-8 border-b border-gray-200/50 pb-6">
+                                    <div className="w-32 space-y-2">
+                                        <label className="text-[9px] font-black text-black uppercase tracking-widest ml-1">ADD Power</label>
+                                        <input type="text" value={tempPrescription.add} disabled={!isAdmin} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[14px] font-black focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" />
+                                    </div>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic pt-6">Calculated Addition Vectoring</p>
                                 </div>
-                                <input disabled={!isAdmin} type="checkbox" checked={tempPrescription.hasAdditionalPower} onChange={e => isAdmin && setTempPrescription({ ...tempPrescription, hasAdditionalPower: e.target.checked })} className="hidden" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-black transition-colors">Complex Addition Layer</span>
-                            </label>
-                            <div className="flex items-center gap-4">
-                                <button onClick={() => setShowPrescriptionModal(false)} className="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Discard</button>
-                                <button disabled={!isAdmin} onClick={() => isAdmin && (() => { setItems(items.map(i => i.id === activePrescriptionItem ? { ...i, prescription: tempPrescription } : i)); setShowPrescriptionModal(false); })()} className="px-10 py-3 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-20">Sync Vector Data</button>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                    <div className="space-y-6">
+                                        <h4 className="text-[10px] font-black text-black opacity-40 uppercase tracking-[0.3em] border-l-4 border-gray-300 pl-4">Near Vision — RE</h4>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <input type="text" value={tempPrescription.adl_re.sph} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
+                                            <input type="text" value={tempPrescription.adl_re.cyl} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
+                                            <input type="text" value={tempPrescription.adl_re.axis} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-6">
+                                        <h4 className="text-[10px] font-black text-black opacity-40 uppercase tracking-[0.3em] border-l-4 border-gray-300 pl-4">Near Vision — LE</h4>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <input type="text" value={tempPrescription.adl_le.sph} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
+                                            <input type="text" value={tempPrescription.adl_le.cyl} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
+                                            <input type="text" value={tempPrescription.adl_le.axis} disabled className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[11px] font-mono font-bold opacity-50" />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+                        )}
+
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Observation Notes</label>
+                            <textarea disabled={!isAdmin} value={tempPrescription.notes} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold h-24 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all disabled:opacity-50" placeholder="Vectoring constraints / Laboratory instructions..."></textarea>
+                        </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-gray-50 mt-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <label className="flex items-center gap-4 cursor-pointer group">
+                            <div className={`w-12 h-6 rounded-full relative transition-all duration-500 ${tempPrescription.hasAdditionalPower ? 'bg-black' : 'bg-gray-200'}`}>
+                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-500 ${tempPrescription.hasAdditionalPower ? 'left-7 shadow-lg' : 'left-1'}`} />
+                            </div>
+                            <input disabled={!isAdmin} type="checkbox" checked={tempPrescription.hasAdditionalPower} onChange={e => isAdmin && setTempPrescription({ ...tempPrescription, hasAdditionalPower: e.target.checked })} className="hidden" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-black transition-colors">Complex Addition Layer</span>
+                        </label>
+                        <div className="flex items-center gap-4 w-full sm:w-auto">
+                            <button onClick={() => setShowPrescriptionModal(false)} className="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Discard</button>
+                            <button disabled={!isAdmin} onClick={() => isAdmin && (() => { setItems(items.map(i => i.id === activePrescriptionItem ? { ...i, prescription: tempPrescription } : i)); setShowPrescriptionModal(false); })()} className="px-10 py-3 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-20 w-full sm:w-auto">Sync Vector Data</button>
                         </div>
                     </div>
                 </div>
-            )}
+            </SlideDrawer>
 
             {/* Eye Power Modal - Order Level */}
-            {showEyePowerModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[32px] w-full max-w-[700px] shadow-2xl overflow-hidden border border-white/20">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                            <div>
-                                <h2 className="text-xl font-black text-black uppercase tracking-tighter">Vector Configuration</h2>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Lens Specification Interface</p>
-                            </div>
-                            <button onClick={() => setShowEyePowerModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                <X size={24} strokeWidth={3} />
-                            </button>
+            {/* Eye Power Modal - Order Level */}
+            <SlideDrawer
+                isOpen={showEyePowerModal}
+                onClose={() => setShowEyePowerModal(false)}
+                title="Vector Configuration"
+                subtitle="Lens Specification Interface"
+            >
+                <div className="space-y-8 flex flex-col h-full">
+                    <div className="space-y-8">
+                        {/* Checkboxes Row */}
+                        <div className="flex flex-wrap gap-6 items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    checked={eyePowerData?.isSamePower}
+                                    onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, isSamePower: e.target.checked })}
+                                    disabled={!isAdmin}
+                                    className="w-5 h-5 rounded-lg border-gray-300 text-black focus:ring-black transition-all disabled:opacity-50"
+                                />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-black">Bilateral Sync</span>
+                            </label>
+
+                            <div className="h-4 w-px bg-gray-200"></div>
+
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    checked={eyePowerData?.isCylindrical}
+                                    onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, isCylindrical: e.target.checked })}
+                                    disabled={!isAdmin}
+                                    className="w-5 h-5 rounded-lg border-gray-300 text-black focus:ring-black transition-all disabled:opacity-50"
+                                />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-black">Astigmatic Correction</span>
+                            </label>
+
+                            <div className="h-4 w-px bg-gray-200"></div>
+
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    checked={eyePowerData?.hasAdditionalPower}
+                                    onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, hasAdditionalPower: e.target.checked })}
+                                    disabled={!isAdmin}
+                                    className="w-5 h-5 rounded-lg border-gray-300 text-black focus:ring-black transition-all disabled:opacity-50"
+                                />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-black">Near Addition</span>
+                            </label>
                         </div>
 
-                        <div className="p-8 space-y-8">
-                            {/* Checkboxes Row */}
-                            <div className="flex flex-wrap gap-6 items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                                <label className="flex items-center gap-3 cursor-pointer group">
-                                    <input
-                                        type="checkbox"
-                                        checked={eyePowerData?.isSamePower}
-                                        onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, isSamePower: e.target.checked })}
-                                        disabled={!isAdmin}
-                                        className="w-5 h-5 rounded-lg border-gray-300 text-black focus:ring-black transition-all disabled:opacity-50"
-                                    />
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-black">Bilateral Sync</span>
-                                </label>
-
-                                <div className="h-4 w-px bg-gray-200"></div>
-
-                                <label className="flex items-center gap-3 cursor-pointer group">
-                                    <input
-                                        type="checkbox"
-                                        checked={eyePowerData?.isCylindrical}
-                                        onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, isCylindrical: e.target.checked })}
-                                        disabled={!isAdmin}
-                                        className="w-5 h-5 rounded-lg border-gray-300 text-black focus:ring-black transition-all disabled:opacity-50"
-                                    />
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-black">Astigmatic Correction</span>
-                                </label>
-
-                                <div className="h-4 w-px bg-gray-200"></div>
-
-                                <label className="flex items-center gap-3 cursor-pointer group">
-                                    <input
-                                        type="checkbox"
-                                        checked={eyePowerData?.hasAdditionalPower}
-                                        onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, hasAdditionalPower: e.target.checked })}
-                                        disabled={!isAdmin}
-                                        className="w-5 h-5 rounded-lg border-gray-300 text-black focus:ring-black transition-all disabled:opacity-50"
-                                    />
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-black">Near Addition</span>
-                                </label>
+                        {/* Distance Vision Section */}
+                        <div className={`grid grid-cols-1 ${eyePowerData?.isSamePower ? '' : 'md:grid-cols-2'} gap-10`}>
+                            {/* Right Eye */}
+                            <div className="space-y-6">
+                                <h3 className="text-[10px] font-black text-black uppercase tracking-[0.3em] border-l-4 border-black pl-4">
+                                    {eyePowerData?.isSamePower ? "Bilateral Distance" : "Distance — RE"}
+                                </h3>
+                                <div className={`grid ${eyePowerData?.isCylindrical ? 'grid-cols-3' : 'grid-cols-1'} gap-4`}>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH</label>
+                                        <input type="text" value={eyePowerData?.re?.sph || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, re: { ...eyePowerData.re, sph: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="0.00" />
+                                    </div>
+                                    {eyePowerData?.isCylindrical && (
+                                        <>
+                                            <div className="space-y-2">
+                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
+                                                <input type="text" value={eyePowerData?.re?.cyl || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, re: { ...eyePowerData.re, cyl: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="0.00" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
+                                                <input type="text" value={eyePowerData?.re?.axis || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, re: { ...eyePowerData.re, axis: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="180" />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Distance Vision Section */}
-                            <div className={`grid grid-cols-1 ${eyePowerData?.isSamePower ? '' : 'md:grid-cols-2'} gap-10`}>
-                                {/* Right Eye */}
+                            {/* Left Eye */}
+                            {!eyePowerData?.isSamePower && (
                                 <div className="space-y-6">
-                                    <h3 className="text-[10px] font-black text-black uppercase tracking-[0.3em] border-l-4 border-black pl-4">
-                                        {eyePowerData?.isSamePower ? "Bilateral Distance" : "Distance — RE"}
-                                    </h3>
+                                    <h3 className="text-[10px] font-black text-black uppercase tracking-[0.3em] border-l-4 border-black pl-4">Distance — LE</h3>
                                     <div className={`grid ${eyePowerData?.isCylindrical ? 'grid-cols-3' : 'grid-cols-1'} gap-4`}>
                                         <div className="space-y-2">
                                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH</label>
-                                            <input type="text" value={eyePowerData?.re?.sph || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, re: { ...eyePowerData.re, sph: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="0.00" />
+                                            <input type="text" value={eyePowerData?.le?.sph || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, le: { ...eyePowerData.le, sph: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="0.00" />
                                         </div>
                                         {eyePowerData?.isCylindrical && (
                                             <>
                                                 <div className="space-y-2">
                                                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
-                                                    <input type="text" value={eyePowerData?.re?.cyl || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, re: { ...eyePowerData.re, cyl: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="0.00" />
+                                                    <input type="text" value={eyePowerData?.le?.cyl || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, le: { ...eyePowerData.le, cyl: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="0.00" />
                                                 </div>
                                                 <div className="space-y-2">
                                                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
-                                                    <input type="text" value={eyePowerData?.re?.axis || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, re: { ...eyePowerData.re, axis: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="180" />
+                                                    <input type="text" value={eyePowerData?.le?.axis || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, le: { ...eyePowerData.le, axis: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="180" />
                                                 </div>
                                             </>
                                         )}
                                     </div>
                                 </div>
-
-                                {/* Left Eye */}
-                                {!eyePowerData?.isSamePower && (
-                                    <div className="space-y-6">
-                                        <h3 className="text-[10px] font-black text-black uppercase tracking-[0.3em] border-l-4 border-black pl-4">Distance — LE</h3>
-                                        <div className={`grid ${eyePowerData?.isCylindrical ? 'grid-cols-3' : 'grid-cols-1'} gap-4`}>
-                                            <div className="space-y-2">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH</label>
-                                                <input type="text" value={eyePowerData?.le?.sph || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, le: { ...eyePowerData.le, sph: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="0.00" />
-                                            </div>
-                                            {eyePowerData?.isCylindrical && (
-                                                <>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
-                                                        <input type="text" value={eyePowerData?.le?.cyl || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, le: { ...eyePowerData.le, cyl: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="0.00" />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
-                                                        <input type="text" value={eyePowerData?.le?.axis || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, le: { ...eyePowerData.le, axis: e.target.value } })} disabled={!isAdmin} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[14px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black disabled:opacity-50" placeholder="180" />
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Near Vision Section */}
-                            {eyePowerData?.hasAdditionalPower && (
-                                <div className="bg-black text-white p-8 rounded-[32px] space-y-8 animate-in slide-in-from-top-4 duration-500 shadow-2xl">
-                                    <div className="flex items-center gap-10 border-b border-white/10 pb-6">
-                                        <div className="w-40 space-y-2">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">ADD Coefficient</label>
-                                            <input type="text" value={eyePowerData?.add || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, add: e.target.value })} disabled={!isAdmin} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[18px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50" placeholder="+2.00" />
-                                        </div>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] italic pt-8">Dynamic Near-Vision Sync Active</p>
-                                    </div>
-                                    <div className={`grid grid-cols-1 ${eyePowerData?.isSamePower ? '' : 'md:grid-cols-2'} gap-10`}>
-                                        <div className="space-y-6">
-                                            <h4 className="text-[10px] font-black text-white uppercase tracking-[0.3em] border-l-4 border-white pl-4">Near — RE</h4>
-                                            <div className="grid grid-cols-3 gap-4">
-                                                <input type="text" value={eyePowerData?.adl_re?.sph || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, adl_re: { ...eyePowerData.adl_re, sph: e.target.value } })} disabled={!isAdmin} className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center" />
-                                                <input type="text" value={eyePowerData?.adl_re?.cyl || ''} disabled className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center opacity-30" />
-                                                <input type="text" value={eyePowerData?.adl_re?.axis || ''} disabled className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center opacity-30" />
-                                            </div>
-                                        </div>
-                                        {!eyePowerData?.isSamePower && (
-                                            <div className="space-y-6">
-                                                <h4 className="text-[10px] font-black text-white uppercase tracking-[0.3em] border-l-4 border-white pl-4">Near — LE</h4>
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <input type="text" value={eyePowerData?.adl_le?.sph || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, adl_le: { ...eyePowerData.adl_le, sph: e.target.value } })} disabled={!isAdmin} className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center" />
-                                                    <input type="text" value={eyePowerData?.adl_le?.cyl || ''} disabled className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center opacity-30" />
-                                                    <input type="text" value={eyePowerData?.adl_le?.axis || ''} disabled className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center opacity-30" />
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
                             )}
-
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Laboratory Directives</label>
-                                <textarea rows="2" value={eyePowerData?.notes || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, notes: e.target.value })} disabled={!isAdmin} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold h-24 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all disabled:opacity-50" placeholder="Lens material, coating specs, etc..."></textarea>
-                            </div>
                         </div>
 
-                        <div className="p-8 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-4">
-                            <button onClick={() => setShowEyePowerModal(false)} className="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Discard</button>
-                            <button
-                                disabled={!isAdmin}
-                                onClick={() => {
-                                    if (!isAdmin) return;
-                                    const { isSamePower } = eyePowerData || {};
-                                    const normalizedPrescription = isSamePower
-                                        ? {
-                                            ...eyePowerData,
-                                            le: { ...(eyePowerData?.re || {}) },
-                                            adl_le: { ...(eyePowerData?.adl_re || {}) },
-                                        }
-                                        : { ...eyePowerData };
+                        {/* Near Vision Section */}
+                        {eyePowerData?.hasAdditionalPower && (
+                            <div className="bg-black text-white p-8 rounded-[32px] space-y-8 animate-in slide-in-from-top-4 duration-500 shadow-2xl">
+                                <div className="flex items-center gap-10 border-b border-white/10 pb-6">
+                                    <div className="w-40 space-y-2">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">ADD Coefficient</label>
+                                        <input type="text" value={eyePowerData?.add || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, add: e.target.value })} disabled={!isAdmin} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[18px] font-mono font-black text-center focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50" placeholder="+2.00" />
+                                    </div>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] italic pt-8">Dynamic Near-Vision Sync Active</p>
+                                </div>
+                                <div className={`grid grid-cols-1 ${eyePowerData?.isSamePower ? '' : 'md:grid-cols-2'} gap-10`}>
+                                    <div className="space-y-6">
+                                        <h4 className="text-[10px] font-black text-white uppercase tracking-[0.3em] border-l-4 border-white pl-4">Near — RE</h4>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <input type="text" value={eyePowerData?.adl_re?.sph || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, adl_re: { ...eyePowerData.adl_re, sph: e.target.value } })} disabled={!isAdmin} className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center" />
+                                            <input type="text" value={eyePowerData?.adl_re?.cyl || ''} disabled className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center opacity-30" />
+                                            <input type="text" value={eyePowerData?.adl_re?.axis || ''} disabled className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center opacity-30" />
+                                        </div>
+                                    </div>
+                                    {!eyePowerData?.isSamePower && (
+                                        <div className="space-y-6">
+                                            <h4 className="text-[10px] font-black text-white uppercase tracking-[0.3em] border-l-4 border-white pl-4">Near — LE</h4>
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <input type="text" value={eyePowerData?.adl_le?.sph || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, adl_le: { ...eyePowerData.adl_le, sph: e.target.value } })} disabled={!isAdmin} className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center" />
+                                                <input type="text" value={eyePowerData?.adl_le?.cyl || ''} disabled className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center opacity-30" />
+                                                <input type="text" value={eyePowerData?.adl_le?.axis || ''} disabled className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[11px] font-mono font-black text-center opacity-30" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
-                                    setItems(items => items.map(it => it.id === eyePowerTargetItemId ? { ...it, prescription: { ...normalizedPrescription } } : it));
-                                    setShowEyePowerModal(false);
-                                }}
-                                className="px-10 py-3 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-20"
-                            >
-                                Commmit Specs
-                            </button>
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Laboratory Directives</label>
+                            <textarea rows="2" value={eyePowerData?.notes || ''} onChange={e => isAdmin && setEyePowerData({ ...eyePowerData, notes: e.target.value })} disabled={!isAdmin} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold h-24 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all disabled:opacity-50" placeholder="Lens material, coating specs, etc..."></textarea>
                         </div>
                     </div>
+
+                    <div className="pt-6 border-t border-gray-50 mt-auto flex items-center justify-end gap-4">
+                        <button onClick={() => setShowEyePowerModal(false)} className="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Discard</button>
+                        <button
+                            disabled={!isAdmin}
+                            onClick={() => {
+                                if (!isAdmin) return;
+                                const { isSamePower } = eyePowerData || {};
+                                const normalizedPrescription = isSamePower
+                                    ? {
+                                        ...eyePowerData,
+                                        le: { ...(eyePowerData?.re || {}) },
+                                        adl_le: { ...(eyePowerData?.adl_re || {}) },
+                                    }
+                                    : { ...eyePowerData };
+
+                                setItems(items => items.map(it => it.id === eyePowerTargetItemId ? { ...it, prescription: { ...normalizedPrescription } } : it));
+                                setShowEyePowerModal(false);
+                            }}
+                            className="px-10 py-3 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-20"
+                        >
+                            Commmit Specs
+                        </button>
+                    </div>
                 </div>
-            )}
+            </SlideDrawer>
 
             {/* Disable Order Modal */}
-            {showDisableModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[32px] w-full max-w-md p-10 shadow-2xl border border-white/20">
-                        <div className="flex items-center justify-center w-20 h-20 rounded-[24px] bg-black mx-auto mb-8 shadow-xl">
-                            <AlertCircle className="text-white" size={40} strokeWidth={3} />
-                        </div>
-                        <h2 className="text-2xl font-black text-black mb-3 text-center uppercase tracking-tighter">
-                            {orderDisabled ? 'Activate Entity?' : 'Archive Record?'}
-                        </h2>
-                        <p className="text-[11px] font-bold text-gray-400 text-center uppercase tracking-widest leading-relaxed mb-10 px-4">
-                            {orderDisabled 
-                                ? 'Restoring technical visibility and metric inclusion for this operational unit.' 
-                                : 'Hidden from operational flows and analytical indices. Entity remains in cold storage.'}
-                        </p>
-                        <div className="flex items-center gap-3 border-t border-gray-100 pt-8">
-                            <button 
-                                onClick={() => setShowDisableModal(false)} 
-                                className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors"
-                            >
-                                Discard
-                            </button>
-                            <button 
-                                onClick={handleDisableOrder} 
-                                disabled={disablingOrder}
-                                className="flex-1 py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-20"
-                            >
-                                {disablingOrder ? 'Syncing...' : 'Confirm'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmSheet
+                isOpen={showDisableModal}
+                onClose={() => setShowDisableModal(false)}
+                onConfirm={handleDisableOrder}
+                title={orderDisabled ? 'Activate Entity?' : 'Archive Record?'}
+                description={orderDisabled 
+                    ? 'Restoring technical visibility and metric inclusion for this operational unit.' 
+                    : 'Hidden from operational flows and analytical indices. Entity remains in cold storage.'}
+                confirmText={orderDisabled ? 'Confirm' : 'Archive'}
+                isDanger={!orderDisabled}
+                loading={disablingOrder}
+            />
 
             {/* Add Product Modal */}
-            {showAddProductModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden border border-white/20">
-                        <div className="p-10">
-                            <div className="flex justify-between items-start mb-10">
-                                <div>
-                                    <h2 className="text-3xl font-black text-black tracking-tighter uppercase">Register Item</h2>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Append New Inventory Entity</p>
-                                </div>
-                                <button onClick={() => setShowAddProductModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                    <X size={28} strokeWidth={3} />
-                                </button>
+            <SlideDrawer
+                isOpen={showAddProductModal}
+                onClose={() => setShowAddProductModal(false)}
+                title="Register Item"
+                subtitle="Append New Inventory Entity"
+            >
+                <form onSubmit={handleAddProduct} className="space-y-8 flex flex-col h-full">
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Entity Designation</label>
+                            <input
+                                type="text"
+                                value={newProduct.name}
+                                onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+                                placeholder="Identification Name..."
+                                required
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Classification</label>
+                            <div className="relative group">
+                                <select
+                                    value={newProduct.category_id}
+                                    onChange={e => {
+                                        const cat = storeCategories.find(c => c.id === e.target.value);
+                                        setNewProduct({ ...newProduct, category_id: e.target.value, category: cat?.name || '' });
+                                    }}
+                                    className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
+                                    required
+                                >
+                                    <option value="">Select Category</option>
+                                    {storeCategories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
                             </div>
+                        </div>
 
-                            <form onSubmit={handleAddProduct} className="space-y-8">
-                                <div className="space-y-2">
-                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Entity Designation</label>
-                                    <input
-                                        type="text"
-                                        value={newProduct.name}
-                                        onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
-                                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                        placeholder="Identification Name..."
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Classification</label>
-                                    <div className="relative group">
-                                        <select
-                                            value={newProduct.category_id}
-                                            onChange={e => {
-                                                const cat = storeCategories.find(c => c.id === e.target.value);
-                                                setNewProduct({ ...newProduct, category_id: e.target.value, category: cat?.name || '' });
-                                            }}
-                                            className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
-                                            required
-                                        >
-                                            <option value="">Select Category</option>
-                                            {storeCategories.map(cat => (
-                                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Unit Value</label>
-                                        <input
-                                            type="number"
-                                            value={newProduct.price}
-                                            onChange={e => setNewProduct({ ...newProduct, price: e.target.value })}
-                                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[14px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                            placeholder="0.00"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Initial Stock</label>
-                                        <input
-                                            type="number"
-                                            value={newProduct.stock}
-                                            onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })}
-                                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[14px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="pt-8 flex flex-col gap-3 border-t border-gray-50">
-                                    <button
-                                        type="submit"
-                                        disabled={addingProduct || !newProduct.category_id}
-                                        className="w-full py-5 bg-black text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20"
-                                    >
-                                        {addingProduct ? 'Syncing...' : 'Register Entity'}
-                                    </button>
-                                    <button type="button" onClick={() => setShowAddProductModal(false)} className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors">
-                                        Abort Operation
-                                    </button>
-                                </div>
-                            </form>
+                        <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Unit Value</label>
+                                <input
+                                    type="number"
+                                    value={newProduct.price}
+                                    onChange={e => setNewProduct({ ...newProduct, price: e.target.value })}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[14px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+                                    placeholder="0.00"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Initial Stock</label>
+                                <input
+                                    type="number"
+                                    value={newProduct.stock}
+                                    onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[14px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+                                    required
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+
+                    <div className="pt-6 border-t border-gray-50 mt-auto">
+                        <button
+                            type="submit"
+                            disabled={addingProduct || !newProduct.category_id}
+                            className="w-full py-5 bg-black text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20 flex items-center justify-center"
+                        >
+                            {addingProduct ? 'Syncing...' : 'Register Entity'}
+                        </button>
+                    </div>
+                </form>
+            </SlideDrawer>
         </div>
     );
 }

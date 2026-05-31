@@ -3,6 +3,7 @@ import {
   Store as StoreIcon, Building2, Package, ArrowRightLeft, 
   Search, Eye, X, CheckCircle2, Clock, MapPin, Filter 
 } from 'lucide-react';
+import SlideDrawer from '../components/common/SlideDrawer';
 
 const MOCK_STORES = [
   { id: 'ST-001', name: 'Downtown Core', location: 'City Center', inventoryCount: 1450, pendingRequests: 4, status: 'Active' },
@@ -183,20 +184,15 @@ export default function StoreInsights() {
       )}
 
       {/* Detail Modal */}
-      {showDetailModal && selectedRequest && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-fast-zoom">
-          <div className="bg-white rounded-[40px] w-full max-w-lg shadow-2xl overflow-hidden border border-white/20">
-            <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <div>
-                <h3 className="text-2xl font-black text-black uppercase tracking-tighter">Manifest Detail</h3>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Ref: {selectedRequest.id}</p>
-              </div>
-              <button onClick={() => setShowDetailModal(false)} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full">
-                <X size={24} strokeWidth={3} />
-              </button>
-            </div>
-            
-            <div className="p-8 space-y-8">
+      <SlideDrawer
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        title="Manifest Detail"
+        subtitle={`Ref: ${selectedRequest?.id}`}
+      >
+        {selectedRequest && (
+          <div className="flex flex-col h-full">
+            <div className="space-y-8">
               <div className="grid grid-cols-2 gap-8">
                 <div>
                     <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Origin Unit</span>
@@ -221,17 +217,17 @@ export default function StoreInsights() {
                     </div>
                 </div>
               </div>
+            </div>
 
-              <div className="pt-4 flex items-center gap-3">
-                <button onClick={() => setShowDetailModal(false)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black">Discard</button>
-                <button className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95  flex items-center justify-center gap-2">
-                  <CheckCircle2 size={16} strokeWidth={3} /> Authorize Fulfillment
-                </button>
-              </div>
+            <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
+              <button onClick={() => setShowDetailModal(false)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black">Discard</button>
+              <button className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95  flex items-center justify-center gap-2">
+                <CheckCircle2 size={16} strokeWidth={3} /> Authorize Fulfillment
+              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </SlideDrawer>
     </div>
   );
 }

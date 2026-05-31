@@ -1,8 +1,10 @@
-import { useState } from"react";
+import { useState } from "react";
 import { 
   Truck, Plus, Search, Download, QrCode, X, 
   ChevronLeft, ChevronRight, CheckCircle2, Clock
-} from"lucide-react";
+} from "lucide-react";
+import SlideDrawer from '../components/common/SlideDrawer';
+import CommandDialog from '../components/common/CommandDialog';
 
 const MOCK_INBOUND = [
   { id:"IN-4401", supplier:"Vision One Supplies", expected:"Today, 03:30 PM", items: 240, status:"In Transit" },
@@ -111,79 +113,63 @@ export default function Shipment({ userProfile }) {
       </div>
 
       {/* Record Shipment Modal */}
-      {showRecordModal && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-fast-zoom">
-          <div className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden border border-white/20">
-            <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <div>
-                <h3 className="text-2xl font-black text-black uppercase tracking-tighter">Record Shipment</h3>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Log inbound inventory vector</p>
+      <SlideDrawer
+        isOpen={showRecordModal}
+        onClose={() => setShowRecordModal(false)}
+        title="Record Shipment"
+        subtitle="Log inbound inventory vector"
+      >
+        <div className="flex flex-col h-full">
+          <form onSubmit={e => { e.preventDefault(); setShowRecordModal(false); }} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Supplier / Origin</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Zeiss Optics"
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Expected Date</label>
+                <input type="date" required className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest outline-none" />
               </div>
-              <button onClick={() => setShowRecordModal(false)} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full">
-                <X size={24} strokeWidth={3} />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Total Units</label>
+                <input type="number" required min="1" className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest outline-none" />
+              </div>
+            </div>
+
+            <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
+              <button type="button" onClick={() => setShowRecordModal(false)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black">Abort</button>
+              <button type="submit" className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95">
+                Commit Shipment
               </button>
             </div>
-            
-            <form onSubmit={e => { e.preventDefault(); setShowRecordModal(false); }} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Supplier / Origin</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Zeiss Optics"
-                  className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Expected Date</label>
-                  <input type="date" required className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest outline-none" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Total Units</label>
-                  <input type="number" required min="1" className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest outline-none" />
-                </div>
-              </div>
-
-              <div className="pt-8 flex items-center gap-3 border-t border-gray-50">
-                <button type="button" onClick={() => setShowRecordModal(false)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black">Abort</button>
-                <button type="submit" className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95">
-                  Commit Shipment
-                </button>
-              </div>
-            </form>
-          </div>
+          </form>
         </div>
-      )}
+      </SlideDrawer>
 
       {/* QR Tracking Modal */}
-      {showQrModal && selectedShipment && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-fast-zoom">
-          <div className="bg-white rounded-[40px] w-full max-w-sm shadow-2xl overflow-hidden border border-white/20">
-            <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <div>
-                <h3 className="text-2xl font-black text-black uppercase tracking-tighter">Tracking Vector</h3>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Ref: {selectedShipment.id}</p>
-              </div>
-              <button onClick={() => setShowQrModal(false)} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full">
-                <X size={24} strokeWidth={3} />
-              </button>
-            </div>
-            
-            <div className="p-8 flex flex-col items-center">
-              <div className="w-48 h-48 bg-gray-50 rounded-[32px] border border-gray-200 shadow-inner flex items-center justify-center mb-8">
-                <QrCode size={120} strokeWidth={1} className="opacity-80" />
-              </div>
-              <p className="text-[12px] font-black text-black uppercase tracking-tight mb-1">{selectedShipment.supplier}</p>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">Asset Tag Ready</p>
-              <button className="w-full py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105  flex items-center justify-center gap-2">
-                <Download size={16} strokeWidth={3} /> Save Asset
-              </button>
-            </div>
+      <CommandDialog
+        isOpen={showQrModal && selectedShipment !== null}
+        onClose={() => setShowQrModal(false)}
+        title="Tracking Vector"
+        subtitle={`Ref: ${selectedShipment?.id}`}
+      >
+        <div className="flex flex-col items-center">
+          <div className="w-48 h-48 bg-gray-50 rounded-[32px] border border-gray-200 shadow-inner flex items-center justify-center mb-8">
+            <QrCode size={120} strokeWidth={1} className="opacity-80" />
           </div>
+          <p className="text-[12px] font-black text-black uppercase tracking-tight mb-1">{selectedShipment?.supplier}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">Asset Tag Ready</p>
+          <button className="w-full py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105  flex items-center justify-center gap-2 transition-all">
+            <Download size={16} strokeWidth={3} /> Save Asset
+          </button>
         </div>
-      )}
+      </CommandDialog>
     </div>
   );
 }

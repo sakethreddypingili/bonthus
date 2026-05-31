@@ -1,17 +1,17 @@
-import { Box, Button, IconButton, Typography, useTheme } from "@mui/material";
-import { tokens } from "../../theme";
-import { mockTransactions } from "../../server/database/mocks/mockData";
-import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
-import EmailIcon from "@mui/icons-material/Email";
-import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import TrafficIcon from "@mui/icons-material/Traffic";
-import Header from "../../components/common/Header";
-import LineChart from "../../components/charts/LineChart";
-import GeographyChart from "../../components/charts/GeographyChart";
-import BarChart from "../../components/charts/BarChart";
-import StatBox from "../../components/other/StatBox";
-import ProgressCircle from "../../components/ProgressCircle";
+import { Box, Button, IconButton, Typography, useTheme } from"@mui/material";
+import { tokens } from"../../theme";
+import { mockTransactions } from"../../server/database/mocks/mockData";
+import DownloadOutlinedIcon from"@mui/icons-material/DownloadOutlined";
+import EmailIcon from"@mui/icons-material/Email";
+import PointOfSaleIcon from"@mui/icons-material/PointOfSale";
+import PersonAddIcon from"@mui/icons-material/PersonAdd";
+import TrafficIcon from"@mui/icons-material/Traffic";
+import Header from"../../components/common/Header";
+import LineChart from"../../components/charts/LineChart";
+import GeographyChart from"../../components/charts/GeographyChart";
+import BarChart from"../../components/charts/BarChart";
+import StatBox from"../../components/other/StatBox";
+import ProgressCircle from"../../components/ProgressCircle";
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -27,17 +27,17 @@ const Dashboard = () => {
           <Button
             sx={{
               backgroundColor: colors.redAccent[500],
-              color: "#ffffff",
-              fontSize: "14px",
-              fontWeight: "bold",
-              padding: "10px 20px",
-              borderRadius: "25px",
-              "&:hover": {
+              color:"#ffffff",
+              fontSize:"14px",
+              fontWeight:"bold",
+              padding:"10px 20px",
+              borderRadius:"25px",
+"&:hover": {
                 backgroundColor: colors.redAccent[600],
               },
             }}
           >
-            <DownloadOutlinedIcon sx={{ mr: "10px" }} />
+            <DownloadOutlinedIcon sx={{ mr:"10px" }} />
             Download Reports
           </Button>
         </Box>
@@ -67,7 +67,7 @@ const Dashboard = () => {
             increase="+14%"
             icon={
               <EmailIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.greenAccent[600], fontSize:"26px" }}
               />
             }
           />
@@ -88,7 +88,7 @@ const Dashboard = () => {
             increase="+21%"
             icon={
               <PointOfSaleIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.greenAccent[600], fontSize:"26px" }}
               />
             }
           />
@@ -109,7 +109,7 @@ const Dashboard = () => {
             increase="+5%"
             icon={
               <PersonAddIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.greenAccent[600], fontSize:"26px" }}
               />
             }
           />
@@ -130,7 +130,7 @@ const Dashboard = () => {
             increase="+43%"
             icon={
               <TrafficIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.greenAccent[600], fontSize:"26px" }}
               />
             }
           />
@@ -147,7 +147,7 @@ const Dashboard = () => {
           <Box
             mt="25px"
             p="0 30px"
-            display="flex "
+            display="flex"
             justifyContent="space-between"
             alignItems="center"
           >
@@ -170,7 +170,7 @@ const Dashboard = () => {
             <Box>
               <IconButton>
                 <DownloadOutlinedIcon
-                  sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
+                  sx={{ fontSize:"26px", color: colors.greenAccent[500] }}
                 />
               </IconButton>
             </Box>
@@ -254,7 +254,7 @@ const Dashboard = () => {
             <Typography
               variant="h5"
               color={colors.greenAccent[500]}
-              sx={{ mt: "15px" }}
+              sx={{ mt:"15px" }}
             >
               $48,352 revenue generated
             </Typography>
@@ -271,7 +271,7 @@ const Dashboard = () => {
           <Typography
             variant="h5"
             fontWeight="600"
-            sx={{ padding: "30px 30px 0 30px" }}
+            sx={{ padding:"30px 30px 0 30px" }}
           >
             Sales Quantity
           </Typography>
@@ -290,7 +290,7 @@ const Dashboard = () => {
           <Typography
             variant="h5"
             fontWeight="600"
-            sx={{ marginBottom: "15px" }}
+            sx={{ marginBottom:"15px" }}
           >
             Geography Based Traffic
           </Typography>

@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { Search, Filter, Download, Eye, ChevronLeft, ChevronRight, MapPin, ChevronDown, Plus, Edit2, X, Trash2, Lock, CheckCircle } from "lucide-react";
+import { Search, Plus, MapPin, Eye, Edit2, Lock, Download, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../server/supabase/supabase";
+import CommandDialog from "../components/common/CommandDialog";
+import ConfirmSheet from "../components/common/ConfirmSheet";
 
 const STATUS_COLORS = {
   Delivered: "bg-black text-white px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
@@ -445,19 +447,13 @@ export default function Orders({ userProfile }) {
       </div>
 
       {/* Modals - Simplified & Monochromatic */}
-      {editingOrder && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-white/20">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-black text-black uppercase tracking-tight">Modify Record</h2>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Ref: {editingOrder.id.slice(0,12)}</p>
-              </div>
-              <button onClick={() => setEditingOrder(null)} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
-                <X size={18} strokeWidth={3} />
-              </button>
-            </div>
-
+      <CommandDialog
+        isOpen={!!editingOrder}
+        onClose={() => setEditingOrder(null)}
+        title="Modify Record"
+        subtitle={editingOrder ? `Ref: ${editingOrder.id.slice(0,12)}` : ''}
+      >
+        {editingOrder && (
             <form onSubmit={handleSaveEdit} className="p-6 space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer Entity</label>
@@ -538,28 +534,24 @@ export default function Orders({ userProfile }) {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        )}
+      </CommandDialog>
 
       {/* Clear Due Payment Modal */}
-      {showPaymentModal && editingOrder && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden border border-white/20">
-            {/* Header */}
-            <div className="bg-gray-50/50 px-8 py-6 border-b border-gray-100 flex justify-between items-start">
-              <div>
-                <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Payment Collection</h2>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Pending Ledger Balance</p>
-              </div>
-              <div className="text-right">
+      <CommandDialog
+        isOpen={showPaymentModal && !!editingOrder}
+        onClose={() => setShowPaymentModal(false)}
+        title="Payment Collection"
+        subtitle="Pending Ledger Balance"
+        maxWidth="max-w-lg"
+      >
+        {editingOrder && (
+            <div className="p-8">
+              <div className="text-right mb-4 border-b border-gray-100 pb-4">
                 <span className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Balance</span>
                 <span className="text-2xl font-black text-black tracking-tighter">₹{Number(editingOrder.due_amount).toLocaleString('en-IN')}</span>
               </div>
-            </div>
 
-            {/* Body */}
-            <div className="p-8">
               <div className="space-y-4 mb-8">
                 {payments.map((p, idx) => (
                   <div key={p.id} className="flex items-end gap-3 group">
@@ -672,26 +664,16 @@ export default function Orders({ userProfile }) {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+        )}
+      </CommandDialog>
 
-      {/* Disable/Enable Modal */}
-      {showDisableModal && selectedOrderForAction && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden border border-white/20">
-            {/* Header */}
-            <div className="bg-gray-50/50 px-8 py-6 border-b border-gray-100 flex justify-between items-start">
-              <div>
-                <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Order Vector</h2>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Ref: <span className="font-mono">{selectedOrderForAction.id.slice(0, 12)}</span></p>
-              </div>
-              <button onClick={() => setShowDisableModal(false)} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-all">
-                <X size={20} strokeWidth={3} />
-              </button>
-            </div>
-
-            {/* Body */}
+      <CommandDialog
+        isOpen={showDisableModal && !!selectedOrderForAction}
+        onClose={() => setShowDisableModal(false)}
+        title="Order Vector"
+        subtitle={selectedOrderForAction ? `Ref: ${selectedOrderForAction.id.slice(0, 12)}` : ''}
+      >
+        {selectedOrderForAction && (
             <div className="p-8">
               <div className="space-y-2 mb-8">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Directive</label>
@@ -740,141 +722,105 @@ export default function Orders({ userProfile }) {
                 </button>
               </div>
             </div>
-          </div>
+        )}
+      </CommandDialog>
+
+      <ConfirmSheet
+        isOpen={showConfirmModal && !!selectedOrderForAction}
+        onClose={() => setShowConfirmModal(false)}
+        icon={disableAction === 'disable' ? Lock : CheckCircle}
+        title={disableAction === 'disable' ? 'Confirm Archive' : 'Confirm Activation'}
+        description={`Ref: ${selectedOrderForAction?.id.slice(0,12)}`}
+        danger={disableAction === 'disable'}
+        confirmLabel={processingAction ? 'Executing...' : 'Commit Authorization'}
+        confirmLoading={processingAction}
+        onConfirm={async () => {
+          setProcessingAction(true);
+          try {
+            const updatedDisabled = disableAction === 'disable';
+            const { error } = await supabase
+              .from('orders')
+              .update({ disabled: updatedDisabled })
+              .eq('id', selectedOrderForAction.id);
+            if (error) throw error;
+            setShowConfirmModal(false);
+            fetchOrders();
+          } catch (err) {
+            alert('Error: ' + err.message);
+          } finally {
+            setProcessingAction(false);
+          }
+        }}
+      >
+        <div className={`p-6 rounded-2xl mb-8 ${
+          disableAction === 'disable'
+            ? 'bg-gray-100 border border-gray-200'
+            : 'bg-black border border-black shadow-xl'
+        }`}>
+          <p className={`text-[10px] font-black uppercase tracking-widest leading-relaxed ${
+            disableAction === 'disable'
+              ? 'text-black'
+              : 'text-white'
+          }`}>
+            {disableAction === 'disable' 
+              ? `Entity will be suspended from operational vectors until explicit reactivation.`
+              : `Entity will be restored to all operational vectors immediately.`
+            }
+          </p>
         </div>
-      )}
 
-      {/* Confirmation Modal */}
-      {showConfirmModal && selectedOrderForAction && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden border border-white/20">
-            {/* Header */}
-            <div className="bg-gray-50/50 px-8 py-6 border-b border-gray-100">
-              <div className="flex items-start gap-4">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg flex-shrink-0 shadow-lg ${
-                  disableAction === 'disable' 
-                    ? 'bg-gray-200 text-black border border-gray-300' 
-                    : 'bg-black text-white'
-                }`}>
-                  {disableAction === 'disable' ? <Lock size={20} strokeWidth={3} /> : <CheckCircle size={20} strokeWidth={3} />}
-                </div>
-                <div>
-                  <h2 className="text-2xl font-black text-black uppercase tracking-tighter">
-                    {disableAction === 'disable' ? 'Confirm Archive' : 'Confirm Activation'}
-                  </h2>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Ref: <span className="font-mono text-black">{selectedOrderForAction.id.slice(0,12)}</span></p>
-                </div>
-              </div>
-            </div>
+        <div className="mb-8 p-4 border border-gray-100 rounded-2xl bg-gray-50">
+          <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Target Entity</span>
+          <span className="text-[12px] font-black text-black uppercase tracking-tight">{selectedOrderForAction?.customer_name}</span>
+        </div>
+      </ConfirmSheet>
 
-            {/* Body */}
-            <div className="p-8">
-              <div className={`p-6 rounded-2xl mb-8 ${
-                disableAction === 'disable'
-                  ? 'bg-gray-100 border border-gray-200'
-                  : 'bg-black border border-black shadow-xl'
-              }`}>
-                <p className={`text-[10px] font-black uppercase tracking-widest leading-relaxed ${
-                  disableAction === 'disable'
-                    ? 'text-black'
-                    : 'text-white'
-                }`}>
-                  {disableAction === 'disable' 
-                    ? `Entity will be suspended from operational vectors until explicit reactivation.`
-                    : `Entity will be restored to all operational vectors immediately.`
-                  }
-                </p>
-              </div>
-
-              <div className="mb-8 p-4 border border-gray-100 rounded-2xl bg-gray-50">
-                <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Target Entity</span>
-                <span className="text-[12px] font-black text-black uppercase tracking-tight">{selectedOrderForAction.customer_name}</span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmModal(false)}
-                  className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={processingAction}
-                  onClick={async () => {
-                    setProcessingAction(true);
-                    try {
-                      const updatedDisabled = disableAction === 'disable';
-                      const { error } = await supabase
-                        .from('orders')
-                        .update({ disabled: updatedDisabled })
-                        .eq('id', selectedOrderForAction.id);
-                      if (error) throw error;
-                      setShowConfirmModal(false);
-                      fetchOrders();
-                    } catch (err) {
-                      alert('Error: ' + err.message);
-                    } finally {
-                      setProcessingAction(false);
-                    }
-                  }}
-                  className="flex-[2] bg-black text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-20"
-                >
-                  {processingAction ? 'Executing...' : 'Commit Authorization'}
-                </button>
-              </div>
+      <CommandDialog
+        isOpen={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        title="Initiate Order"
+        subtitle="Identify Customer Entity"
+      >
+        <div className="p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-black rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl">
+              <Plus size={32} className="text-white" strokeWidth={3} />
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Customer Lookup Modal */}
-      {showCustomerModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[32px] w-full max-w-sm shadow-2xl overflow-hidden p-8 border border-white/20">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-black rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl">
-                <Plus size={32} className="text-white" strokeWidth={3} />
-              </div>
-              <h2 className="text-xl font-black text-black uppercase tracking-tighter">Initiate Order</h2>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-2">Identify Customer Entity</p>
+          <form onSubmit={handleLookupCustomer} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contact Link</label>
+              <input
+                required
+                type="tel"
+                autoFocus
+                placeholder="+91 MOBILE"
+                value={customerMobile}
+                onChange={e => setCustomerMobile(e.target.value)}
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-3xl text-lg font-black tracking-tighter focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-200"
+              />
             </div>
 
-            <form onSubmit={handleLookupCustomer} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contact Link</label>
-                <input
-                  required
-                  type="tel"
-                  autoFocus
-                  placeholder="+91 MOBILE"
-                  value={customerMobile}
-                  onChange={e => setCustomerMobile(e.target.value)}
-                  className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-3xl text-lg font-black tracking-tighter focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-200"
-                />
-              </div>
-
-              <div className="pt-4 flex flex-col gap-2">
-                <button 
-                  type="submit" 
-                  disabled={loadingCustomer} 
-                  className="w-full px-6 py-4 bg-black text-white rounded-[24px] text-xs font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
-                >
-                  {loadingCustomer ? 'Verifying...' : 'Proceed to Intake'}
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setShowCustomerModal(false)} 
-                  className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors"
-                >
-                  Cancel Operation
-                </button>
-              </div>
-            </form>
-          </div>
+            <div className="pt-4 flex flex-col gap-2">
+              <button 
+                type="submit" 
+                disabled={loadingCustomer} 
+                className="w-full px-6 py-4 bg-black text-white rounded-[24px] text-xs font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+              >
+                {loadingCustomer ? 'Verifying...' : 'Proceed to Intake'}
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setShowCustomerModal(false)} 
+                className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors"
+              >
+                Cancel Operation
+              </button>
+            </div>
+          </form>
         </div>
-      )}
+      </CommandDialog>
 
     </div>
   );

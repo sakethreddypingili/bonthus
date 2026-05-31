@@ -1,11 +1,11 @@
-import { Box, IconButton, useTheme, Typography } from "@mui/material";
-import InputBase from "@mui/material/InputBase";
-import { tokens } from "../../theme";
-import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
-import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
-import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
-import FavoriteBorderOutlinedIcon from "@mui/icons-material/FavoriteBorderOutlined";
-import SearchIcon from "@mui/icons-material/Search";
+import { Box, IconButton, useTheme, Typography } from"@mui/material";
+import InputBase from"@mui/material/InputBase";
+import { tokens } from"../../theme";
+import NotificationsOutlinedIcon from"@mui/icons-material/NotificationsOutlined";
+import ShoppingCartOutlinedIcon from"@mui/icons-material/ShoppingCartOutlined";
+import PersonOutlinedIcon from"@mui/icons-material/PersonOutlined";
+import FavoriteBorderOutlinedIcon from"@mui/icons-material/FavoriteBorderOutlined";
+import SearchIcon from"@mui/icons-material/Search";
 
 const Topbar = () => {
   const theme = useTheme();
@@ -27,39 +27,39 @@ const Topbar = () => {
           <Typography
             variant="h3"
             sx={{
-              color: "#ffffff",
-              fontWeight: "700",
-              letterSpacing: "1px",
+              color:"#ffffff",
+              fontWeight:"700",
+              letterSpacing:"1px",
             }}
           >
             ADMIN
           </Typography>
 
           {/* NAVIGATION LINKS */}
-          <Box display="flex" gap={3} sx={{ display: { xs: "none", sm: "flex" } }}>
+          <Box display="flex" gap={3} sx={{ display: { xs:"none", sm:"flex" } }}>
             <Typography
               sx={{
-                color: "#ffffff",
-                cursor: "pointer",
-                "&:hover": { color: colors.greenAccent[500] },
+                color:"#ffffff",
+                cursor:"pointer",
+"&:hover": { color: colors.greenAccent[500] },
               }}
             >
               Dashboard
             </Typography>
             <Typography
               sx={{
-                color: "#ffffff",
-                cursor: "pointer",
-                "&:hover": { color: colors.greenAccent[500] },
+                color:"#ffffff",
+                cursor:"pointer",
+"&:hover": { color: colors.greenAccent[500] },
               }}
             >
               Reports
             </Typography>
             <Typography
               sx={{
-                color: "#ffffff",
-                cursor: "pointer",
-                "&:hover": { color: colors.greenAccent[500] },
+                color:"#ffffff",
+                cursor:"pointer",
+"&:hover": { color: colors.greenAccent[500] },
               }}
             >
               Users
@@ -81,7 +81,7 @@ const Topbar = () => {
               ml: 2,
               flex: 1,
               color: colors.grey[200],
-              "& ::placeholder": {
+"& ::placeholder": {
                 color: colors.grey[600],
                 opacity: 1,
               },
@@ -101,16 +101,16 @@ const Topbar = () => {
 
         {/* RIGHT SIDE - ICONS */}
         <Box display="flex" gap={2} alignItems="center">
-          <IconButton sx={{ color: "#ffffff", "&:hover": { color: colors.greenAccent[500] } }}>
+          <IconButton sx={{ color:"#ffffff","&:hover": { color: colors.greenAccent[500] } }}>
             <NotificationsOutlinedIcon />
           </IconButton>
-          <IconButton sx={{ color: "#ffffff", "&:hover": { color: colors.greenAccent[500] } }}>
+          <IconButton sx={{ color:"#ffffff","&:hover": { color: colors.greenAccent[500] } }}>
             <FavoriteBorderOutlinedIcon />
           </IconButton>
-          <IconButton sx={{ color: "#ffffff", "&:hover": { color: colors.greenAccent[500] } }}>
+          <IconButton sx={{ color:"#ffffff","&:hover": { color: colors.greenAccent[500] } }}>
             <ShoppingCartOutlinedIcon />
           </IconButton>
-          <IconButton sx={{ color: "#ffffff", "&:hover": { color: colors.greenAccent[500] } }}>
+          <IconButton sx={{ color:"#ffffff","&:hover": { color: colors.greenAccent[500] } }}>
             <PersonOutlinedIcon />
           </IconButton>
         </Box>

@@ -44,14 +44,14 @@ export default function Analytics() {
   const [timeRange, setTimeRange] = useState('6M');
 
   const metrics = [
-    { label: "Total Inventory Value", value: "₹1,350,000", trend: "+4.2%", icon: PackageSearch },
-    { label: "Requisition Fulfillment", value: "94.5%", trend: "+1.5%", icon: TrendingUp },
-    { label: "Critical Stock Alerts", value: "12", trend: "-3", icon: AlertTriangle },
-    { label: "Avg. Transfer Time", value: "4.2 hrs", trend: "-0.5 hrs", icon: Clock },
+    { label:"Total Inventory Value", value:"₹1,350,000", trend:"+4.2%", icon: PackageSearch },
+    { label:"Requisition Fulfillment", value:"94.5%", trend:"+1.5%", icon: TrendingUp },
+    { label:"Critical Stock Alerts", value:"12", trend:"-3", icon: AlertTriangle },
+    { label:"Avg. Transfer Time", value:"4.2 hrs", trend:"-0.5 hrs", icon: Clock },
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-8 pb-20 animate-fast-slide">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
         <div>
@@ -63,7 +63,7 @@ export default function Analytics() {
             <button
               key={range}
               onClick={() => setTimeRange(range)}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest  ${
                 timeRange === range ? 'bg-black text-white shadow-lg' : 'bg-gray-50 text-gray-400 hover:text-black hover:bg-gray-100'
               }`}
             >
@@ -76,10 +76,10 @@ export default function Analytics() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {metrics.map(m => (
-          <div key={m.label} className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm hover:shadow-xl hover:border-black transition-all duration-300 group">
+          <div key={m.label} className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm hover:shadow-xl hover:border-black   group">
             <div className="flex justify-between items-start mb-6">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{m.label}</p>
-              <m.icon size={20} className="text-gray-300 group-hover:text-black transition-colors" strokeWidth={3} />
+              <m.icon size={20} className="text-gray-300 group-hover:text-black" strokeWidth={3} />
             </div>
             <div className="flex items-end justify-between">
               <div className="text-3xl font-black text-black tracking-tighter">{m.value}</div>

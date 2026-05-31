@@ -10,8 +10,6 @@ import {
   ChevronDown
 } from "lucide-react";
 import { useState } from "react";
-import { supabase } from "../../server/supabase/supabase";
-
 const logoImg = '/assets/images/logo.webp';
 const iconImg = '/assets/images/icon.webp';
 
@@ -25,7 +23,7 @@ const navItems = [
   { to: "/analytics", label: "Analytics", role: ["admin", "super_admin", "store_manager"], icon: BarChart2 },
 ];
 
-export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile }) {
+export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile, onLogout }) {
   const location = useLocation();
   const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
   const isEmployee = userProfile?.role === 'employee';
@@ -149,7 +147,8 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
         )}
 
         <button
-          onClick={() => supabase.auth.signOut()}
+          type="button"
+          onClick={() => void onLogout?.()}
           className={`
             w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50
             transition-all text-sm font-medium

@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Menu, Search, Bell, ChevronDown, User, Settings, LogOut, X } from "lucide-react";
-import { supabase } from "../../server/supabase/supabase";
-
 const titles = {
   "/": { title: "Dashboard", subtitle: "Welcome back, here's what's happening today" },
   "/orders": { title: "Orders", subtitle: "Manage and track all customer orders" },
@@ -14,9 +12,10 @@ const titles = {
   "/settings": { title: "Settings", subtitle: "Configure your store preferences" },
   "/reminders": { title: "Reminders", subtitle: "Manage your tasks and upcoming events" },
   "/notifications": { title: "Notifications", subtitle: "Stay updated with the latest alerts" },
+  "/warehouse": { title: "Overview", subtitle: "Warehouse operational summary and key metrics" },
 };
 
-export default function Topbar({ onToggleSidebar, userProfile }) {
+export default function Topbar({ onToggleSidebar, userProfile, onLogout }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -129,8 +128,12 @@ export default function Topbar({ onToggleSidebar, userProfile }) {
                 </button>
               </div>
               <div className="p-2 border-t border-gray-100">
-                <button 
-                  onClick={() => supabase.auth.signOut()}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    void onLogout?.();
+                  }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-black text-red-600 uppercase tracking-widest hover:bg-red-600 hover:text-white rounded-xl transition-all group"
                 >
                   <LogOut size={16} className="text-red-400 group-hover:text-white" />

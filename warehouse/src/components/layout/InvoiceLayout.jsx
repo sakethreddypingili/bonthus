@@ -193,7 +193,7 @@ const InvoiceLayout = React.forwardRef(({
               }
 
               return (
-                <tr key={item.id} className="bg-white hover:bg-slate-50 transition-colors">
+                <tr key={item.id} className="bg-white hover:bg-slate-50">
                   <td className="py-2 px-4 font-bold text-slate-900 text-xs border-r border-slate-400">
                     {item.products_list?.name || 'Custom Product'}
                   </td>
@@ -442,7 +442,7 @@ const InvoiceLayout = React.forwardRef(({
         <div className="flex flex-col justify-end items-end">
           <div className="flex flex-col items-center gap-6 mt-4">
             <div className="text-center">
-              <p className="text-[10px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For "The Lenscare" {storeName}</p>
+              <p className="text-[10px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For"The Lenscare" {storeName}</p>
               <div className="w-40 h-[1px] bg-slate-300 mb-1"></div>
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Authorized Signatory</p>
             </div>

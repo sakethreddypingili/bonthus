@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Search, Plus, LayoutGrid, List, X, Tags, MoreVertical, ChevronDown, Check } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import { generateId, ID_RULES } from "../server/supabase/idGenerator";
+import SlideDrawer from "../components/common/SlideDrawer";
 
 const DEFAULT_CATEGORIES = ["All"];
 
@@ -500,181 +501,174 @@ export default function Products({ userProfile }) {
         </div>
       </div>
 
-      {/* Modals - Standardized */}
-      {(showAddModal || showCategoryModal || editingProduct || editingCategory) && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-            {/* Add Product */}
-            {showAddModal && (
-              <form onSubmit={handleAddProduct} className="p-8 space-y-6">
-                <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Add Product</h2>
-                  <button type="button" onClick={() => setShowAddModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20} /></button>
-                </div>
+      {/* Add Product Drawer */}
+      <SlideDrawer
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Add Product"
+      >
+        <form onSubmit={handleAddProduct} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Product Name</label>
+              <input required type="text" value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="Product Name" />
+            </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Product Name</label>
-                    <input required type="text" value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="Product Name" />
-                  </div>
-
-                  {isSuperAdmin && (
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Store</label>
-                      <select value={productStoreId} onChange={e => setProductStoreId(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight">
-                        <option value="" disabled>Select Store</option>
-                        {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Category</label>
-                    <select value={newProduct.category_id} onChange={e => setNewProduct({ ...newProduct, category_id: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" disabled={!productStoreId}>
-                      <option value="">Select Category</option>
-                      {productCategories.map(c => <option key={c.id} value={c.id}>{getCategoryLabel(c)}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
-                      <input required type="number" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Stock</label>
-                      <input required type="number" value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 flex gap-3">
-                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Cancel</button>
-                  <button type="submit" disabled={adding || !productStoreId || !newProduct.category_id} className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:shadow-xl transition-all disabled:opacity-50">
-                    {adding ? 'Processing...' : 'Add Product'}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Add Category */}
-            {showCategoryModal && (
-              <form onSubmit={handleCreateCategory} className="p-8 space-y-6">
-                <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Add Category</h2>
-                  <button type="button" onClick={() => setShowCategoryModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20} /></button>
-                </div>
-
-                <div className="space-y-4">
-                  {isSuperAdmin && (
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Store</label>
-                      <select value={newCategory.store_id} onChange={e => setNewCategory({ ...newCategory, store_id: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight">
-                        <option value="" disabled>Select Store</option>
-                        {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Category Name</label>
-                    <input required type="text" value={newCategory.name} onChange={e => setNewCategory({ ...newCategory, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="e.g. Sunglasses" />
-                  </div>
-                </div>
-
-                <div className="pt-4 flex gap-3">
-                  <button type="button" onClick={() => setShowCategoryModal(false)} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Cancel</button>
-                  <button type="submit" disabled={creatingCategory || (isSuperAdmin && !newCategory.store_id)} className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:shadow-xl transition-all disabled:opacity-50">
-                    {creatingCategory ? 'Processing...' : 'Create Category'}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Edit Product */}
-            {editingProduct && (
-              <form onSubmit={handleSaveProductEdit} className="p-8 space-y-6">
-                <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Edit Product</h2>
-                  <button type="button" onClick={() => setEditingProduct(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20} /></button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Product Name</label>
-                    <input required type="text" value={editingProduct.name} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Category</label>
-                    <select value={editingProduct.category_id} onChange={e => setEditingProduct({ ...editingProduct, category_id: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight">
-                      {browseCategories.map(c => <option key={c.id} value={c.id}>{getCategoryLabel(c)}</option>)}
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
-                      <input required type="number" value={editingProduct.price} onChange={e => setEditingProduct({ ...editingProduct, price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Stock</label>
-                      <input required type="number" value={editingProduct.stock} onChange={e => setEditingProduct({ ...editingProduct, stock: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 flex gap-3">
-                  <button type="button" onClick={() => setEditingProduct(null)} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Cancel</button>
-                  <button type="submit" disabled={savingProduct} className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:shadow-xl transition-all disabled:opacity-50">
-                    {savingProduct ? 'Saving...' : 'Save Product'}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Edit Category */}
-            {editingCategory && (
-              <div className="p-8 space-y-6">
-                <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Edit Category</h2>
-                  <button type="button" onClick={() => { setEditingCategory(null); setEditCategoryName(""); }} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20} /></button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Category Name</label>
-                    <input type="text" value={editCategoryName} onChange={e => setEditCategoryName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="Category Name" />
-                  </div>
-
-                  <div className="bg-gray-50 rounded-[2rem] p-6 border border-gray-100 flex flex-col h-[300px]">
-                    <div className="flex justify-between items-center mb-4">
-                      <p className="text-[10px] font-black text-black uppercase tracking-widest">Assign Products</p>
-                      <div className="flex gap-3">
-                        <button onClick={() => setSelectedProductIds(dbProducts.filter(p => p.store_id === editingCategory.store_id).map(p => p.id))} className="text-[9px] font-black text-black uppercase tracking-widest hover:underline">Select All</button>
-                        <button onClick={() => setSelectedProductIds([])} className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:underline">Clear</button>
-                      </div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-2">
-                      {dbProducts.filter(p => p.store_id === editingCategory.store_id).map(p => (
-                        <label key={p.id} className="flex items-center gap-3 py-3 px-4 bg-white border border-gray-100 rounded-2xl cursor-pointer hover:border-black transition-all group">
-                          <input type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleSelectProduct(p.id)} className="w-4 h-4 rounded-lg accent-black" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-black text-black uppercase tracking-tight truncate">{p.name}</p>
-                            <p className="text-[9px] font-black text-gray-400 font-mono italic">#{p.id.slice(0, 8)}</p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 flex gap-3">
-                  <button type="button" onClick={() => { setEditingCategory(null); setEditCategoryName(""); }} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Cancel</button>
-                  <button type="button" onClick={handleSaveRename} className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:shadow-xl transition-all">Save Changes</button>
-                </div>
+            {isSuperAdmin && (
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Store</label>
+                <select value={productStoreId} onChange={e => setProductStoreId(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight">
+                  <option value="" disabled>Select Store</option>
+                  {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
               </div>
             )}
+
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Category</label>
+              <select value={newProduct.category_id} onChange={e => setNewProduct({ ...newProduct, category_id: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" disabled={!productStoreId}>
+                <option value="">Select Category</option>
+                {productCategories.map(c => <option key={c.id} value={c.id}>{getCategoryLabel(c)}</option>)}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
+                <input required type="number" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Stock</label>
+                <input required type="number" value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+
+          <div className="pt-4 flex gap-3">
+            <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Cancel</button>
+            <button type="submit" disabled={adding || !productStoreId || !newProduct.category_id} className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:shadow-xl transition-all disabled:opacity-50">
+              {adding ? 'Processing...' : 'Add Product'}
+            </button>
+          </div>
+        </form>
+      </SlideDrawer>
+
+      {/* Add Category Drawer */}
+      <SlideDrawer
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        title="Add Category"
+      >
+        <form onSubmit={handleCreateCategory} className="space-y-6">
+          <div className="space-y-4">
+            {isSuperAdmin && (
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Store</label>
+                <select value={newCategory.store_id} onChange={e => setNewCategory({ ...newCategory, store_id: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight">
+                  <option value="" disabled>Select Store</option>
+                  {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Category Name</label>
+              <input required type="text" value={newCategory.name} onChange={e => setNewCategory({ ...newCategory, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="e.g. Sunglasses" />
+            </div>
+          </div>
+
+          <div className="pt-4 flex gap-3">
+            <button type="button" onClick={() => setShowCategoryModal(false)} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Cancel</button>
+            <button type="submit" disabled={creatingCategory || (isSuperAdmin && !newCategory.store_id)} className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:shadow-xl transition-all disabled:opacity-50">
+              {creatingCategory ? 'Processing...' : 'Create Category'}
+            </button>
+          </div>
+        </form>
+      </SlideDrawer>
+
+      {/* Edit Product Drawer */}
+      <SlideDrawer
+        isOpen={!!editingProduct}
+        onClose={() => setEditingProduct(null)}
+        title="Edit Product"
+      >
+        {editingProduct && (
+          <form onSubmit={handleSaveProductEdit} className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Product Name</label>
+                <input required type="text" value={editingProduct.name} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Category</label>
+                <select value={editingProduct.category_id} onChange={e => setEditingProduct({ ...editingProduct, category_id: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight">
+                  {browseCategories.map(c => <option key={c.id} value={c.id}>{getCategoryLabel(c)}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
+                  <input required type="number" value={editingProduct.price} onChange={e => setEditingProduct({ ...editingProduct, price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Stock</label>
+                  <input required type="number" value={editingProduct.stock} onChange={e => setEditingProduct({ ...editingProduct, stock: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 flex gap-3">
+              <button type="button" onClick={() => setEditingProduct(null)} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Cancel</button>
+              <button type="submit" disabled={savingProduct} className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:shadow-xl transition-all disabled:opacity-50">
+                {savingProduct ? 'Saving...' : 'Save Product'}
+              </button>
+            </div>
+          </form>
+        )}
+      </SlideDrawer>
+
+      {/* Edit Category Drawer */}
+      <SlideDrawer
+        isOpen={!!editingCategory}
+        onClose={() => { setEditingCategory(null); setEditCategoryName(""); }}
+        title="Edit Category"
+      >
+        {editingCategory && (
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Category Name</label>
+                <input type="text" value={editCategoryName} onChange={e => setEditCategoryName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="Category Name" />
+              </div>
+
+              <div className="bg-gray-50 rounded-[2rem] p-6 border border-gray-100 flex flex-col h-[300px]">
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-[10px] font-black text-black uppercase tracking-widest">Assign Products</p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setSelectedProductIds(dbProducts.filter(p => p.store_id === editingCategory.store_id).map(p => p.id))} className="text-[9px] font-black text-black uppercase tracking-widest hover:underline">Select All</button>
+                    <button onClick={() => setSelectedProductIds([])} className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:underline">Clear</button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {dbProducts.filter(p => p.store_id === editingCategory.store_id).map(p => (
+                    <label key={p.id} className="flex items-center gap-3 py-3 px-4 bg-white border border-gray-100 rounded-2xl cursor-pointer hover:border-black transition-all group">
+                      <input type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleSelectProduct(p.id)} className="w-4 h-4 rounded-lg accent-black" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-black text-black uppercase tracking-tight truncate">{p.name}</p>
+                        <p className="text-[9px] font-black text-gray-400 font-mono italic">#{p.id.slice(0, 8)}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 flex gap-3">
+              <button type="button" onClick={() => { setEditingCategory(null); setEditCategoryName(""); }} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Cancel</button>
+              <button type="button" onClick={handleSaveRename} className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:shadow-xl transition-all">Save Changes</button>
+            </div>
+          </div>
+        )}
+      </SlideDrawer>
     </div>
   );
 }

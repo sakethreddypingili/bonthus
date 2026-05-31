@@ -1,8 +1,8 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import "./index.css";
-import App from "./App";
-import { BrowserRouter } from "react-router-dom";
+import React from"react";
+import ReactDOM from"react-dom/client";
+import"./index.css";
+import App from"./App";
+import { BrowserRouter } from"react-router-dom";
 
 const setFavicon = (href) => {
   const head = document.head || document.getElementsByTagName("head")[0];
@@ -10,16 +10,16 @@ const setFavicon = (href) => {
 
   if (!link) {
     link = document.createElement("link");
-    link.rel = "icon";
+    link.rel ="icon";
     head.appendChild(link);
   }
-  link.type = "image/x-icon";
+  link.type ="image/x-icon";
   link.href = href;
 };
 
 // Use public path for favicon
 setFavicon("/assets/images/favicon.ico");
-document.title = "The Lenscare - Admin";
+document.title ="The Lenscare - Admin";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 

@@ -20,7 +20,7 @@ import EditOrder from "./pages/EditOrder";
 import PasswordReset from "./pages/PasswordReset";
 import Reminders from "./pages/Reminders";
 import Notifications from "./pages/Notifications";
- const PROFILE_CACHE_KEY = "lenscare_profile_cache_v1";
+import { PROFILE_CACHE_KEY, logout } from "./utils/auth";
 
 function App() {
   const location = useLocation();
@@ -70,6 +70,19 @@ function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--app-topbar-offset', '4.5rem');
+    root.style.setProperty(
+      '--app-sidebar-offset',
+      isMobile ? '0px' : sidebarCollapsed ? '66px' : '14rem'
+    );
+    return () => {
+      root.style.removeProperty('--app-topbar-offset');
+      root.style.removeProperty('--app-sidebar-offset');
+    };
+  }, [isMobile, sidebarCollapsed]);
 
   const fetchProfile = useCallback(async (activeSession, options = {}) => {
     const requestId = ++profileRequestRef.current;
@@ -254,7 +267,25 @@ function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      void handleAuthStateChange(event, nextSession);
+      if (!isMounted) return;
+
+      if (event === 'SIGNED_OUT' || !nextSession) {
+        profileRequestRef.current += 1;
+        setSession(null);
+        setUserProfile(null);
+        clearCachedProfile();
+        setProfileResolved(true);
+        setAuthLoading(false);
+        return;
+      }
+
+      if (event === 'INITIAL_SESSION' && authBootstrappedRef.current) {
+        return;
+      }
+
+      setTimeout(() => {
+        void handleAuthStateChange(event, nextSession);
+      }, 0);
     });
 
     return () => {
@@ -262,6 +293,17 @@ function App() {
       subscription.unsubscribe();
     };
   }, [clearCachedProfile, fetchProfile, readCachedProfile]);
+
+  const handleLogout = useCallback(async () => {
+    profileRequestRef.current += 1;
+    authBootstrappedRef.current = true;
+    setSession(null);
+    setUserProfile(null);
+    setProfileResolved(true);
+    setAuthLoading(false);
+    clearCachedProfile();
+    await logout();
+  }, [clearCachedProfile]);
 
   if (authLoading || (session && !profileResolved)) {
     return (
@@ -299,7 +341,8 @@ function App() {
           <h2 className="text-lg font-bold text-[#000000]">Unable to load account profile</h2>
           <p className="text-sm text-gray-500 mt-2">Please sign in again to continue.</p>
           <button
-            onClick={() => supabase.auth.signOut()}
+            type="button"
+            onClick={() => void handleLogout()}
             className="mt-5 px-4 py-2 rounded-lg bg-[#000000] text-white text-sm font-semibold"
           >
             Sign out
@@ -325,7 +368,8 @@ function App() {
           <h2 className="text-lg font-bold text-[#000000]">Unauthorized role</h2>
           <p className="text-sm text-gray-500 mt-2">This account role is not configured for this app.</p>
           <button
-            onClick={() => supabase.auth.signOut()}
+            type="button"
+            onClick={() => void handleLogout()}
             className="mt-5 px-4 py-2 rounded-lg bg-[#000000] text-white text-sm font-semibold"
           >
             Sign out
@@ -388,12 +432,17 @@ function App() {
           setCollapsed={setSidebarCollapsed}
           userProfile={userProfile}
           isMobile={isMobile}
+          onLogout={handleLogout}
         />
       </div>
 
 
       <div className="flex flex-col flex-1 overflow-hidden min-w-0">
-        <Topbar onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} userProfile={userProfile} />
+        <Topbar
+          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          userProfile={userProfile}
+          onLogout={handleLogout}
+        />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6">
           {isEmployee ? employeeRoutes : adminRoutes}
         </main>

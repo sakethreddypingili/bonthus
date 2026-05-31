@@ -4,6 +4,9 @@ import { ArrowLeft, Save, Plus, Trash2, X, CheckCircle, Loader2, ChevronDown } f
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../server/supabase/supabase";
 import { generateId, ID_RULES } from "../server/supabase/idGenerator";
+import CommandDialog from "../components/common/CommandDialog";
+import SlideDrawer from "../components/common/SlideDrawer";
+import { OVERLAY_CHROME_STYLE } from "../components/common/overlayChrome";
 
 export default function CreateOrder({ userProfile }) {
     const navigate = useNavigate();
@@ -1175,7 +1178,7 @@ export default function CreateOrder({ userProfile }) {
                                                 />
                                                 {activeItemSearch === item.id && dropdownLayout && createPortal(
                                                     <>
-                                                        <div className="fixed inset-0 z-[9998]" onMouseDown={closeProductSearch}></div>
+                                                        <div className="fixed z-[9998]" style={OVERLAY_CHROME_STYLE} onMouseDown={closeProductSearch} aria-hidden="true" />
                                                         <div
                                                             className="fixed z-[9999] bg-white border border-gray-100 rounded-3xl shadow-2xl overflow-y-auto animate-in zoom-in duration-200"
                                                             style={{
@@ -1419,107 +1422,155 @@ export default function CreateOrder({ userProfile }) {
             </div>
 
             {/* Add Product Modal */}
-            {showAddProductModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-                        <div className="p-8 space-y-6">
-                            <div className="flex justify-between items-center">
-                                <h2 className="text-2xl font-black text-black uppercase tracking-tighter">New Entity</h2>
-                                <button onClick={handleCancelAddProduct} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                    <X size={20} />
-                                </button>
-                            </div>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Registering unknown catalog item</p>
-                            
-                            <form onSubmit={handleAddProduct} className="space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Product Name</label>
-                                    <input required type="text" value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" readOnly />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Classification</label>
-                                    <select 
-                                        value={newProduct.category_id} 
-                                        onChange={e => {
-                                            const cat = storeCategories.find(c => c.id === e.target.value);
-                                            setNewProduct({ ...newProduct, category_id: e.target.value, category: cat?.name || '' });
-                                        }} 
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight"
-                                        required
-                                    >
-                                        <option value="">Select Category</option>
-                                        {storeCategories.map(cat => (
-                                            <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
-                                        <input required type="number" min="0" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Init Stock</label>
-                                        <input required type="number" min="0" value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
-                                    </div>
-                                </div>
-                                <div className="pt-4 flex gap-3">
-                                    <button type="button" onClick={handleCancelAddProduct} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Abort</button>
-                                    <button type="submit" disabled={addingProduct || !newProduct.category_id} className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:shadow-xl transition-all disabled:opacity-50">
-                                        {addingProduct ? 'Registering...' : 'Register Item'}
-                                    </button>
-                                </div>
-                            </form>
+            <CommandDialog
+                isOpen={showAddProductModal}
+                onClose={handleCancelAddProduct}
+                title="New Entity"
+                subtitle="Registering unknown catalog item"
+                maxWidth="max-w-md"
+            >
+                <div className="p-8 space-y-6">
+                    <form onSubmit={handleAddProduct} className="space-y-4">
+                        <div>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Product Name</label>
+                            <input required type="text" value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" readOnly />
                         </div>
-                    </div>
+                        <div>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Classification</label>
+                            <select 
+                                value={newProduct.category_id} 
+                                onChange={e => {
+                                    const cat = storeCategories.find(c => c.id === e.target.value);
+                                    setNewProduct({ ...newProduct, category_id: e.target.value, category: cat?.name || '' });
+                                }} 
+                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight"
+                                required
+                            >
+                                <option value="">Select Category</option>
+                                {storeCategories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
+                                <input required type="number" min="0" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Init Stock</label>
+                                <input required type="number" min="0" value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
+                            </div>
+                        </div>
+                        <div className="pt-4 flex gap-3">
+                            <button type="button" onClick={handleCancelAddProduct} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Abort</button>
+                            <button type="submit" disabled={addingProduct || !newProduct.category_id} className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:shadow-xl transition-all disabled:opacity-50">
+                                {addingProduct ? 'Registering...' : 'Register Item'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-            )}
+            </CommandDialog>
 
             {/* Prescription Modal */}
-            {showPrescriptionModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-                        <div className="p-8 space-y-8">
-                            <div className="flex justify-between items-center border-b border-gray-50 pb-6">
-                                <div>
-                                    <h2 className="text-2xl font-black text-black uppercase tracking-tighter leading-none">Optical Data Input</h2>
-                                    <p className="text-[10px] text-gray-400 mt-2 font-black uppercase tracking-widest">Specify lens power requirements</p>
+            <SlideDrawer
+                isOpen={showPrescriptionModal}
+                onClose={() => setShowPrescriptionModal(false)}
+                title="Optical Data Input"
+                subtitle="Specify lens power requirements"
+                width="max-w-2xl"
+            >
+                <div className="p-8 space-y-8">
+                    <div className="grid grid-cols-3 gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100">
+                        {[
+                            { key: 'isSamePower', label: 'Uniform Eye Power' },
+                            { key: 'isCylindrical', label: 'Cylindrical Focus' },
+                            { key: 'hasAdditionalPower', label: 'Addition Enabled' }
+                        ].map(opt => (
+                            <label key={opt.key} className={`flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all border ${tempPrescription[opt.key] ? 'bg-black border-black text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400 hover:text-black'}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={tempPrescription[opt.key]}
+                                    onChange={e => setTempPrescription({ ...tempPrescription, [opt.key]: e.target.checked })}
+                                    className="hidden"
+                                />
+                                <span className="text-[10px] font-black uppercase tracking-widest">{opt.label}</span>
+                            </label>
+                        ))}
+                    </div>
+
+                    <div className="space-y-8">
+                        <div className={`grid grid-cols-1 ${tempPrescription.isSamePower ? '' : 'md:grid-cols-2'} gap-8`}>
+                            <div className="space-y-4">
+                                <p className="text-[10px] font-black text-black uppercase tracking-widest border-l-2 border-black pl-3">{tempPrescription.isSamePower ? "Universal Distance" : "Right Eye (RE) Distance"}</p>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {['sph', 'cyl', 'axis'].map(f => (
+                                        <div key={f} className={(!tempPrescription.isCylindrical && (f === 'cyl' || f === 'axis')) ? 'hidden' : ''}>
+                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">{f}</label>
+                                            <input
+                                                type="text"
+                                                value={tempPrescription.re[f]}
+                                                onChange={e => handlePowerInputChange(e, 'dv', 're', f)}
+                                                className="w-full px-2 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:border-black text-center text-[11px] font-black font-mono"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    ))}
                                 </div>
-                                <button onClick={() => setShowPrescriptionModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                    <X size={24} />
-                                </button>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100">
-                                {[
-                                    { key: 'isSamePower', label: 'Uniform Eye Power' },
-                                    { key: 'isCylindrical', label: 'Cylindrical Focus' },
-                                    { key: 'hasAdditionalPower', label: 'Addition Enabled' }
-                                ].map(opt => (
-                                    <label key={opt.key} className={`flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all border ${tempPrescription[opt.key] ? 'bg-black border-black text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400 hover:text-black'}`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={tempPrescription[opt.key]}
-                                            onChange={e => setTempPrescription({ ...tempPrescription, [opt.key]: e.target.checked })}
-                                            className="hidden"
-                                        />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">{opt.label}</span>
-                                    </label>
-                                ))}
-                            </div>
+                            {!tempPrescription.isSamePower && (
+                                <div className="space-y-4">
+                                    <p className="text-[10px] font-black text-black uppercase tracking-widest border-l-2 border-black pl-3">Left Eye (LE) Distance</p>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {['sph', 'cyl', 'axis'].map(f => (
+                                            <div key={f} className={(!tempPrescription.isCylindrical && (f === 'cyl' || f === 'axis')) ? 'hidden' : ''}>
+                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">{f}</label>
+                                                <input
+                                                    type="text"
+                                                    value={tempPrescription.le[f]}
+                                                    onChange={e => handlePowerInputChange(e, 'dv', 'le', f)}
+                                                    className="w-full px-2 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:border-black text-center text-[11px] font-black font-mono"
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
-                            <div className="space-y-8">
-                                <div className={`grid grid-cols-1 ${tempPrescription.isSamePower ? '' : 'md:grid-cols-2'} gap-8`}>
+                        {tempPrescription.hasAdditionalPower && (
+                            <div className={`grid grid-cols-1 ${tempPrescription.isSamePower ? '' : 'md:grid-cols-2'} gap-8 pt-4 border-t border-gray-50`}>
+                                <div className="space-y-4">
+                                    <p className="text-[10px] font-black text-black uppercase tracking-widest border-l-2 border-black pl-3">{tempPrescription.isSamePower ? "Universal Near" : "Right Eye (RE) Near"}</p>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {['sph', 'cyl', 'axis'].map(f => (
+                                            <div key={f} className={(!tempPrescription.isCylindrical && (f === 'cyl' || f === 'axis')) ? 'hidden' : ''}>
+                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">{f}</label>
+                                                <input
+                                                    type="text"
+                                                    value={tempPrescription.adl_re[f]}
+                                                    onChange={e => handlePowerInputChange(e, 'nv', 'adl_re', f)}
+                                                    className="w-full px-2 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:border-black text-center text-[11px] font-black font-mono"
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {!tempPrescription.isSamePower && (
                                     <div className="space-y-4">
-                                        <p className="text-[10px] font-black text-black uppercase tracking-widest border-l-2 border-black pl-3">{tempPrescription.isSamePower ? "Universal Distance" : "Right Eye (RE) Distance"}</p>
+                                        <p className="text-[10px] font-black text-black uppercase tracking-widest border-l-2 border-black pl-3">Left Eye (LE) Near</p>
                                         <div className="grid grid-cols-3 gap-3">
                                             {['sph', 'cyl', 'axis'].map(f => (
                                                 <div key={f} className={(!tempPrescription.isCylindrical && (f === 'cyl' || f === 'axis')) ? 'hidden' : ''}>
                                                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">{f}</label>
                                                     <input
                                                         type="text"
-                                                        value={tempPrescription.re[f]}
-                                                        onChange={e => handlePowerInputChange(e, 'dv', 're', f)}
+                                                        value={tempPrescription.adl_le[f]}
+                                                        onChange={e => handlePowerInputChange(e, 'nv', 'adl_le', f)}
                                                         className="w-full px-2 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:border-black text-center text-[11px] font-black font-mono"
                                                         placeholder="0.00"
                                                     />
@@ -1527,173 +1578,103 @@ export default function CreateOrder({ userProfile }) {
                                             ))}
                                         </div>
                                     </div>
-
-                                    {!tempPrescription.isSamePower && (
-                                        <div className="space-y-4">
-                                            <p className="text-[10px] font-black text-black uppercase tracking-widest border-l-2 border-black pl-3">Left Eye (LE) Distance</p>
-                                            <div className="grid grid-cols-3 gap-3">
-                                                {['sph', 'cyl', 'axis'].map(f => (
-                                                    <div key={f} className={(!tempPrescription.isCylindrical && (f === 'cyl' || f === 'axis')) ? 'hidden' : ''}>
-                                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">{f}</label>
-                                                        <input
-                                                            type="text"
-                                                            value={tempPrescription.le[f]}
-                                                            onChange={e => handlePowerInputChange(e, 'dv', 'le', f)}
-                                                            className="w-full px-2 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:border-black text-center text-[11px] font-black font-mono"
-                                                            placeholder="0.00"
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {tempPrescription.hasAdditionalPower && (
-                                    <div className={`grid grid-cols-1 ${tempPrescription.isSamePower ? '' : 'md:grid-cols-2'} gap-8 pt-4 border-t border-gray-50`}>
-                                        <div className="space-y-4">
-                                            <p className="text-[10px] font-black text-black uppercase tracking-widest border-l-2 border-black pl-3">{tempPrescription.isSamePower ? "Universal Near" : "Right Eye (RE) Near"}</p>
-                                            <div className="grid grid-cols-3 gap-3">
-                                                {['sph', 'cyl', 'axis'].map(f => (
-                                                    <div key={f} className={(!tempPrescription.isCylindrical && (f === 'cyl' || f === 'axis')) ? 'hidden' : ''}>
-                                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">{f}</label>
-                                                        <input
-                                                            type="text"
-                                                            value={tempPrescription.adl_re[f]}
-                                                            onChange={e => handlePowerInputChange(e, 'nv', 'adl_re', f)}
-                                                            className="w-full px-2 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:border-black text-center text-[11px] font-black font-mono"
-                                                            placeholder="0.00"
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {!tempPrescription.isSamePower && (
-                                            <div className="space-y-4">
-                                                <p className="text-[10px] font-black text-black uppercase tracking-widest border-l-2 border-black pl-3">Left Eye (LE) Near</p>
-                                                <div className="grid grid-cols-3 gap-3">
-                                                    {['sph', 'cyl', 'axis'].map(f => (
-                                                        <div key={f} className={(!tempPrescription.isCylindrical && (f === 'cyl' || f === 'axis')) ? 'hidden' : ''}>
-                                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">{f}</label>
-                                                            <input
-                                                                type="text"
-                                                                value={tempPrescription.adl_le[f]}
-                                                                onChange={e => handlePowerInputChange(e, 'nv', 'adl_le', f)}
-                                                                className="w-full px-2 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:border-black text-center text-[11px] font-black font-mono"
-                                                                placeholder="0.00"
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
                                 )}
                             </div>
+                        )}
+                    </div>
 
-                            <div className="pt-6 border-t border-gray-100 flex gap-4">
-                                <button type="button" onClick={() => setShowPrescriptionModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Discard</button>
-                                <button
-                                    onClick={handleSavePrescription}
-                                    className="flex-[2] py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:shadow-2xl transition-all"
-                                >
-                                    Commit Data
-                                </button>
-                            </div>
-                        </div>
+                    <div className="pt-6 border-t border-gray-100 flex gap-4">
+                        <button type="button" onClick={() => setShowPrescriptionModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Discard</button>
+                        <button
+                            onClick={handleSavePrescription}
+                            className="flex-[2] py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:shadow-2xl transition-all"
+                        >
+                            Commit Data
+                        </button>
                     </div>
                 </div>
-            )}
+            </SlideDrawer>
 
             {/* Payment Details Modal */}
-            {showPaymentModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[120] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-                        <div className="p-8 space-y-8">
-                            <div className="flex justify-between items-center border-b border-gray-50 pb-6">
-                                <div>
-                                    <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Settlement</h2>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Aggregate Value: <span className="text-black">₹{grossTotal.toLocaleString()}</span></p>
+            <CommandDialog
+                isOpen={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                title="Settlement"
+                subtitle={`Aggregate Value: ₹${grossTotal.toLocaleString()}`}
+                maxWidth="max-w-lg"
+            >
+                <div className="p-8 space-y-8">
+                    <div className="space-y-4">
+                        {payments.map((p, idx) => (
+                            <div key={p.id} className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                                <div className="flex-1">
+                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Mode</label>
+                                    <select
+                                        value={p.mode}
+                                        onChange={e => updatePayment(p.id, 'mode', e.target.value)}
+                                        className="w-full bg-transparent text-[11px] font-black uppercase focus:outline-none"
+                                    >
+                                        <option>Cash</option>
+                                        <option>UPI</option>
+                                        <option>Card</option>
+                                        <option>Due</option>
+                                    </select>
                                 </div>
-                                <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                    <X size={24} />
-                                </button>
-                            </div>
-
-                            <div className="space-y-4">
-                                {payments.map((p, idx) => (
-                                    <div key={p.id} className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                                        <div className="flex-1">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Mode</label>
-                                            <select
-                                                value={p.mode}
-                                                onChange={e => updatePayment(p.id, 'mode', e.target.value)}
-                                                className="w-full bg-transparent text-[11px] font-black uppercase focus:outline-none"
-                                            >
-                                                <option>Cash</option>
-                                                <option>UPI</option>
-                                                <option>Card</option>
-                                                <option>Due</option>
-                                            </select>
-                                        </div>
-                                        <div className="flex-[2]">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Quantum (₹)</label>
-                                            <input
-                                                type="number"
-                                                value={p.amount}
-                                                onChange={e => updatePayment(p.id, 'amount', e.target.value)}
-                                                className="w-full bg-transparent text-[14px] font-black text-black font-mono focus:outline-none"
-                                                placeholder="0.00"
-                                                autoFocus={idx === payments.length - 1}
-                                            />
-                                        </div>
-                                        <button
-                                            onClick={() => removePayment(p.id)}
-                                            className="p-2 text-gray-300 hover:text-black transition-all"
-                                            disabled={payments.length === 1}
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                ))}
-
+                                <div className="flex-[2]">
+                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Quantum (₹)</label>
+                                    <input
+                                        type="number"
+                                        value={p.amount}
+                                        onChange={e => updatePayment(p.id, 'amount', e.target.value)}
+                                        className="w-full bg-transparent text-[14px] font-black text-black font-mono focus:outline-none"
+                                        placeholder="0.00"
+                                        autoFocus={idx === payments.length - 1}
+                                    />
+                                </div>
                                 <button
-                                    onClick={handleAddPayment}
-                                    className="w-full py-4 border-2 border-dashed border-gray-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:border-black hover:text-black transition-all"
+                                    onClick={() => removePayment(p.id)}
+                                    className="p-2 text-gray-300 hover:text-black transition-all"
+                                    disabled={payments.length === 1}
                                 >
-                                    Add Payment Split
+                                    <Trash2 size={18} />
                                 </button>
                             </div>
+                        ))}
 
-                            <div className="bg-black text-white p-6 rounded-2xl space-y-3">
-                                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                                    <span className="text-gray-400">Total Recorded</span>
-                                    <span>₹{totalPaid.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between text-[11px] font-black uppercase tracking-widest border-t border-white/10 pt-3">
-                                    <span className="text-gray-400">Deviation</span>
-                                    <span className={Number(paymentGap) === 0 ? 'text-white' : 'text-gray-400'}>
-                                        {Number(paymentGap) === 0 ? '✓ Balanced' : `₹${paymentGap}`}
-                                    </span>
-                                </div>
-                            </div>
+                        <button
+                            onClick={handleAddPayment}
+                            className="w-full py-4 border-2 border-dashed border-gray-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:border-black hover:text-black transition-all"
+                        >
+                            Add Payment Split
+                        </button>
+                    </div>
 
-                            <div className="pt-4 flex gap-4">
-                                <button type="button" onClick={() => setShowPaymentModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Back</button>
-                                <button
-                                    onClick={handleFinalSave}
-                                    disabled={loading || Number(paymentGap) !== 0}
-                                    className="flex-[2] py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:shadow-2xl transition-all disabled:opacity-30 flex items-center justify-center gap-3"
-                                >
-                                    {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save size={18} />}
-                                    Finalize Transaction
-                                </button>
-                            </div>
+                    <div className="bg-black text-white p-6 rounded-2xl space-y-3">
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                            <span className="text-gray-400">Total Recorded</span>
+                            <span>₹{totalPaid.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] font-black uppercase tracking-widest border-t border-white/10 pt-3">
+                            <span className="text-gray-400">Deviation</span>
+                            <span className={Number(paymentGap) === 0 ? 'text-white' : 'text-gray-400'}>
+                                {Number(paymentGap) === 0 ? '✓ Balanced' : `₹${paymentGap}`}
+                            </span>
                         </div>
                     </div>
+
+                    <div className="pt-4 flex gap-4">
+                        <button type="button" onClick={() => setShowPaymentModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Back</button>
+                        <button
+                            onClick={handleFinalSave}
+                            disabled={loading || Number(paymentGap) !== 0}
+                            className="flex-[2] py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:shadow-2xl transition-all disabled:opacity-30 flex items-center justify-center gap-3"
+                        >
+                            {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save size={18} />}
+                            Finalize Transaction
+                        </button>
+                    </div>
                 </div>
-            )}
+            </CommandDialog>
 
         </div>
     );

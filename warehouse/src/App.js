@@ -1,22 +1,28 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { supabase } from "./server/supabase/supabase";
-import { supabaseAdmin } from "./server/supabase/supabaseAdmin";
-import Sidebar from "./components/common/Sidebar";
-import Topbar from "./components/common/Topbar";
-import Products from "./pages/Products";
-import Attendance from "./pages/Attendance";
-import Settings from "./pages/Settings";
-import Login from "./pages/Login";
-import PasswordReset from "./pages/PasswordReset";
-import Reminders from "./pages/Reminders";
-import Notifications from "./pages/Notifications";
-import Warehouse from "./pages/Warehouse";
-import Analytics from "./pages/Analytics";
-import Store from "./pages/Store";
-import Staff from "./pages/Staff";
-
-const PROFILE_CACHE_KEY = "lenscare_profile_cache_v1";
+import { useState, useEffect, useCallback, useRef } from"react";
+import { Routes, Route, Navigate, useLocation } from"react-router-dom";
+import { supabase } from"./server/supabase/supabase";
+import { supabaseAdmin } from"./server/supabase/supabaseAdmin";
+import Sidebar from"./components/common/Sidebar";
+import Topbar from"./components/common/Topbar";
+import InventoryEntities from"./pages/InventoryEntities";
+import EntityDetails from"./pages/EntityDetails";
+import Attendance from"./pages/Attendance";
+import Settings from"./pages/Settings";
+import Login from"./pages/Login";
+import PasswordReset from"./pages/PasswordReset";
+import Reminders from"./pages/Reminders";
+import Notifications from"./pages/Notifications";
+import Dashboard from"./pages/Dashboard";
+import Categories from"./pages/Categories";
+import Barcodes from"./pages/Barcodes";
+import BarcodeCreator from"./pages/BarcodeCreator";
+import Analytics from"./pages/Analytics";
+import Store from"./pages/Store";
+import Shipment from"./pages/Shipment";
+import ShipmentOverview from"./pages/ShipmentOverview";
+import Vendors from"./pages/Vendors";
+import Provisioning from"./pages/Provisioning";
+import { PROFILE_CACHE_KEY, logout } from"./utils/auth";
 
 function App() {
   const location = useLocation();
@@ -66,6 +72,19 @@ function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--app-topbar-offset', '4.5rem');
+    root.style.setProperty(
+      '--app-sidebar-offset',
+      isMobile ? '0px' : sidebarCollapsed ? '66px' : '14rem'
+    );
+    return () => {
+      root.style.removeProperty('--app-topbar-offset');
+      root.style.removeProperty('--app-sidebar-offset');
+    };
+  }, [isMobile, sidebarCollapsed]);
 
   const fetchProfile = useCallback(async (activeSession, options = {}) => {
     const requestId = ++profileRequestRef.current;
@@ -235,7 +254,7 @@ function App() {
       if (!isMounted) return;
 
       // Initial session is already handled by getSession during bootstrap.
-      if (event === "INITIAL_SESSION" && authBootstrappedRef.current) {
+      if (event ==="INITIAL_SESSION" && authBootstrappedRef.current) {
         return;
       }
 
@@ -258,6 +277,17 @@ function App() {
       subscription.unsubscribe();
     };
   }, [clearCachedProfile, fetchProfile, readCachedProfile]);
+
+  const handleLogout = useCallback(async () => {
+    profileRequestRef.current += 1;
+    authBootstrappedRef.current = true;
+    setSession(null);
+    setUserProfile(null);
+    setProfileResolved(true);
+    setAuthLoading(false);
+    clearCachedProfile();
+    await logout();
+  }, [clearCachedProfile]);
 
   if (authLoading || (session && !profileResolved)) {
     return (
@@ -288,7 +318,8 @@ function App() {
           <h2 className="text-lg font-bold text-[#000000]">Unable to load account profile</h2>
           <p className="text-sm text-gray-500 mt-2">Please sign in again to continue.</p>
           <button
-            onClick={() => supabase.auth.signOut()}
+            type="button"
+            onClick={() => void handleLogout()}
             className="mt-5 px-4 py-2 rounded-lg bg-[#000000] text-white text-sm font-semibold"
           >
             Sign out
@@ -304,8 +335,8 @@ function App() {
   }
 
   const role = userProfile?.role;
-  const isEmployee = role === "employee";
-  const isAdminOrManager = role === "admin" || role === "super_admin" || role === "store_manager";
+  const isEmployee = role ==="employee";
+  const isAdminOrManager = role ==="admin" || role ==="super_admin" || role ==="store_manager";
 
   if (!isEmployee && !isAdminOrManager) {
     return (
@@ -314,7 +345,8 @@ function App() {
           <h2 className="text-lg font-bold text-[#000000]">Unauthorized role</h2>
           <p className="text-sm text-gray-500 mt-2">This account role is not configured for this app.</p>
           <button
-            onClick={() => supabase.auth.signOut()}
+            type="button"
+            onClick={() => void handleLogout()}
             className="mt-5 px-4 py-2 rounded-lg bg-[#000000] text-white text-sm font-semibold"
           >
             Sign out
@@ -336,34 +368,41 @@ function App() {
 
   const adminRoutes = (
     <Routes>
-      <Route path="/" element={<Navigate to="/warehouse" replace />} />
-      <Route path="/warehouse" element={<Warehouse userProfile={userProfile} />} />
-      <Route path="/products" element={<Products userProfile={userProfile} />} />
+      <Route path="/" element={<Dashboard userProfile={userProfile} />} />
+      <Route path="/inventory-entities" element={<InventoryEntities userProfile={userProfile} />} />
+      <Route path="/inventory-entities/:id" element={<EntityDetails userProfile={userProfile} />} />
       <Route path="/analytics" element={<Analytics userProfile={userProfile} />} />
       <Route path="/store" element={<Store userProfile={userProfile} />} />
-      <Route path="/staff" element={<Staff userProfile={userProfile} />} />
+      <Route path="/shipment" element={<Shipment userProfile={userProfile} />} />
+      <Route path="/shipment-overview" element={<ShipmentOverview userProfile={userProfile} />} />
+      <Route path="/provisioning" element={<Provisioning userProfile={userProfile} />} />
+      <Route path="/vendors" element={<Vendors userProfile={userProfile} />} />
+      <Route path="/requests" element={<Store userProfile={userProfile} />} />
+      <Route path="/barcode-creator" element={<BarcodeCreator userProfile={userProfile} />} />
+      <Route path="/categories" element={<Categories userProfile={userProfile} />} />
+      <Route path="/barcodes" element={<Barcodes userProfile={userProfile} />} />
       <Route path="/attendance" element={<Attendance userProfile={userProfile} />} />
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
-      <Route path="*" element={<Navigate to="/warehouse" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 
-  const isBoardPath = location.pathname === "/reminders" || location.pathname === "/notifications";
+  const isBoardPath = location.pathname ==="/reminders" || location.pathname ==="/notifications";
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8F9FB] font-sans relative">
       {/* Mobile Overlay */}
       {!sidebarCollapsed && isMobile && (
         <div
-          className="fixed inset-0 bg-[#000000]/40 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-[#000000]/40 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setSidebarCollapsed(true)}
         />
       )}
 
       {/* Sidebar Wrapper */}
-      <div className={`fixed inset-y-0 left-0 z-50 transform md:relative md:translate-x-0 transition-all duration-300 flex-shrink-0 ${isMobile
+      <div className={`fixed inset-y-0 left-0 z-50 transform md:relative md:translate-x-0 transition-all duration-150 flex-shrink-0 ${isMobile
         ? (sidebarCollapsed ? '-translate-x-full w-64' : 'translate-x-0 w-64')
         : (sidebarCollapsed ? 'w-[66px]' : 'w-56')
         } h-full`}>
@@ -372,12 +411,17 @@ function App() {
           setCollapsed={setSidebarCollapsed}
           userProfile={userProfile}
           isMobile={isMobile}
+          onLogout={handleLogout}
         />
       </div>
 
 
       <div className="flex flex-col flex-1 overflow-hidden min-w-0">
-        <Topbar onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} userProfile={userProfile} />
+        <Topbar
+          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          userProfile={userProfile}
+          onLogout={handleLogout}
+        />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6">
           {isEmployee ? employeeRoutes : adminRoutes}
         </main>

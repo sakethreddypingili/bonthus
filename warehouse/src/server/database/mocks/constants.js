@@ -1,14 +1,14 @@
 export const STORE_LOCATIONS = [
-    "All",
-    "Madeenaguda, Hyderabad",
-    "JNTUH Kukatpally, Hyderabad",
-    "Ameerpet, Hyderabad",
-    "Puppalguda Manikonda, Hyderabad",
-    "Nizampet Kukatpally, Hyderabad",
-    "Bachupally, Hyderabad",
-    "Nandigama, Andhra Pradesh",
-    "Vijayawada, Andhra Pradesh",
-    "Vizag, Andhra Pradesh"
+"All",
+"Madeenaguda, Hyderabad",
+"JNTUH Kukatpally, Hyderabad",
+"Ameerpet, Hyderabad",
+"Puppalguda Manikonda, Hyderabad",
+"Nizampet Kukatpally, Hyderabad",
+"Bachupally, Hyderabad",
+"Nandigama, Andhra Pradesh",
+"Vijayawada, Andhra Pradesh",
+"Vizag, Andhra Pradesh"
 ];
 
 export const USER_ROLES = [

@@ -11,7 +11,7 @@ export default function BoardSidebar({ collapsed, setCollapsed }) {
   ];
 
   return (
-    <div className={`bg-white border-r border-gray-200 flex flex-col h-full animate-in slide-in-from-left-4 duration-300 transition-all ${collapsed ? 'w-[66px]' : 'w-64'}`}>
+    <div className={`bg-white border-r border-gray-200 flex flex-col h-full animate-fast-slide transition-all duration-150 ${collapsed ? 'w-[66px]' : 'w-64'}`}>
       <div className={`p-6 border-b border-gray-50 flex items-center ${collapsed ? 'justify-center' : 'gap-3'} text-[#000000]`}>
         <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center shadow-sm flex-shrink-0">
           <Layout size={20} />
@@ -36,12 +36,12 @@ export default function BoardSidebar({ collapsed, setCollapsed }) {
               key={to}
               to={to}
               className={`
-                flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-4 py-3 rounded-2xl text-sm font-bold transition-all
+                flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-4 py-3 rounded-2xl text-sm font-bold 
                 ${isActive 
                   ? 'bg-black text-white shadow-sm' 
                   : 'text-gray-500 hover:bg-gray-50 hover:text-black'
                 }
-              `}
+`}
               title={collapsed ? label : undefined}
             >
               <div className="flex items-center gap-3">
@@ -60,9 +60,9 @@ export default function BoardSidebar({ collapsed, setCollapsed }) {
           onClick={() => setCollapsed(!collapsed)}
           className={`
             w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-gray-400 hover:text-black hover:bg-gray-100
-            transition-all text-sm font-[400]
-            ${collapsed ? "justify-center" : ""}
-          `}
+             text-sm font-[400]
+            ${collapsed ?"justify-center" :""}
+`}
         >
           {collapsed
             ? <ChevronRight size={18} />

@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation } from"react-router-dom";
 import {
   LayoutDashboard, ShoppingBag, Package, Users,
   BarChart2, Settings, ChevronLeft, ChevronRight, LogOut,
@@ -8,36 +8,41 @@ import {
   Bell,
   Calendar,
   ChevronDown,
-  Store
-} from "lucide-react";
-import { useState } from "react";
-import { supabase } from "../../server/supabase/supabase";
-
+  Store,
+  QrCode,
+  Tags,
+  Plus,
+  List,
+  Truck,
+  ClipboardList,
+  ArrowRightLeft
+} from"lucide-react";
+import { useState } from"react";
 const logoImg = '/assets/images/logo.webp';
 const iconImg = '/assets/images/icon.webp';
 
 const navItems = [
-  { to: "/warehouse", label: "Warehouse", role: ["admin", "super_admin", "store_manager"], icon: Package },
-  { to: "/store", label: "Store Insight", role: ["admin", "super_admin", "store_manager"], icon: Store },
-  { to: "/products", label: "Master Catalog", role: ["admin", "super_admin", "store_manager"], icon: Package },
-  { to: "/analytics", label: "Analytics", role: ["admin", "super_admin", "store_manager"], icon: BarChart2 },
-  { to: "/staff", label: "Staff", role: ["admin", "super_admin"], icon: Users },
-  { to: "/reminders", label: "Board", role: ["admin", "super_admin", "store_manager", "employee"], icon: Layout },
-  { to: "/attendance", label: "Attendance", role: ["admin", "super_admin", "store_manager", "employee"], icon: ClipboardCheck },
+  { to:"/", label:"Overview", role: ["admin","super_admin","store_manager"], icon: LayoutDashboard },
+  { to:"/analytics", label:"Analytics", role: ["admin","super_admin","store_manager"], icon: BarChart2 },
+  { to:"/store", label:"Store Insight", role: ["admin","super_admin","store_manager"], icon: Store },
+  { to:"/shipment", label:"Shipment", role: ["admin","super_admin","store_manager"], icon: Truck },
+  { to:"/inventory-entities", label:"Master Catalog", role: ["admin","super_admin","store_manager"], icon: Package },
+  { to:"/reminders", label:"Board", role: ["admin","super_admin","store_manager","employee"], icon: Layout },
+  { to:"/attendance", label:"Attendance", role: ["admin","super_admin","store_manager","employee"], icon: ClipboardCheck },
 ];
 
-export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile }) {
+export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile, onLogout }) {
   const location = useLocation();
   const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
   const isEmployee = userProfile?.role === 'employee';
 
   return (
     <aside
-      className="flex flex-col bg-white text-black border-r border-gray-200 transition-all duration-300 w-full h-full tracking-wide"
+      className="flex flex-col bg-white text-black border-r border-gray-200 transition-all duration-150 w-full h-full tracking-wide"
     >
       {/* Logo */}
-      <div className={`flex items-center justify-center border-b border-gray-100 transition-all duration-300 ${
-        collapsed ? "py-1 px-0 min-h-[80px] overflow-visible" : "py-1 px-2 min-h-[120px]"
+      <div className={`flex items-center justify-center border-b border-gray-100 transition-all duration-150 ${
+        collapsed ?"py-1 px-0 min-h-[80px] overflow-visible" :"py-1 px-2 min-h-[120px]"
       }`}>
         {collapsed ? (
           <img src={iconImg} alt="LensCare Icon" className="w-[73px] h-[73px] object-contain flex-shrink-0 max-w-none" />
@@ -52,11 +57,17 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 mb-2">Menu</p>
         )}
         {navItems.filter(item => item.role.includes(userProfile?.role)).map(({ to, label, icon: Icon }) => {
-          const isActive = to === "/warehouse"
-            ? location.pathname === "/warehouse" || location.pathname === "/"
-            : (to === "/reminders" 
-                ? (location.pathname === "/reminders" || location.pathname === "/notifications")
-                : location.pathname.startsWith(to)
+          const isActive = to ==="/"
+            ? location.pathname ==="/"
+            : (to ==="/reminders" 
+                ? (location.pathname ==="/reminders" || location.pathname ==="/notifications")
+                : (to ==="/inventory-entities"
+                    ? (location.pathname ==="/inventory-entities" || location.pathname ==="/categories" || location.pathname ==="/barcodes" || location.pathname ==="/barcode-creator")
+                    : (to ==="/shipment"
+                        ? (location.pathname ==="/shipment" || location.pathname ==="/shipment-overview" || location.pathname ==="/vendors" || location.pathname ==="/provisioning")
+                        : location.pathname.startsWith(to)
+                      )
+                  )
               );
           
           return (
@@ -64,25 +75,27 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
               <NavLink
                 to={to}
                 className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium 
                   ${isActive
-                    ? "bg-black text-white shadow-md"
-                    : "text-gray-600 hover:text-black hover:bg-gray-100"
+                    ?"bg-black text-white shadow-md"
+                    :"text-gray-600 hover:text-black hover:bg-gray-100"
                   }
-                  ${collapsed ? "justify-center" : ""}
-                `}
+                  ${collapsed ?"justify-center" :""}
+`}
                 title={collapsed ? label : undefined}
               >
                 <Icon size={18} className="flex-shrink-0" />
                 {!collapsed && <span>{label}</span>}
               </NavLink>
 
-              {/* Sub-menu for Board */}
-              {label === "Board" && isActive && (
+              {/* Sub-menu for Shipment */}
+              {label ==="Shipment" && isActive && (
                 <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
                   {[
-                    { to: "/reminders", label: "Reminders", icon: Calendar },
-                    { to: "/notifications", label: "Notifications", icon: Bell }
+                    { to:"/shipment-overview", label:"Overview", icon: BarChart2 },
+                    { to:"/shipment", label:"Registry", icon: List },
+                    { to:"/provisioning", label:"Provisioning", icon: ClipboardList },
+                    { to:"/vendors", label:"Vendors", icon: Users }
                   ].map((sub) => {
                     const isSubActive = location.pathname === sub.to;
                     const SubIcon = sub.icon;
@@ -91,13 +104,77 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                         key={sub.to}
                         to={sub.to}
                         className={`
-                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all w-full
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold  w-full
                           ${isSubActive
-                            ? "bg-black text-white shadow-sm"
-                            : "text-gray-500 hover:text-black hover:bg-gray-50"
+                            ?"bg-black text-white shadow-sm"
+                            :"text-gray-500 hover:text-black hover:bg-gray-50"
                           }
-                          ${collapsed ? "justify-center" : ""}
-                        `}
+                          ${collapsed ?"justify-center" :""}
+`}
+                        title={collapsed ? sub.label : undefined}
+                      >
+                        <SubIcon size={15} className="flex-shrink-0" />
+                        {!collapsed && <span>{sub.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Sub-menu for Master Catalog */}
+              {label ==="Master Catalog" && isActive && (
+                <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
+                  {[
+                    { to:"/inventory-entities", label:"Inventory Entities", icon: List },
+                    { to:"/categories", label:"Categories", icon: Tags },
+                    { to:"/barcode-creator", label:"Barcode Creator", icon: Plus },
+                    { to:"/barcodes", label:"Barcode Studio", icon: QrCode }
+                  ].map((sub) => {
+                    const isSubActive = location.pathname === sub.to;
+                    const SubIcon = sub.icon;
+                    return (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={`
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold  w-full
+                          ${isSubActive
+                            ?"bg-black text-white shadow-sm"
+                            :"text-gray-500 hover:text-black hover:bg-gray-50"
+                          }
+                          ${collapsed ?"justify-center" :""}
+`}
+                        title={collapsed ? sub.label : undefined}
+                      >
+                        <SubIcon size={15} className="flex-shrink-0" />
+                        {!collapsed && <span>{sub.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Sub-menu for Board */}
+              {label ==="Board" && isActive && (
+                <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
+                  {[
+                    { to:"/reminders", label:"Reminders", icon: Calendar },
+                    { to:"/notifications", label:"Notifications", icon: Bell }
+                  ].map((sub) => {
+                    const isSubActive = location.pathname === sub.to;
+                    const SubIcon = sub.icon;
+                    return (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={`
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold  w-full
+                          ${isSubActive
+                            ?"bg-black text-white shadow-sm"
+                            :"text-gray-500 hover:text-black hover:bg-gray-50"
+                          }
+                          ${collapsed ?"justify-center" :""}
+`}
                         title={collapsed ? sub.label : undefined}
                       >
                         <SubIcon size={15} className="flex-shrink-0" />
@@ -119,11 +196,11 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
             to="/settings"
             className={`
               flex items-center gap-2 px-3 py-2.5 rounded-lg text-gray-600 hover:text-black hover:bg-gray-100
-              transition-all text-sm font-medium
-              ${location.pathname.startsWith("/settings") ? "bg-black text-white" : ""}
-              ${collapsed ? "justify-center" : ""}
-            `}
-            title={collapsed ? "Settings" : undefined}
+               text-sm font-medium
+              ${location.pathname.startsWith("/settings") ?"bg-black text-white" :""}
+              ${collapsed ?"justify-center" :""}
+`}
+            title={collapsed ?"Settings" : undefined}
           >
             <Settings size={18} className="flex-shrink-0" />
             {!collapsed && <span>Settings</span>}
@@ -131,12 +208,13 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
         )}
 
         <button
-          onClick={() => supabase.auth.signOut()}
+          type="button"
+          onClick={() => void onLogout?.()}
           className={`
             w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50
-            transition-all text-sm font-medium
-            ${collapsed ? "justify-center" : ""}
-          `}
+             text-sm font-medium
+            ${collapsed ?"justify-center" :""}
+`}
         >
           <LogOut size={18} />
           {!collapsed && <span>Logout</span>}
@@ -145,13 +223,13 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
           onClick={() => isMobile ? setCollapsed(true) : setCollapsed(!collapsed)}
           className={`
             w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-gray-400 hover:text-black hover:bg-gray-100
-            transition-all text-sm font-[400]
-            ${collapsed ? "justify-center" : ""}
-          `}
+             text-sm font-[400]
+            ${collapsed ?"justify-center" :""}
+`}
         >
           {collapsed
             ? <ChevronRight size={18} />
-            : <><ChevronLeft size={18} /><span>{isMobile ? "Close" : "Collapse"}</span></>
+            : <><ChevronLeft size={18} /><span>{isMobile ?"Close" :"Collapse"}</span></>
           }
         </button>
       </div>

@@ -425,7 +425,7 @@ const PdfInvoiceLayout = React.forwardRef(({
         {/* Right Column: Signatures */}
         <div className="flex flex-col justify-end items-end text-right">
           <div className="mt-4 flex flex-col items-center">
-            <p className="text-[11px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For "The Lenscare" {storeName}</p>
+            <p className="text-[11px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For"The Lenscare" {storeName}</p>
             <div className="w-40 h-[1px] bg-slate-400 mb-1"></div>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Authorized Signatory</p>
           </div>

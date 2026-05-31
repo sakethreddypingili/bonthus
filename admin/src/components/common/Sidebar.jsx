@@ -17,8 +17,6 @@ import {
   Tags
 } from "lucide-react";
 import { useState } from "react";
-import { supabase } from "../../server/supabase/supabase";
-
 const logoImg = '/assets/images/logo.webp';
 const iconImg = '/assets/images/icon.webp';
 
@@ -26,14 +24,14 @@ const navItems = [
   { to: "/", label: "Dashboard", role: ["admin", "super_admin", "store_manager"], icon: LayoutDashboard },
   { to: "/orders", label: "Orders", role: ["admin", "super_admin", "store_manager"], icon: ShoppingBag },
   { to: "/inventory-entities", label: "Master Catalog", role: ["admin", "super_admin", "store_manager"], icon: Package },
-  { to: "/warehouse", label: "Warehouse Hub", role: ["admin", "super_admin"], icon: Warehouse },
+  { to: "/warehouse", label: "Warehouse", role: ["admin", "super_admin"], icon: Warehouse },
   { to: "/customers", label: "Customers", role: ["admin", "super_admin", "store_manager"], icon: Users },
   { to: "/reminders", label: "Board", role: ["admin", "super_admin", "store_manager", "employee"], icon: Layout },
   { to: "/attendance", label: "Attendance", role: ["admin", "super_admin", "store_manager", "employee"], icon: ClipboardCheck },
   { to: "/analytics", label: "Analytics", role: ["admin", "super_admin", "store_manager"], icon: BarChart2 },
 ];
 
-export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile }) {
+export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile, onLogout }) {
   const location = useLocation();
   const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
   const isEmployee = userProfile?.role === 'employee';
@@ -123,12 +121,12 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 </div>
               )}
 
-              {/* Sub-menu for Warehouse Hub */}
-              {label === "Warehouse Hub" && isActive && (
+              {/* Sub-menu for Warehouse */}
+              {label === "Warehouse" && isActive && (
                 <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
                   {[
-                    { to: "/warehouse", label: "Operational Hub", icon: Warehouse },
-                    { to: "/warehouse/shipment", label: "Logistics (Shipment)", icon: Truck },
+                    { to: "/warehouse", label: "Overview", icon: Warehouse },
+                    { to: "/warehouse/shipment", label: "Shipment", icon: Truck },
                     { to: "/warehouse/store", label: "Store Insights", icon: Store },
                     { to: "/warehouse/analytics", label: "Warehouse Data", icon: BarChart2 },
                   ].map((sub) => {
@@ -229,7 +227,8 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
         )}
 
         <button
-          onClick={() => supabase.auth.signOut()}
+          type="button"
+          onClick={() => void onLogout?.()}
           className={`
             w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50
             transition-all text-sm font-medium
