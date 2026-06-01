@@ -141,9 +141,9 @@ export default function StoreManagement({ userProfile }) {
 
     async function fetchProductStocks() {
         try {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseAdmin
                 .from('store_inventory')
-                .select('stock_quantity, store_id, stores(name), products(id, name)')
+                .select('stock_quantity, store_id, products(id, name)')
                 .order('products(name)', { ascending: true });
             if (!error && data) {
                 const mapped = data.map(d => ({
@@ -151,7 +151,6 @@ export default function StoreManagement({ userProfile }) {
                     name: d.products?.name,
                     stock: d.stock_quantity,
                     store_id: d.store_id,
-                    store: d.stores
                 }));
                 setProductStocks(mapped);
             }
@@ -173,7 +172,7 @@ export default function StoreManagement({ userProfile }) {
 
     async function fetchStores() {
         try {
-            const { data, error } = await supabase.from('stores').select('*').order('name');
+            const { data, error } = await supabaseAdmin.from('stores').select('*').order('name');
             if (!error && data) {
                 setStores(data);
                 if (data.length > 0) {
@@ -191,9 +190,9 @@ export default function StoreManagement({ userProfile }) {
     async function fetchUsers() {
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseAdmin
                 .from('users')
-                .select('*, stores(name)')
+                .select('*')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -208,7 +207,7 @@ export default function StoreManagement({ userProfile }) {
     async function handleUpdateUser(e) {
         e.preventDefault();
         try {
-            const { error } = await supabaseAdmin
+            const { error } = await supabase
                 .from('users')
                 .update({
                     role: editingUser.role,
@@ -236,44 +235,42 @@ export default function StoreManagement({ userProfile }) {
             const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
                 email: finalEmail,
                 password: newUser.password,
-                email_confirm: true
+                email_confirm: true,
+                user_metadata: { name: newUser.name }
             });
 
             if (authError) throw authError;
 
             setTimeout(async () => {
                 const { error: updateError } = await supabaseAdmin
-                    .from('users')
+                    .from("users")
                     .update({
                         role: newUser.role,
                         store_id: newUser.store_id || null,
-                        is_active: true
+                        is_active: true,
+                        must_reset_password: true
                     })
-                    .eq('id', authData.user.id);
+                    .eq("id", authData.user.id);
 
                 if (updateError) {
-                    console.error("Could not set final role:", updateError.message);
-                    showNotification("Account created, but updating role failed. Please edit manually.", "warning");
-                } else {
-                    showNotification(`User ${finalEmail} successfully created!`, "success");
-                    setCreatingNewUser(false);
-                    fetchUsers();
+                    console.error("Profile update error:", updateError);
                 }
-
+                
+                showNotification(`User ${finalEmail} successfully created!`, "success");
                 setCreating(false);
+                setCreatingNewUser(false);
                 setNewUser({ 
-                    emailPrefix: '', 
-                    domain: '@lenscare.in',
-                    password: 'Welcome@123', 
+                    emailPrefix: "", 
+                    domain: "@lenscare.in",
+                    password: "Welcome@123", 
                     useDefaultPassword: true, 
-                    role: 'store_manager', 
-                    store_id: stores[0]?.id || '' 
+                    role: "store_manager", 
+                    store_id: stores[0]?.id || "" 
                 });
-            }, 1500);
-
+                fetchUsers();
+            }, 1000);
         } catch (err) {
-            console.error(err);
-            showNotification(err.message || "Failed to create user.", "error");
+            showNotification(err.message, "error");
             setCreating(false);
         }
     };
@@ -313,7 +310,7 @@ export default function StoreManagement({ userProfile }) {
                 let error = null;
 
                 for (let attempt = 0; attempt < 6; attempt += 1) {
-                    ({ error } = await supabase
+                    ({ error } = await supabaseAdmin
                         .from('stores')
                         .update(payload)
                         .eq('id', editingStore.id));
@@ -341,7 +338,7 @@ export default function StoreManagement({ userProfile }) {
                 let error = null;
 
                 for (let attempt = 0; attempt < 6; attempt += 1) {
-                    ({ data, error } = await supabase
+                    ({ data, error } = await supabaseAdmin
                         .from('stores')
                         .insert([payload])
                         .select('id')
@@ -638,7 +635,7 @@ export default function StoreManagement({ userProfile }) {
                                                         <p className="text-[11px] font-black text-black uppercase tracking-tight">{p.name}</p>
                                                         <p className="text-[9px] font-mono text-gray-400 mt-0.5 uppercase tracking-tighter">ID: {p.id.slice(0,12)}</p>
                                                     </td>
-                                                    <td className="px-8 py-6 text-[10px] font-bold text-gray-500 uppercase tracking-widest">{p.store?.name || 'Central Archive'}</td>
+                                                    <td className="px-8 py-6 text-[10px] font-bold text-gray-500 uppercase tracking-widest">{stores.find(s => s.id === p.store_id)?.name || 'Central Archive'}</td>
                                                     <td className="px-8 py-6 text-right">
                                                         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${p.stock === 0 ? "bg-gray-100 text-gray-300 line-through" : p.stock < 10 ? "border border-black text-black" : "bg-black text-white shadow-sm"}`}>
                                                             {p.stock} Units

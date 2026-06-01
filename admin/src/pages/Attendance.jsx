@@ -118,7 +118,7 @@ export default function Attendance({ userProfile }) {
   }, [activeTab]);
 
   useEffect(() => {
-    if (userProfile?.email || userProfile?.employee_id) {
+    if (userProfile?.email) {
       const fetchEmployeeData = async () => {
         try {
           let employee = null;
@@ -127,11 +127,6 @@ export default function Attendance({ userProfile }) {
           if (normalizedEmail) {
             const { data: emailData } = await supabase.from("users").select("*").ilike("email", normalizedEmail).maybeSingle();
             employee = emailData;
-          }
-          
-          if (!employee && userProfile.employee_id) {
-            const { data: idData } = await supabase.from("users").select("*").eq("employee_id", userProfile.employee_id).maybeSingle();
-            employee = idData;
           }
           
           if (employee) {
@@ -144,10 +139,10 @@ export default function Attendance({ userProfile }) {
             }
           } else if (isEmployee) {
             setCurrentUserEmployee(null);
-            setNotice({ type: "error", message: "Employee profile not mapped. Contact admin." });
+            setNotice({ type: "error", message: "User profile not mapped. Contact admin." });
           }
         } catch (err) {
-          console.error("Error fetching employee data:", err);
+          console.error("Error fetching user data:", err);
         }
       };
       
@@ -169,32 +164,18 @@ export default function Attendance({ userProfile }) {
 
     setEmployeeSaving(true);
     try {
-      const { supabaseAdmin } = await import("../server/supabase/supabaseAdmin");
-      if (!supabaseAdmin || !supabaseAdmin.auth.admin) throw new Error("Admin credentials missing.");
-
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: employeeForm.email,
-        password: employeeForm.password,
-        email_confirm: true,
-        user_metadata: { name: name }
+      const { data, error } = await supabase.functions.invoke('admin-user-management', {
+        body: {
+          action: 'create',
+          email: employeeForm.email,
+          password: employeeForm.password,
+          role: employeeForm.role,
+          store_id: targetStoreId
+        }
       });
 
-      if (authError) throw authError;
-
-      const { error: empError } = await supabase.from("users").insert([{
-        id: authData.user.id,
-        name,
-        store_id: targetStoreId,
-        role: employeeForm.role,
-        email: employeeForm.email,
-        password_hash: 'managed_by_auth',
-        is_active: true
-      }]);
-
-      if (empError) {
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-        throw empError;
-      }
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       setEmployeeForm({
         name: "", store_id: isSuperAdmin ? "" : targetStoreId, role: "sales",

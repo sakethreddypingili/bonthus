@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT CHECK (role IN ('admin', 'optometrist', 'sales', 'manager')),
     store_id UUID REFERENCES stores(id) ON DELETE SET NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    must_reset_password BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

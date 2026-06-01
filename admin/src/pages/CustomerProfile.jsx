@@ -11,6 +11,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
+import { isValidUUID } from "../utils/securityUtils";
 
 export default function CustomerProfile({ userProfile }) {
   const { id } = useParams();
@@ -22,6 +23,10 @@ export default function CustomerProfile({ userProfile }) {
 
   useEffect(() => {
     const fetchCustomerData = async () => {
+      if (!isValidUUID(id)) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         // Fetch customer basic info
@@ -42,7 +47,7 @@ export default function CustomerProfile({ userProfile }) {
             order_items(
               id,
               quantity,
-              price,
+              unit_price,
               products(name)
             )
           `)
@@ -52,7 +57,7 @@ export default function CustomerProfile({ userProfile }) {
 
         // Apply store filter for non-admin users
         const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
-        if (!isAdmin && userProfile?.store_id) {
+        if (!isAdmin && userProfile?.store_id && isValidUUID(userProfile.store_id)) {
           orderQuery = orderQuery.eq('store_id', userProfile.store_id);
         }
 
@@ -108,269 +113,217 @@ export default function CustomerProfile({ userProfile }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#333333]"></div>
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
       </div>
     );
   }
 
   if (!customer) {
     return (
-      <div className="text-center py-20">
-        <h2 className="text-2xl font-bold text-gray-600">Customer not found</h2>
+      <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
+        <h2 className="text-2xl font-black uppercase tracking-tighter">Customer Not Found</h2>
         <button 
           onClick={() => navigate('/customers')}
-          className="mt-4 text-[#333333] font-semibold hover:underline flex items-center justify-center gap-2 mx-auto"
+          className="mt-6 px-8 py-3 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all"
         >
-          <ArrowLeft size={16} /> Back to Customers
+          Back to Registry
         </button>
       </div>
     );
   }
 
-  const totalSpent = orders.reduce((sum, order) => sum + Number(order.net_amount || 0), 0);
+  const totalSpent = orders.reduce((sum, o) => sum + Number(o.net_amount || 0), 0);
   const totalOrders = orders.length;
 
   return (
-    <div className="space-y-6 pb-10">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <button
+    <div className="space-y-10 animate-fast-slide pb-20">
+      {/* Header & Stats */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 pb-10 border-b border-gray-100">
+        <div className="space-y-4">
+          <button 
             onClick={() => navigate('/customers')}
-            className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+            className="group flex items-center gap-2 text-gray-400 hover:text-black transition-colors"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Back to Database</span>
           </button>
           <div>
-            <h1 className="text-2xl font-black text-[#000000]">{customer.name}</h1>
-            <p className="text-xs text-gray-500 flex items-center gap-1">
-              <span className="font-mono">{customer.id}</span>
-              <span className="mx-1">•</span>
-              <span>Joined {new Date(customer.created_at).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</span>
-            </p>
+            <h1 className="text-5xl font-black text-black tracking-tighter uppercase mb-2 leading-none">{customer.name}</h1>
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="px-3 py-1 bg-black text-white rounded-lg text-[9px] font-black uppercase tracking-widest">Customer Protocol</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Since {new Date(customer.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-            <button 
-                onClick={() => navigate('/orders/new', { state: { customer } })}
-                className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
-            >
-                <ShoppingBag size={16} /> New Order
-            </button>
+
+        <div className="flex gap-4">
+          <div className="bg-white border border-gray-100 rounded-[28px] p-6 min-w-[200px] shadow-sm">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+              <ShoppingBag size={12} className="text-black" /> Lifetime Volume
+            </p>
+            <p className="text-3xl font-black text-black tracking-tighter uppercase">{totalOrders} Orders</p>
+          </div>
+          <div className="bg-black rounded-[28px] p-6 min-w-[220px] shadow-xl">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+              <IndianRupee size={12} className="text-white" /> Financial Output
+            </p>
+            <p className="text-3xl font-black text-white tracking-tighter uppercase">₹{totalSpent.toLocaleString()}</p>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Stats & Info */}
-        <div className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <ShoppingBag size={14} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">Orders</span>
-              </div>
-              <p className="text-xl font-black text-[#000000]">{totalOrders}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-10">
+        {/* Main Content: Orders */}
+        <div className="space-y-10">
+          <section>
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xs font-black text-black uppercase tracking-[0.3em] flex items-center gap-3">
+                Order History <span className="w-12 h-px bg-gray-100"></span>
+              </h3>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <IndianRupee size={14} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">Total Spent</span>
-              </div>
-              <p className="text-xl font-black text-[#000000]">₹{totalSpent.toLocaleString()}</p>
-            </div>
-          </div>
 
-          {/* Contact Info */}
-          <div className="section-card p-5 space-y-4">
-            <h3 className="text-sm font-bold text-[#000000] border-b border-gray-100 pb-2">Contact Details</h3>
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-gray-100 text-black rounded-lg">
-                  <Phone size={16} />
+            <div className="space-y-4">
+              {orders.length === 0 ? (
+                <div className="bg-white border-2 border-dashed border-gray-100 rounded-[32px] p-16 text-center">
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Zero transactional history</p>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Phone Number</p>
-                  <p className="text-sm font-semibold text-gray-700">{customer.phone || 'N/A'}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-gray-100 text-black rounded-lg">
-                  <Mail size={16} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Email Address</p>
-                  <p className="text-sm font-semibold text-gray-700">{customer.email || 'N/A'}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-gray-100 text-black rounded-lg">
-                  <MapPin size={16} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Address</p>
-                  <p className="text-sm font-semibold text-gray-700 leading-relaxed">
-                    {[customer.street, customer.town, customer.district, customer.state].filter(Boolean).join(', ') || 'No address provided'}
-                  </p>
-                </div>
-              </div>
+              ) : (
+                orders.map((order) => (
+                  <div 
+                    key={order.id}
+                    className="bg-white border border-gray-100 rounded-[32px] p-8 hover:border-black hover:shadow-2xl transition-all duration-300 group cursor-pointer"
+                    onClick={() => navigate(`/orders/edit/${order.id}`)}
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div className="flex gap-6">
+                        <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center text-black group-hover:bg-black group-hover:text-white transition-colors duration-300 shadow-inner">
+                          <ShoppingBag size={24} strokeWidth={2.5} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-3 mb-1">
+                            <h4 className="text-xl font-black text-black tracking-tighter uppercase">{order.order_number}</h4>
+                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${
+                              order.status === 'delivered' ? 'bg-green-50 text-green-600' : 
+                              order.status === 'pending' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'
+                            }`}>
+                              {order.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                            <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                            <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
+                            <span>{order.store?.name}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-10">
+                        <div className="text-right">
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Order Net</p>
+                          <p className="text-lg font-black text-black tracking-tight uppercase">₹{Number(order.net_amount).toLocaleString()}</p>
+                        </div>
+                        <div className="h-10 w-px bg-gray-50"></div>
+                        <button className="w-12 h-12 rounded-2xl flex items-center justify-center text-gray-300 hover:bg-black hover:text-white transition-all duration-300 border border-transparent hover:border-black">
+                          <Eye size={20} />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-6 pt-6 border-t border-gray-50 grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {order.order_items?.slice(0, 4).map((item, idx) => (
+                        <div key={idx} className="flex flex-col gap-1">
+                          <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Entity</p>
+                          <p className="text-[10px] font-bold text-black uppercase tracking-tight truncate">{item.products?.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-          </div>
+          </section>
         </div>
 
-        {/* Middle & Right Column: Tabs for Orders and Eye Power */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Eye Power History */}
-          <div className="section-card">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[#000000] flex items-center gap-2">
-                <Eye size={16} className="text-[#333333]" /> Eye Power History
-              </h3>
-            </div>
-            <div className="p-0 overflow-x-auto">
-              {eyePowers.length > 0 ? (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-5 py-2 text-left text-[10px] font-bold text-gray-400 uppercase">Date</th>
-                      <th className="px-5 py-2 text-center text-[10px] font-bold text-gray-400 uppercase">Eye</th>
-                      <th className="px-5 py-2 text-center text-[10px] font-bold text-gray-400 uppercase">SPH</th>
-                      <th className="px-5 py-2 text-center text-[10px] font-bold text-gray-400 uppercase">CYL</th>
-                      <th className="px-5 py-2 text-center text-[10px] font-bold text-gray-400 uppercase">AXIS</th>
-                      <th className="px-5 py-2 text-left text-[10px] font-bold text-gray-400 uppercase">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {eyePowers.map((pow, idx) => {
-                      const hasNearVision = (p) => p.nv_re_sph != null || p.nv_le_sph != null || 
-                                              p.nv_re_cyl != null || p.nv_le_cyl != null || 
-                                              p.nv_re_axis != null || p.nv_le_axis != null;
-                      const showNV = hasNearVision(pow);
-                      const groupRowSpan = showNV ? 4 : 2;
+        {/* Sidebar: Profile & Prescriptions */}
+        <div className="space-y-10">
+          <section className="bg-white border border-gray-100 rounded-[40px] p-10 shadow-sm">
+            <h3 className="text-xs font-black text-black uppercase tracking-[0.3em] mb-10 flex items-center gap-3">
+              Entity Identity <span className="w-8 h-px bg-gray-100"></span>
+            </h3>
 
-                      return (
-                        <React.Fragment key={pow.id}>
-                          {/* Distance Vision Row */}
-                          <tr className="hover:bg-gray-50/50">
-                            <td rowSpan={groupRowSpan} className="px-5 py-4 text-xs font-medium text-gray-600 border-r border-gray-100">
-                              {new Date(pow.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </td>
-                            <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">RE (DV)</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_re_sph ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_re_cyl ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_re_axis ?? '-'}</td>
-                            <td rowSpan={groupRowSpan} className="px-5 py-4 text-xs text-gray-500 max-w-[200px] italic border-l border-gray-100">
-                              {pow.notes || '-'}
-                            </td>
-                          </tr>
-                          <tr className="hover:bg-gray-50/50 border-b border-gray-50">
-                            <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">LE (DV)</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_le_sph ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_le_cyl ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_le_axis ?? '-'}</td>
-                          </tr>
-                          
-                          {/* Near Vision Row (Conditional) */}
-                          {showNV && (
-                            <>
-                              <tr className="hover:bg-gray-50/50">
-                                <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">RE (NV)</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_re_sph ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_re_cyl ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_re_axis ?? '-'}</td>
-                              </tr>
-                              <tr className="hover:bg-gray-50/50 border-b border-gray-100">
-                                <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">LE (NV)</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_le_sph ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_le_cyl ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_le_axis ?? '-'}</td>
-                              </tr>
-                            </>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            <div className="space-y-8">
+              <div className="space-y-1.5">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <Phone size={10} className="text-black" /> Primary Link
+                </p>
+                <p className="text-lg font-black text-black uppercase tracking-tight">{customer.phone}</p>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <Mail size={10} className="text-black" /> Digital Address
+                </p>
+                <p className="text-lg font-black text-black lowercase tracking-tight">{customer.email || 'None Registered'}</p>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <MapPin size={10} className="text-black" /> Geo Coordinates
+                </p>
+                <p className="text-xs font-bold text-black uppercase leading-relaxed">
+                  {[customer.street, customer.town, customer.district, customer.state].filter(Boolean).join(', ') || 'N/A'}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-gray-50 border border-gray-100 rounded-[40px] p-10">
+            <h3 className="text-xs font-black text-black uppercase tracking-[0.3em] mb-10 flex items-center gap-3">
+              Optical Prescriptions <span className="w-8 h-px bg-gray-200"></span>
+            </h3>
+
+            <div className="space-y-4">
+              {eyePowers.length === 0 ? (
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">No measurements recorded</p>
               ) : (
-                <div className="p-10 text-center text-gray-400 italic">No eye power records found.</div>
+                eyePowers.map((pow) => (
+                  <div key={pow.id} className="bg-white border border-gray-200 rounded-[28px] p-6 hover:border-black transition-all group">
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <p className="text-[11px] font-black text-black uppercase tracking-tight">Rx Data</p>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">{new Date(pow.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center text-gray-300 group-hover:bg-black group-hover:text-white transition-colors duration-300 shadow-inner">
+                        <ExternalLink size={14} />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Right Eye</p>
+                        <div className="flex gap-2 text-[10px] font-black text-black">
+                          <span>{pow.dv_re_sph || 'PL'}</span>
+                          <span className="text-gray-200">/</span>
+                          <span>{pow.dv_re_cyl || '0.00'}</span>
+                        </div>
+                      </div>
+                      <div className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Left Eye</p>
+                        <div className="flex gap-2 text-[10px] font-black text-black">
+                          <span>{pow.dv_le_sph || 'PL'}</span>
+                          <span className="text-gray-200">/</span>
+                          <span>{pow.dv_le_cyl || '0.00'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {pow.notes && (
+                      <p className="mt-4 text-[9px] font-bold text-gray-400 uppercase tracking-tight line-clamp-1 italic">"{pow.notes}"</p>
+                    )}
+                  </div>
+                ))
               )}
             </div>
-          </div>
-
-          {/* Recent Orders */}
-          <div className="section-card">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[#000000] flex items-center gap-2">
-                <ShoppingBag size={16} className="text-[#333333]" /> Order History
-              </h3>
-            </div>
-            <div className="p-0 overflow-x-auto">
-              {orders.length > 0 ? (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Order ID</th>
-                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Date</th>
-                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Store</th>
-                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Products</th>
-                      <th className="px-5 py-3 text-center text-[10px] font-bold text-gray-400 uppercase">Status</th>
-                      <th className="px-5 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">Amount</th>
-                      <th className="px-5 py-3 text-center text-[10px] font-bold text-gray-400 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {orders.map((order) => (
-                      <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-5 py-4">
-                          <span className="font-mono text-xs font-bold text-[#000000]">{order.id}</span>
-                        </td>
-                        <td className="px-5 py-4 text-xs text-gray-500 whitespace-nowrap">
-                          {new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </td>
-                        <td className="px-5 py-4 text-xs font-semibold text-gray-600 whitespace-nowrap">
-                          {order.store?.name || 'N/A'}
-                        </td>
-                        <td className="px-5 py-4 text-xs text-gray-500 max-w-[200px]">
-                          <div className="flex flex-col gap-0.5">
-                            {order.order_items?.map((item, idx) => (
-                              <div key={item.id} className="truncate">
-                                • {item.products?.name || 'Unknown Product'} 
-                                <span className="text-[10px] opacity-70 ml-1">(x{item.quantity})</span>
-                              </div>
-                            )) || <span className="italic">No products</span>}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap ${
-                            order.status === 'Completed' || order.status === 'Delivered' ? 'bg-black text-white' : 
-                            order.status === 'Processing' ? 'bg-gray-100 text-black' : 
-                            'bg-gray-100 text-gray-600'
-                          }`}>
-                            {order.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-right font-bold text-[#000000] whitespace-nowrap">
-                          ₹{order.net_amount?.toLocaleString()}
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <button 
-                            onClick={() => navigate(`/invoice/${order.id}`)}
-                            className="p-1.5 text-gray-400 hover:text-[#333333] hover:bg-[#333333]/5 rounded-lg transition-colors"
-                          >
-                            <ExternalLink size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="p-10 text-center text-gray-400 italic">No orders found for this customer.</div>
-              )}
-            </div>
-          </div>
+          </section>
         </div>
       </div>
     </div>

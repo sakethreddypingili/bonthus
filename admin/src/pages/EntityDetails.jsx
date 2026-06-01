@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Package, History, TrendingUp, ShieldCheck, Tag, Info, AlertCircle } from 'lucide-react';
 import { supabase } from '../server/supabase/supabase';
+import { isValidUUID } from '../utils/securityUtils';
 
 export default function EntityDetails({ userProfile }) {
   const { id } = useParams();
@@ -11,16 +12,31 @@ export default function EntityDetails({ userProfile }) {
 
   useEffect(() => {
     async function fetchEntity() {
+      if (!isValidUUID(id)) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('*, store(name)')
+          .select('*, store_inventory(*, stores(name))')
           .eq('id', id)
           .single();
         
         if (error) throw error;
-        setEntity(data);
+        
+        const totalStock = data.store_inventory?.reduce((sum, si) => sum + (si.stock_quantity || 0), 0) || 0;
+        const avgPrice = data.store_inventory?.length > 0 
+          ? data.store_inventory.reduce((sum, si) => sum + (si.unit_price || 0), 0) / data.store_inventory.length 
+          : data.base_price;
+
+        setEntity({
+          ...data,
+          stock: totalStock,
+          price: avgPrice,
+          inventory: data.store_inventory || []
+        });
       } catch (err) {
         console.error("Error fetching entity details:", err.message);
       } finally {
@@ -97,8 +113,10 @@ export default function EntityDetails({ userProfile }) {
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Deployment</p>
                 <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
-                  <span className="text-xl font-black text-black uppercase tracking-tight">{entity.store?.name || "Global Hub"}</span>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase mt-2">Node location</p>
+                  <span className="text-xl font-black text-black uppercase tracking-tight">
+                    {entity.inventory?.length > 1 ? `${entity.inventory.length} Stores` : entity.inventory?.[0]?.stores?.name || "Unassigned"}
+                  </span>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase mt-2">Deployment Nodes</p>
                 </div>
               </div>
             </div>

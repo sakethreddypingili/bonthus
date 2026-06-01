@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "./server/supabase/supabase";
-import { supabaseAdmin } from "./server/supabase/supabaseAdmin";
 import Sidebar from "./components/common/Sidebar";
 import Topbar from "./components/common/Topbar";
 import Dashboard from "./pages/Dashboard";
@@ -29,10 +28,10 @@ import PasswordReset from "./pages/PasswordReset";
 import Reminders from "./pages/Reminders";
 import Notifications from "./pages/Notifications";
 import { PROFILE_CACHE_KEY, logout } from "./utils/auth";
-import { isValidUUID } from "./utils/securityUtils";
+
 
 function App() {
-  const location = useLocation();
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 768);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [session, setSession] = useState(null);
@@ -104,11 +103,25 @@ function App() {
     }
 
     try {
+      // 1. Primary Lookup: Try matching public.users.id with Auth UID
       let { data, error } = await supabase
-        .from("auth_users")
-        .select("*, store(name)")
+        .from("users")
+        .select("*")
         .eq("id", activeSession.user.id)
         .maybeSingle();
+
+      // 2. Secondary Lookup: Try matching by email if ID match fails
+      if (!data && activeSession.user.email) {
+        const { data: emailMatch } = await supabase
+          .from("users")
+          .select("*")
+          .ilike("email", activeSession.user.email)
+          .maybeSingle();
+        
+        if (emailMatch) {
+          data = emailMatch;
+        }
+      }
 
       // Ignore stale responses from older in-flight profile requests.
       if (requestId !== profileRequestRef.current) {
@@ -119,61 +132,12 @@ function App() {
         throw error;
       }
 
-      // If not found in auth_users, try users table (for employee login)
-      // Use supabaseAdmin to bypass RLS policies
-      if (!data) {
-        console.log("Not found in auth_users, trying users table...");
-        
-        let { data: employeeData, error: empError } = await supabaseAdmin
-          .from("users")
-          .select("id, name, store_id, role, email, phone, is_active")
-          .eq("user_id", activeSession.user.id)
-          .maybeSingle();
-        
-        // Fallback to email lookup if user_id is missing
-        if (!employeeData && activeSession.user.email) {
-          const { data: emailData } = await supabaseAdmin
-            .from("users")
-            .select("id, name, store_id, role, email, phone, is_active")
-            .ilike("email", activeSession.user.email)
-            .maybeSingle();
-            
-          if (emailData) {
-            employeeData = emailData;
-            // Update the user_id for future logins
-            await supabaseAdmin.from("users").update({ user_id: activeSession.user.id }).eq("id", emailData.id);
-          }
-        }
-
-        if (employeeData) {
-          let storeData = null;
-          // Fetch store name separately if valid UUID
-          if (isValidUUID(employeeData.store_id)) {
-            const { data: sData } = await supabaseAdmin
-              .from("stores")
-              .select("name")
-              .eq("id", employeeData.store_id)
-              .maybeSingle();
-            storeData = sData;
-          }
-          
-          data = {
-            id: activeSession.user.id,
-            email: activeSession.user.email,
-            role: 'employee',
-            store_id: employeeData.store_id,
-            name: employeeData.name,
-            phone: employeeData.phone,
-            is_active: employeeData.is_active,
-            store: storeData
-          };
-        }
-      }
-
-      setUserProfile(data ?? null);
       if (data) {
+        setUserProfile(data);
         writeCachedProfile(data);
       } else {
+        console.error("Unauthorized: No profile found for", activeSession.user.email);
+        setUserProfile(null);
         clearCachedProfile();
       }
       return data ?? null;
@@ -358,19 +322,21 @@ function App() {
   }
 
   const role = userProfile?.role;
-  const isEmployee = role === "employee";
-  const isAdminOrManager = role === "admin" || role === "super_admin" || role === "store_manager";
+  const isEmployee = role === "sales" || role === "optometrist" || role === "employee";
+  const isAdminOrManager = role === "admin" || role === "manager" || role === "super_admin" || role === "store_manager";
 
   if (!isEmployee && !isAdminOrManager) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB] p-6">
-        <div className="max-w-md w-full bg-white border border-gray-200 rounded-2xl p-6 text-center shadow-sm">
-          <h2 className="text-lg font-bold text-[#000000]">Unauthorized role</h2>
-          <p className="text-sm text-gray-500 mt-2">This account role is not configured for this app.</p>
+        <div className="max-w-md w-full bg-white border border-gray-100 rounded-3xl p-10 text-center shadow-sm">
+          <h2 className="text-xl font-black text-black uppercase tracking-tighter">Unauthorized Identity</h2>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4 leading-relaxed">
+            This account role is not registered for the administrative dashboard.
+          </p>
           <button
             type="button"
             onClick={() => void handleLogout()}
-            className="mt-5 px-4 py-2 rounded-lg bg-[#000000] text-white text-sm font-semibold"
+            className="mt-8 px-10 py-4 rounded-2xl bg-black text-white text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all"
           >
             Sign out
           </button>

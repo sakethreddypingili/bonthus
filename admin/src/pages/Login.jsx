@@ -63,24 +63,18 @@ export default function Login() {
 
             // 1. Phone number detection (Exactly 10 digits)
             if (/^\d{10}$/.test(loginEmail)) {
-                const { data: resolvedEmail, error: rpcErr } = await supabase
-                    .rpc('get_email_by_phone', { p_phone: loginEmail });
+                const { data: userData, error: userErr } = await supabase
+                    .from('users')
+                    .select('email')
+                    .eq('phone', loginEmail)
+                    .maybeSingle();
                 
-                if (rpcErr) throw rpcErr;
-                if (!resolvedEmail) throw new Error("This phone number is not registered.");
-                loginEmail = resolvedEmail;
-            }
-            // 2. Employee ID detection (6 digits)
-            else if (/^\d{6}$/.test(loginEmail)) {
-                const { data: resolvedEmail, error: rpcErr } = await supabase
-                    .rpc('get_email_by_employee_id', { p_employee_id: loginEmail });
-                
-                if (rpcErr) throw rpcErr;
-                if (!resolvedEmail) throw new Error("This employee ID is not registered.");
-                loginEmail = resolvedEmail;
+                if (userErr) throw userErr;
+                if (!userData) throw new Error("This phone number is not registered.");
+                loginEmail = userData.email;
             }
 
-            // 3. Auth Attempt
+            // 2. Auth Attempt
             const { error: authError } = await supabase.auth.signInWithPassword({
                 email: loginEmail,
                 password,
@@ -140,7 +134,7 @@ export default function Login() {
 
                     <form onSubmit={handleLogin} autoComplete="off" className="space-y-6">
                         <div>
-                            <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">Email, Phone, or Employee ID</label>
+                            <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">Email or Phone</label>
                             <div className="relative group">
                                 <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-black group-focus-within:scale-110 transition-transform duration-150">
                                     <User size={18} strokeWidth={2.5} />
@@ -154,7 +148,7 @@ export default function Login() {
                                     value={identifier}
                                     onChange={(e) => setIdentifier(e.target.value)}
                                     onFocus={() => setShowSuggestions(true)}
-                                    placeholder="Email, 10-digit Phone, or 6-digit Employee ID"
+                                    placeholder="Email or 10-digit Phone"
                                     style={{ WebkitBoxShadow: '0 0 0 1000px white inset' }}
                                     className="w-full pl-11 pr-4 py-3.5 bg-white border-2 border-black rounded-xl text-sm font-semibold focus:outline-none focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all duration-150 placeholder:text-gray-400"
                                     required

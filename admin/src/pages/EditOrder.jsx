@@ -501,18 +501,16 @@ export default function EditOrder({ userProfile }) {
             // 4. Update Order Items (Clean & Replace)
             await supabase.from('order_items').delete().eq('order_id', orderId);
             const orderItemsPayload = totalLineAmounts.map(item => ({
-                id: generateId(ID_RULES.ORDER_ITEMS.prefix, ID_RULES.ORDER_ITEMS.digits),
                 order_id: orderId,
                 product_id: item.product_id,
                 quantity: Number(item.quantity),
                 unit_price: Number(item.price),
                 discount_amount: Number(item.discount || 0),
                 total_price: item.lineTotal,
-                custom_lens_specs: item.prescription ? JSON.stringify(item.prescription) : null
+                custom_lens_specs: item.prescription ? item.prescription : null
             }));
             await supabase.from('order_items').insert(orderItemsPayload);
 
-            // 5. Eye Power - Now stored per-item in order_items, no separate prescriptions table needed
             alert("Order updated successfully!");
             navigate('/orders');
         } catch (err) {

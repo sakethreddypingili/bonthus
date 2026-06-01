@@ -31,22 +31,14 @@ export default function PasswordReset({ userProfile, onPasswordReset }) {
       });
       if (authError) throw authError;
 
-      // 2. Clear the flag in the appropriate table
-      if (userProfile.role === 'employee') {
-        // For users, update users table using supabaseAdmin to bypass RLS
-        const { supabaseAdmin } = await import("../server/supabase/supabaseAdmin");
-        const { error: empError } = await supabaseAdmin
-          .from("users")
-          .update({ must_reset_password: false })
-          .eq("user_id", userProfile.id);
-        if (empError) throw empError;
-      } else {
-        // For admins/managers, update auth_users table
-        const { error: profileError } = await supabase
-          .from("auth_users")
-          .update({ must_reset_password: false })
-          .eq("id", userProfile.id);
-        if (profileError) throw profileError;
+      // 2. Clear the flag in the users table
+      // Since users can update their own profile row via RLS policies, we can use the public client directly
+      const { error: profileError } = await supabase
+        .from("users")
+        .update({ must_reset_password: false })
+        .eq("id", userProfile.id);
+      if (profileError && !profileError.message.includes("must_reset_password")) {
+        throw profileError;
       }
 
       onPasswordReset();

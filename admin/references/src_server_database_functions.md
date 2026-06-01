@@ -5,13 +5,13 @@
 ### `current_app_role()`
 - **Type**: SQL Function (Stable, Security Definer)
 - **File**: `src/server/database/attendance_rls.sql`
-- **Logic**: Retrieves the role of the current authenticated user from `public.auth_users` using the email from the JWT.
+- **Logic**: Retrieves the role of the current authenticated user from `public.users` using the email from the JWT.
 - **Used In**: RLS Policies for access control.
 
 ### `current_app_store_id()`
 - **Type**: SQL Function (Stable, Security Definer)
 - **File**: `src/server/database/attendance_rls.sql`
-- **Logic**: Retrieves the `store_id` of the current authenticated user from `public.auth_users` using the email from the JWT.
+- **Logic**: Retrieves the `store_id` of the current authenticated user from `public.users` using the email from the JWT.
 - **Used In**: RLS Policies for store-scoped data access.
 
 ### `gen_id(prefix text, length integer)`
@@ -23,7 +23,7 @@
 ### `get_auth_role()`
 - **Type**: SQL Function (Stable, Security Definer)
 - **File**: `src/server/database/reset_schema.sql`
-- **Logic**: Simplified helper to get the role from `public.auth_users` by matching the user's UUID.
+- **Logic**: Simplified helper to get the role from `public.users` by matching the user's UUID.
 - **Used In**: Master schema RLS policies.
 
 ### `get_email_by_employee_id(p_employee_id text)`

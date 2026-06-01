@@ -12,20 +12,21 @@ export const STORE_LOCATIONS = [
 ];
 
 export const USER_ROLES = [
-    { value: 'super_admin', label: 'Super Admin' },
-    { value: 'admin', label: 'Admin' },
-    { value: 'store_manager', label: 'Store Manager' },
-    { value: 'employee', label: 'Employee' }
+    { value: 'admin', label: 'Administrator' },
+    { value: 'manager', label: 'Store Manager' },
+    { value: 'sales', label: 'Sales Executive' },
+    { value: 'optometrist', label: 'Optometrist' }
 ];
 
 export const ROLES_FOR_SUPER_ADMIN = [
     { value: 'admin', label: 'Administrator' },
-    { value: 'store_manager', label: 'Store Manager' },
-    { value: 'employee', label: 'Employee' }
+    { value: 'manager', label: 'Store Manager' },
+    { value: 'sales', label: 'Sales Executive' },
+    { value: 'optometrist', label: 'Optometrist' }
 ];
 
 export const ROLES_FOR_ADMIN = [
-    { value: 'admin', label: 'Administrator' },
-    { value: 'store_manager', label: 'Store Manager' },
-    { value: 'employee', label: 'Employee' }
+    { value: 'manager', label: 'Store Manager' },
+    { value: 'sales', label: 'Sales Executive' },
+    { value: 'optometrist', label: 'Optometrist' }
 ];

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Search, Download, Eye, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../server/supabase/supabase";
+import { isValidUUID } from "../utils/securityUtils";
 
 export default function Customers({ userProfile }) {
   const navigate = useNavigate();
@@ -39,9 +40,9 @@ export default function Customers({ userProfile }) {
           .order('created_at', { ascending: false })
           .range(start, start + step - 1);
           
-        if (!isSuperAdmin && userProfile?.store_id) {
+        if (!isSuperAdmin && userProfile?.store_id && isValidUUID(userProfile.store_id)) {
            query = query.eq('store_id', userProfile.store_id);
-        } else if (isSuperAdmin && selectedStore && selectedStore !== 'All' && selectedStore !== "") {
+        } else if (isSuperAdmin && selectedStore && selectedStore !== 'All' && isValidUUID(selectedStore)) {
            query = query.eq('store_id', selectedStore);
         }
 

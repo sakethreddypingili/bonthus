@@ -37,7 +37,7 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view users from their store"
   ON users FOR SELECT
   USING (
-    store_id = (SELECT store_id FROM auth_users WHERE id = auth.uid())
+    store_id = (SELECT store_id FROM users WHERE id = auth.uid())
     OR auth.jwt() ->> 'role' = 'super_admin'
   );
 
@@ -45,15 +45,15 @@ CREATE POLICY "Users can view users from their store"
 CREATE POLICY "Only admins can update users"
   ON users FOR UPDATE
   USING (
-    (SELECT role FROM auth_users WHERE id = auth.uid()) IN ('admin', 'super_admin')
-    AND store_id = (SELECT store_id FROM auth_users WHERE id = auth.uid())
+    (SELECT role FROM users WHERE id = auth.uid()) IN ('admin', 'super_admin')
+    AND store_id = (SELECT store_id FROM users WHERE id = auth.uid())
   );
 
 -- Policy: Only super_admin can delete users
 CREATE POLICY "Only super_admin can delete users"
   ON users FOR DELETE
   USING (
-    (SELECT role FROM auth_users WHERE id = auth.uid()) = 'super_admin'
+    (SELECT role FROM users WHERE id = auth.uid()) = 'super_admin'
   );
 
 
@@ -67,22 +67,22 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view orders from their store"
   ON orders FOR SELECT
   USING (
-    store_id = (SELECT store_id FROM auth_users WHERE id = auth.uid())
-    OR (SELECT role FROM auth_users WHERE id = auth.uid()) = 'super_admin'
+    store_id = (SELECT store_id FROM users WHERE id = auth.uid())
+    OR (SELECT role FROM users WHERE id = auth.uid()) = 'super_admin'
   );
 
 -- Policy: Users can only modify orders from their store
 CREATE POLICY "Users can only modify orders from their store"
   ON orders FOR UPDATE
   USING (
-    store_id = (SELECT store_id FROM auth_users WHERE id = auth.uid())
+    store_id = (SELECT store_id FROM users WHERE id = auth.uid())
   );
 
 -- Policy: Only admins can insert orders
 CREATE POLICY "Only admins can insert orders"
   ON orders FOR INSERT
   WITH CHECK (
-    (SELECT role FROM auth_users WHERE id = auth.uid()) IN ('admin', 'super_admin')
+    (SELECT role FROM users WHERE id = auth.uid()) IN ('admin', 'super_admin')
   );
 
 
@@ -103,14 +103,14 @@ CREATE POLICY "All authenticated users can view products"
 CREATE POLICY "Only admins can modify products"
   ON products FOR UPDATE
   USING (
-    (SELECT role FROM auth_users WHERE id = auth.uid()) IN ('admin', 'super_admin')
+    (SELECT role FROM users WHERE id = auth.uid()) IN ('admin', 'super_admin')
   );
 
 -- Policy: Only super_admin can delete products
 CREATE POLICY "Only super_admin can delete products"
   ON products FOR DELETE
   USING (
-    (SELECT role FROM auth_users WHERE id = auth.uid()) = 'super_admin'
+    (SELECT role FROM users WHERE id = auth.uid()) = 'super_admin'
   );
 
 
@@ -124,16 +124,16 @@ ALTER TABLE store_tax_rates ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view tax rates for their store"
   ON store_tax_rates FOR SELECT
   USING (
-    store_id = (SELECT store_id FROM auth_users WHERE id = auth.uid())
-    OR (SELECT role FROM auth_users WHERE id = auth.uid()) = 'super_admin'
+    store_id = (SELECT store_id FROM users WHERE id = auth.uid())
+    OR (SELECT role FROM users WHERE id = auth.uid()) = 'super_admin'
   );
 
 -- Policy: Only store admins can modify tax rates
 CREATE POLICY "Only admins can modify tax rates"
   ON store_tax_rates FOR UPDATE
   USING (
-    store_id = (SELECT store_id FROM auth_users WHERE id = auth.uid())
-    AND (SELECT role FROM auth_users WHERE id = auth.uid()) IN ('admin', 'super_admin')
+    store_id = (SELECT store_id FROM users WHERE id = auth.uid())
+    AND (SELECT role FROM users WHERE id = auth.uid()) IN ('admin', 'super_admin')
   );
 
 
@@ -141,31 +141,31 @@ CREATE POLICY "Only admins can modify tax rates"
 -- AUTH_USERS TABLE RLS
 -- ============================================
 
-ALTER TABLE auth_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can view their own profile
 CREATE POLICY "Users can view their own profile"
-  ON auth_users FOR SELECT
+  ON users FOR SELECT
   USING (
     id = auth.uid()
-    OR (SELECT role FROM auth_users WHERE id = auth.uid()) = 'super_admin'
+    OR (SELECT role FROM users WHERE id = auth.uid()) = 'super_admin'
   );
 
 -- Policy: Users can only update their own profile
 CREATE POLICY "Users can only update their own profile"
-  ON auth_users FOR UPDATE
+  ON users FOR UPDATE
   USING (
     id = auth.uid()
   );
 
 -- Policy: Only super_admin can modify other users
 CREATE POLICY "Only super_admin can modify other users"
-  ON auth_users FOR UPDATE
+  ON users FOR UPDATE
   USING (
-    (SELECT role FROM auth_users WHERE id = auth.uid()) = 'super_admin'
+    (SELECT role FROM users WHERE id = auth.uid()) = 'super_admin'
   )
   WITH CHECK (
-    (SELECT role FROM auth_users WHERE id = auth.uid()) = 'super_admin'
+    (SELECT role FROM users WHERE id = auth.uid()) = 'super_admin'
   );
 `;
 
@@ -182,7 +182,7 @@ RLS Configuration:
 □ RLS enabled on products table
 □ RLS enabled on store_tax_rates table
 □ RLS enabled on store table
-□ RLS enabled on auth_users table
+□ RLS enabled on users table
 
 Policy Verification:
 □ SELECT policies allow correct access
@@ -289,7 +289,7 @@ export const commonRLSMistakes = `
 
 ❌ MISTAKE 2: RLS policies using hardcoded values
    CREATE POLICY "Bad" ON table USING (store_id = '123');
-   Solution: Use auth.uid() and joins to auth_users
+   Solution: Use auth.uid() and joins to users
 
 ❌ MISTAKE 3: Overly permissive policies
    CREATE POLICY "Allow All" ON table USING (TRUE);

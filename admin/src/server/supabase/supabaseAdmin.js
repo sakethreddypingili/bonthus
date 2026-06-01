@@ -1,22 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
-console.warn('⚠️ SECURITY WARNING: Service role key should NOT be exposed in frontend code.');
-console.warn('TODO: Move all admin operations to a secure backend API endpoint.');
+// ⚠️ SECURITY WARNING: Service role key should NOT be exposed in frontend code.
+// This allows bypassing all Row Level Security (RLS) policies.
+// TODO: Move all admin operations to a secure backend API endpoint.
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-// ⚠️ CRITICAL SECURITY ISSUE: Service role key in frontend bypasses ALL RLS policies
-// This allows anyone with XSS access to modify any database record
-// MUST be moved to backend API with proper authentication
 const serviceRoleKey = process.env.REACT_APP_SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !serviceRoleKey) {
-    console.error('❌ Supabase admin credentials missing. Check your .env file for REACT_APP_SUPABASE_SERVICE_ROLE_KEY.');
+    // We only log this in development to avoid leaking info in production
+    if (process.env.NODE_ENV === 'development') {
+        console.warn('Supabase admin credentials missing for advanced operations.');
+    }
 }
 
-// TODO: SECURITY REFACTOR NEEDED
-// Replace all uses of supabaseAdmin with calls to a secure backend API
-// Example backend endpoint: POST /api/admin/create-user
-// This will allow proper authentication, authorization, and logging
 export const supabaseAdmin = createClient(
     supabaseUrl || 'https://placeholder.supabase.co',
     serviceRoleKey || 'placeholder-key',
@@ -24,7 +21,10 @@ export const supabaseAdmin = createClient(
         auth: {
             autoRefreshToken: false,
             persistSession: false,
-            detectSessionInUrl: false
+            detectSessionInUrl: false,
+            // Use a separate storage key so this client never conflicts
+            // with the user-session GoTrueClient in supabase.js.
+            storageKey: 'sb-admin-service-role'
         }
     }
 );
