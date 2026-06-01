@@ -18,7 +18,7 @@ export default function Customers({ userProfile }) {
 
   useEffect(() => {
     if (isSuperAdmin) {
-      supabase.from('store').select('*').order('name').then(({ data }) => setStores(data || []));
+      supabase.from('stores').select('*').order('name').then(({ data }) => setStores(data || []));
     } else if (userProfile?.store_id) {
       setSelectedStore(userProfile.store_id);
     }
@@ -35,7 +35,7 @@ export default function Customers({ userProfile }) {
       while (hasMore) {
         let query = supabase
           .from("customers")
-          .select('*, orders(gross_amount)')
+          .select('*, orders(net_amount)')
           .order('created_at', { ascending: false })
           .range(start, start + step - 1);
           
@@ -64,7 +64,7 @@ export default function Customers({ userProfile }) {
         phone: u.phone || 'N/A',
         city: [u.street, u.town, u.district, u.state].filter(Boolean).join(', ') || 'N/A',
         orders: u.orders?.length || 0,
-        spent: u.orders?.reduce((sum, o) => sum + Number(o.gross_amount || 0), 0) || 0,
+        spent: u.orders?.reduce((sum, o) => sum + Number(o.net_amount || 0), 0) || 0,
         joined: u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : 'N/A'
       }));
 

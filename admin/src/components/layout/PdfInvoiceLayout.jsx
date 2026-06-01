@@ -30,18 +30,18 @@ const pickBestEyePower = (eyePowerRows) => {
   const scoreRow = (row) => {
     if (!row) return 0;
     const fields = [
-      row.dv_right_sph,
-      row.dv_right_cyl,
-      row.dv_right_axis,
-      row.nv_right_sph,
-      row.nv_right_cyl,
-      row.nv_right_axis,
-      row.dv_left_sph,
-      row.dv_left_cyl,
-      row.dv_left_axis,
-      row.nv_left_sph,
-      row.nv_left_cyl,
-      row.nv_left_axis,
+      row.dv_re_sph,
+      row.dv_re_cyl,
+      row.dv_re_axis,
+      row.nv_re_sph,
+      row.nv_re_cyl,
+      row.nv_re_axis,
+      row.dv_le_sph,
+      row.dv_le_cyl,
+      row.dv_le_axis,
+      row.nv_le_sph,
+      row.nv_le_cyl,
+      row.nv_le_axis,
     ];
     return fields.reduce((acc, v) => acc + (isNonEmpty(v) ? 1 : 0), 0);
   };
@@ -156,12 +156,12 @@ const PdfInvoiceLayout = React.forwardRef(({
             </thead>
             <tbody>
               {order?.order_items?.map((item) => {
-                const q = Number(item.qty || 0);
+                const q = Number(item.quantity || 0);
                 const p = Number(item.price || 0);
-                const d = Number(item.discount_amt || 0);
+                const d = Number(item.discount_amount || 0);
 
-                const sgstR = Number(item.products_list?.products_category?.sgst || 0);
-                const cgstR = Number(item.products_list?.products_category?.cgst || 0);
+                const sgstR = Number(item.products?.product_categories?.sgst || 0);
+                const cgstR = Number(item.products?.product_categories?.cgst || 0);
                 const totalTaxR = sgstR + cgstR;
 
                 let taxable, sgstA, cgstA, total;
@@ -180,7 +180,7 @@ const PdfInvoiceLayout = React.forwardRef(({
                 return (
                   <tr key={item.id} className="bg-white border-b border-slate-400 last:border-b-0">
                     <td className="border-r border-slate-400 py-1.5 px-4 text-slate-600 font-medium uppercase text-[11px]">
-                      {item.products_list?.name || 'Custom Product'}
+                      {item.products?.name || 'Custom Product'}
                     </td>
                     <td className="border-r border-slate-400 py-1.5 px-2 text-center text-slate-600">{q}</td>
                     <td className="border-r border-slate-400 py-1.5 px-2 text-right text-slate-600">{p.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -196,7 +196,7 @@ const PdfInvoiceLayout = React.forwardRef(({
               })}
               <tr className="bg-[#f8f9fc] border-t border-slate-400 font-bold text-[12px]">
                 <td className="border-r border-slate-400 py-2 px-4 text-slate-900 uppercase italic">Total</td>
-                <td className="border-r border-slate-400 py-2 px-2 text-center text-slate-900">{order?.order_items?.reduce((sum, item) => sum + Number(item.qty || 0), 0)}</td>
+                <td className="border-r border-slate-400 py-2 px-2 text-center text-slate-900">{order?.order_items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0)}</td>
                 <td className="border-r border-slate-400 py-2 px-2"></td>
                 <td className="border-r border-slate-400 py-2 px-2 text-right text-black">₹{Number(totals.itemDiscount || 0).toLocaleString()}</td>
                 <td className="border-r border-slate-400 py-2 px-2 text-right text-slate-900 text-[11px]">₹{Number(totals.taxableAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -215,7 +215,7 @@ const PdfInvoiceLayout = React.forwardRef(({
       <div className="flex flex-row justify-between items-start px-8 mb-8">
         <div className="w-[45%]">
           {(() => {
-            const ep = pickBestEyePower(order?.eye_power);
+            const ep = pickBestEyePower(order?.prescriptions);
             if (!ep) return null;
 
             const isNonEmpty = (v) => {
@@ -225,21 +225,21 @@ const PdfInvoiceLayout = React.forwardRef(({
             };
 
             const hasRightDv =
-              isNonEmpty(ep.dv_right_sph) ||
-              isNonEmpty(ep.dv_right_cyl) ||
-              isNonEmpty(ep.dv_right_axis);
+              isNonEmpty(ep.dv_re_sph) ||
+              isNonEmpty(ep.dv_re_cyl) ||
+              isNonEmpty(ep.dv_re_axis);
             const hasRightNv =
-              isNonEmpty(ep.nv_right_sph) ||
-              isNonEmpty(ep.nv_right_cyl) ||
-              isNonEmpty(ep.nv_right_axis);
+              isNonEmpty(ep.nv_re_sph) ||
+              isNonEmpty(ep.nv_re_cyl) ||
+              isNonEmpty(ep.nv_re_axis);
             const hasLeftDv =
-              isNonEmpty(ep.dv_left_sph) ||
-              isNonEmpty(ep.dv_left_cyl) ||
-              isNonEmpty(ep.dv_left_axis);
+              isNonEmpty(ep.dv_le_sph) ||
+              isNonEmpty(ep.dv_le_cyl) ||
+              isNonEmpty(ep.dv_le_axis);
             const hasLeftNv =
-              isNonEmpty(ep.nv_left_sph) ||
-              isNonEmpty(ep.nv_left_cyl) ||
-              isNonEmpty(ep.nv_left_axis);
+              isNonEmpty(ep.nv_le_sph) ||
+              isNonEmpty(ep.nv_le_cyl) ||
+              isNonEmpty(ep.nv_le_axis);
 
             const hasRE = hasRightDv || hasRightNv;
             const hasLE = hasLeftDv || hasLeftNv;
@@ -283,8 +283,8 @@ const PdfInvoiceLayout = React.forwardRef(({
                         return addNum >= 0 ? `+${addNum.toFixed(2)}` : addNum.toFixed(2);
                       };
 
-                      const directRightAdd = computeAddNum(ep.nv_right_sph, ep.dv_right_sph);
-                      const directLeftAdd = computeAddNum(ep.nv_left_sph, ep.dv_left_sph);
+                      const directRightAdd = computeAddNum(ep.nv_re_sph, ep.dv_re_sph);
+                      const directLeftAdd = computeAddNum(ep.nv_le_sph, ep.dv_le_sph);
 
                       const isPlausibleAdd = (addNum) => {
                         // Addition power is typically positive; negative values usually indicate bad/partial data.
@@ -331,9 +331,9 @@ const PdfInvoiceLayout = React.forwardRef(({
                         <>
                           <tr className="bg-white">
                             <td className="py-1.5 px-3 font-bold text-slate-800 text-left border-r border-slate-100">RE (DV)</td>
-                            <td className="py-1.5 px-3 text-slate-600">{formatOptical(ep.dv_right_sph, { kind: 'sph' })}</td>
-                            <td className="py-1.5 px-3 text-slate-500">{formatOptical(ep.dv_right_cyl, { kind: 'cyl' })}</td>
-                            <td className="py-1.5 px-3 text-slate-500">{formatOptical(ep.dv_right_axis, { kind: 'axis' })}</td>
+                            <td className="py-1.5 px-3 text-slate-600">{formatOptical(ep.dv_re_sph, { kind: 'sph' })}</td>
+                            <td className="py-1.5 px-3 text-slate-500">{formatOptical(ep.dv_re_cyl, { kind: 'cyl' })}</td>
+                            <td className="py-1.5 px-3 text-slate-500">{formatOptical(ep.dv_re_axis, { kind: 'axis' })}</td>
                             {hasBothVision && (
                               <td rowSpan={rightHasNvRow ? 2 : 1} className="py-1.5 px-3 text-gray-500 font-bold border-l border-slate-100 bg-gray-50 text-center align-middle">
                                 {formatAdd(resolvedRightAdd)}
@@ -343,9 +343,9 @@ const PdfInvoiceLayout = React.forwardRef(({
                           {rightHasNvRow && (
                             <tr className="bg-gray-50">
                               <td className="py-1.5 px-3 font-bold text-black text-left border-r border-slate-100">RE (NV)</td>
-                              <td className="py-1.5 px-3 text-slate-600 font-medium">{formatOptical(ep.nv_right_sph, { kind: 'sph' })}</td>
-                              <td className="py-1.5 px-3 text-slate-400 opacity-50">{formatOptical(ep.nv_right_cyl ?? ep.dv_right_cyl, { kind: 'cyl' })}</td>
-                              <td className="py-1.5 px-3 text-slate-400 opacity-50">{formatOptical(ep.nv_right_axis ?? ep.dv_right_axis, { kind: 'axis' })}</td>
+                              <td className="py-1.5 px-3 text-slate-600 font-medium">{formatOptical(ep.nv_re_sph, { kind: 'sph' })}</td>
+                              <td className="py-1.5 px-3 text-slate-400 opacity-50">{formatOptical(ep.nv_re_cyl ?? ep.dv_re_cyl, { kind: 'cyl' })}</td>
+                              <td className="py-1.5 px-3 text-slate-400 opacity-50">{formatOptical(ep.nv_re_axis ?? ep.dv_re_axis, { kind: 'axis' })}</td>
                             </tr>
                           )}
                         </>
@@ -356,9 +356,9 @@ const PdfInvoiceLayout = React.forwardRef(({
                         <>
                           <tr className="bg-white border-t border-slate-200">
                             <td className="py-1.5 px-3 font-bold text-slate-800 text-left border-r border-slate-100">LE (DV)</td>
-                            <td className="py-1.5 px-3 text-slate-600">{formatOptical(ep.dv_left_sph, { kind: 'sph' })}</td>
-                            <td className="py-1.5 px-3 text-slate-500">{formatOptical(ep.dv_left_cyl, { kind: 'cyl' })}</td>
-                            <td className="py-1.5 px-3 text-slate-500">{formatOptical(ep.dv_left_axis, { kind: 'axis' })}</td>
+                            <td className="py-1.5 px-3 text-slate-600">{formatOptical(ep.dv_le_sph, { kind: 'sph' })}</td>
+                            <td className="py-1.5 px-3 text-slate-500">{formatOptical(ep.dv_le_cyl, { kind: 'cyl' })}</td>
+                            <td className="py-1.5 px-3 text-slate-500">{formatOptical(ep.dv_le_axis, { kind: 'axis' })}</td>
                             {hasBothVision && (
                               <td rowSpan={leftHasNvRow ? 2 : 1} className="py-1.5 px-3 text-gray-500 font-bold border-l border-slate-100 bg-gray-50 text-center align-middle">
                                 {formatAdd(resolvedLeftAdd)}
@@ -368,9 +368,9 @@ const PdfInvoiceLayout = React.forwardRef(({
                           {leftHasNvRow && (
                             <tr className="bg-gray-50">
                               <td className="py-1.5 px-3 font-bold text-black text-left border-r border-slate-100">LE (NV)</td>
-                              <td className="py-1.5 px-3 text-slate-600 font-medium">{formatOptical(ep.nv_left_sph, { kind: 'sph' })}</td>
-                              <td className="py-1.5 px-3 text-slate-400 opacity-50">{formatOptical(ep.nv_left_cyl ?? ep.dv_left_cyl, { kind: 'cyl' })}</td>
-                              <td className="py-1.5 px-3 text-slate-400 opacity-50">{formatOptical(ep.nv_left_axis ?? ep.dv_left_axis, { kind: 'axis' })}</td>
+                              <td className="py-1.5 px-3 text-slate-600 font-medium">{formatOptical(ep.nv_le_sph, { kind: 'sph' })}</td>
+                              <td className="py-1.5 px-3 text-slate-400 opacity-50">{formatOptical(ep.nv_le_cyl ?? ep.dv_le_cyl, { kind: 'cyl' })}</td>
+                              <td className="py-1.5 px-3 text-slate-400 opacity-50">{formatOptical(ep.nv_le_axis ?? ep.dv_le_axis, { kind: 'axis' })}</td>
                             </tr>
                           )}
                         </>

@@ -14,7 +14,7 @@ export default function EntityDetails({ userProfile }) {
       setLoading(true);
       try {
         const { data, error } = await supabase
-          .from('products_list')
+          .from('products')
           .select('*, store(name)')
           .eq('id', id)
           .single();

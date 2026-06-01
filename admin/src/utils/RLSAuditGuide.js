@@ -10,7 +10,7 @@
 // ============================================
 
 /*
-✅ RLS Enabled on: employees, orders, products, store_tax_rates, store
+✅ RLS Enabled on: users, orders, products, store_tax_rates, store
 ⚠️  RLS Status: Requires audit and enforcement verification
 
 ISSUE: Service role key in frontend BYPASSES ALL RLS POLICIES
@@ -30,28 +30,28 @@ const RLS_POLICIES_SQL = `
 -- EMPLOYEES TABLE RLS
 -- ============================================
 
--- Enable RLS on employees table
-ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+-- Enable RLS on users table
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can view employees from their store
-CREATE POLICY "Users can view employees from their store"
-  ON employees FOR SELECT
+-- Policy: Users can view users from their store
+CREATE POLICY "Users can view users from their store"
+  ON users FOR SELECT
   USING (
     store_id = (SELECT store_id FROM auth_users WHERE id = auth.uid())
     OR auth.jwt() ->> 'role' = 'super_admin'
   );
 
--- Policy: Only admins can update employees
-CREATE POLICY "Only admins can update employees"
-  ON employees FOR UPDATE
+-- Policy: Only admins can update users
+CREATE POLICY "Only admins can update users"
+  ON users FOR UPDATE
   USING (
     (SELECT role FROM auth_users WHERE id = auth.uid()) IN ('admin', 'super_admin')
     AND store_id = (SELECT store_id FROM auth_users WHERE id = auth.uid())
   );
 
--- Policy: Only super_admin can delete employees
-CREATE POLICY "Only super_admin can delete employees"
-  ON employees FOR DELETE
+-- Policy: Only super_admin can delete users
+CREATE POLICY "Only super_admin can delete users"
+  ON users FOR DELETE
   USING (
     (SELECT role FROM auth_users WHERE id = auth.uid()) = 'super_admin'
   );
@@ -177,7 +177,7 @@ export const RLS_VERIFICATION_CHECKLIST = `
 DATABASE SECURITY AUDIT:
 
 RLS Configuration:
-□ RLS enabled on employees table
+□ RLS enabled on users table
 □ RLS enabled on orders table
 □ RLS enabled on products table
 □ RLS enabled on store_tax_rates table
@@ -213,7 +213,7 @@ Connection Security:
 
 Testing:
 □ Test each RLS policy manually
-□ Verify employees can only see own store data
+□ Verify users can only see own store data
 □ Verify admins cannot see other store data
 □ Verify service role bypasses are removed
 □ Verify data leakage is impossible
@@ -227,25 +227,25 @@ export const testRLSPolicies = async (supabase, userId, userRole, userStoreId) =
   console.log('Testing RLS Policies...');
   
   try {
-    // Test 1: User can view employees from their store
+    // Test 1: User can view users from their store
     const { data: ownStoreEmployees, error: error1 } = await supabase
-      .from('employees')
+      .from('users')
       .select('*')
       .eq('store_id', userStoreId);
     
     if (error1) {
-      console.error('❌ FAIL: Cannot view own store employees', error1);
+      console.error('❌ FAIL: Cannot view own store users', error1);
       return false;
     }
-    console.log('✅ PASS: Can view own store employees');
+    console.log('✅ PASS: Can view own store users');
 
-    // Test 2: User cannot view employees from other store
+    // Test 2: User cannot view users from other store
     // (This would need another store_id)
     
     // Test 3: User cannot modify employee data if not admin
     if (userRole === 'employee') {
       const { error: updateError } = await supabase
-        .from('employees')
+        .from('users')
         .update({ status: 'inactive' })
         .eq('id', 'any-employee-id');
       
@@ -256,17 +256,17 @@ export const testRLSPolicies = async (supabase, userId, userRole, userStoreId) =
       console.log('✅ PASS: Non-admin cannot modify employee data');
     }
 
-    // Test 4: Admin can modify their store employees
+    // Test 4: Admin can modify their store users
     if (userRole === 'admin') {
       const { error: adminUpdateError } = await supabase
-        .from('employees')
+        .from('users')
         .update({ status: 'active' })
         .eq('store_id', userStoreId)
         .select()
         .limit(1);
       
       // Should succeed (or no rows to update)
-      console.log('✅ PASS: Admin can modify store employees');
+      console.log('✅ PASS: Admin can modify store users');
     }
 
     console.log('✅ All RLS tests passed!');

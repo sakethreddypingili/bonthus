@@ -164,15 +164,15 @@ export default function InvoiceView({ userProfile }) {
         .select(`
           *,
           customers(*),
-          eye_power(*),
+          prescriptions(*),
           order_items(
             *,
-            products_list(
+            products(
               id,
               name, 
-              price,
+              base_price,
               category_id,
-              products_category(id, name, sgst, cgst)
+              product_categories(id, name, sgst, cgst)
             )
           )
         `)
@@ -188,7 +188,7 @@ export default function InvoiceView({ userProfile }) {
       // 2. Fetch Store Details 
       if (data.store_id) {
         const { data: storeData } = await supabase
-          .from('store')
+          .from('stores')
           .select('*')
           .eq('id', data.store_id)
           .single();
@@ -212,7 +212,7 @@ export default function InvoiceView({ userProfile }) {
 
   const totals = useMemo(() => {
     if (!order?.order_items?.length) {
-      const g = Number(order?.gross_amount || 0);
+      const g = Number(order?.net_amount || 0);
       const d = Number(order?.due_amount || 0);
       return {
         isLegacy: false,
@@ -224,23 +224,23 @@ export default function InvoiceView({ userProfile }) {
 
     // 1. Calculate the inclusive sum of items (current standard)
     const inclusiveItemSum = order.order_items.reduce((sum, item) => {
-      return sum + (Number(item.qty || 0) * Number(item.price || 0)) - Number(item.discount_amt || 0);
+      return sum + (Number(item.quantity || 0) * Number(item.price || 0)) - Number(item.discount_amount || 0);
     }, 0);
 
     // 2. Detect if this is a legacy order where tax was added ON TOP of the prices
     // We allow a small tolerance for rounding differences
-    const isLegacy = Number(order?.gross_amount || 0) > (inclusiveItemSum + 5);
+    const isLegacy = Number(order?.net_amount || 0) > (inclusiveItemSum + 5);
 
     let tCgst = 0, tSgst = 0, tTaxable = 0, tSub = 0, tDisc = 0;
 
     order.order_items.forEach(item => {
-      const q = Number(item.qty || 0);
+      const q = Number(item.quantity || 0);
       const p = Number(item.price || 0);
-      const d = Number(item.discount_amt || 0);
+      const d = Number(item.discount_amount || 0);
       
       const sub = q * p;
-      const sgstRate = Number(item.products_list?.products_category?.sgst || 0);
-      const cgstRate = Number(item.products_list?.products_category?.cgst || 0);
+      const sgstRate = Number(item.products?.product_categories?.sgst || 0);
+      const cgstRate = Number(item.products?.product_categories?.cgst || 0);
       const totalTaxRate = sgstRate + cgstRate;
 
       let taxable, sgstAmt, cgstAmt, lineTotal;
@@ -418,8 +418,8 @@ export default function InvoiceView({ userProfile }) {
   const customerPhone = order?.customers?.phone || 'N/A';
 
   const displayAddress = storeDetails?.address || 'No Address Provided';
-  const displayGstin = storeDetails?.gst_no || storeDetails?.gstin || 'Not Available';
-  const displayPhone = storeDetails?.phone_no || storeDetails?.phone || 'No Contact Provided';
+  const displayGstin = storeDetails?.gst_no || storeDetails?.gst_no || 'Not Available';
+  const displayPhone = storeDetails?.phone || storeDetails?.phone || 'No Contact Provided';
   
   // If order status is "Delivered", treat payment as successful.
   const isDelivered = String(order?.status || '').toLowerCase() === 'delivered';

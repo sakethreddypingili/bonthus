@@ -66,18 +66,18 @@ export const allOrders = [
 ];
 
 export const allProducts = [
-  { id: "P-001", name: "Classic Aviator Gold",     category: "Sunglasses",   price: 2499, stock: 142, sales: 487, status: "Active",   image: "🕶️" },
-  { id: "P-002", name: "Round Frame Blue Light",   category: "Eyeglasses",  price: 1899, stock: 89,  sales: 412, status: "Active",   image: "👓" },
-  { id: "P-003", name: "Wayfarer Black",           category: "Sunglasses",   price: 3299, stock: 56,  sales: 398, status: "Active",   image: "🕶️" },
-  { id: "P-004", name: "Daily Disposable 30-pack", category: "Contact Lens", price: 899,  stock: 320, sales: 356, status: "Active",   image: "👁️" },
-  { id: "P-005", name: "Titanium Rimless",         category: "Eyeglasses",  price: 4599, stock: 34,  sales: 289, status: "Active",   image: "👓" },
-  { id: "P-006", name: "Cat Eye Tortoise",        category: "Eyeglasses",  price: 2199, stock: 67,  sales: 241, status: "Active",   image: "👓" },
-  { id: "P-007", name: "Sports Wrap Polarized",    category: "Sunglasses",   price: 2799, stock: 23,  sales: 198, status: "Low Stock",image: "🕶️" },
-  { id: "P-008", name: "Kids Shield Frame",       category: "Eyeglasses",  price: 1299, stock: 0,   sales: 176, status: "Out of Stock", image: "👓" },
-  { id: "P-009", name: "Monthly Toric Lenses",    category: "Contact Lens", price: 1299, stock: 210, sales: 162, status: "Active",   image: "👁️" },
-  { id: "P-010", name: "Gradient Lens Butterfly", category: "Sunglasses",   price: 3499, stock: 45,  sales: 149, status: "Active",   image: "🕶️" },
-  { id: "P-011", name: "Clip-on Magnetic",        category: "Accessories",  price: 899,  stock: 88,  sales: 134, status: "Active",   image: "🔗" },
-  { id: "P-012", name: "Acetate Square Frame",    category: "Eyeglasses",  price: 2099, stock: 12,  sales: 118, status: "Low Stock",image: "👓" },
+  { id: "P-001", name: "Classic Aviator Gold",     category: "Sunglasses",   unit_price: 2499, stock: 142, sales: 487, status: "Active",   image: "🕶️" },
+  { id: "P-002", name: "Round Frame Blue Light",   category: "Eyeglasses",  unit_price: 1899, stock: 89,  sales: 412, status: "Active",   image: "👓" },
+  { id: "P-003", name: "Wayfarer Black",           category: "Sunglasses",   unit_price: 3299, stock: 56,  sales: 398, status: "Active",   image: "🕶️" },
+  { id: "P-004", name: "Daily Disposable 30-pack", category: "Contact Lens", unit_price: 899,  stock: 320, sales: 356, status: "Active",   image: "👁️" },
+  { id: "P-005", name: "Titanium Rimless",         category: "Eyeglasses",  unit_price: 4599, stock: 34,  sales: 289, status: "Active",   image: "👓" },
+  { id: "P-006", name: "Cat Eye Tortoise",        category: "Eyeglasses",  unit_price: 2199, stock: 67,  sales: 241, status: "Active",   image: "👓" },
+  { id: "P-007", name: "Sports Wrap Polarized",    category: "Sunglasses",   unit_price: 2799, stock: 23,  sales: 198, status: "Low Stock",image: "🕶️" },
+  { id: "P-008", name: "Kids Shield Frame",       category: "Eyeglasses",  unit_price: 1299, stock: 0,   sales: 176, status: "Out of Stock", image: "👓" },
+  { id: "P-009", name: "Monthly Toric Lenses",    category: "Contact Lens", unit_price: 1299, stock: 210, sales: 162, status: "Active",   image: "👁️" },
+  { id: "P-010", name: "Gradient Lens Butterfly", category: "Sunglasses",   unit_price: 3499, stock: 45,  sales: 149, status: "Active",   image: "🕶️" },
+  { id: "P-011", name: "Clip-on Magnetic",        category: "Accessories",  unit_price: 899,  stock: 88,  sales: 134, status: "Active",   image: "🔗" },
+  { id: "P-012", name: "Acetate Square Frame",    category: "Eyeglasses",  unit_price: 2099, stock: 12,  sales: 118, status: "Low Stock",image: "👓" },
 ];
 
 export const weeklyOrdersData = [

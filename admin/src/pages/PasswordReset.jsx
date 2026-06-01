@@ -33,10 +33,10 @@ export default function PasswordReset({ userProfile, onPasswordReset }) {
 
       // 2. Clear the flag in the appropriate table
       if (userProfile.role === 'employee') {
-        // For employees, update employees table using supabaseAdmin to bypass RLS
+        // For users, update users table using supabaseAdmin to bypass RLS
         const { supabaseAdmin } = await import("../server/supabase/supabaseAdmin");
         const { error: empError } = await supabaseAdmin
-          .from("employees")
+          .from("users")
           .update({ must_reset_password: false })
           .eq("user_id", userProfile.id);
         if (empError) throw empError;

@@ -21,18 +21,18 @@ const pickBestEyePower = (eyePowerRows) => {
     const scoreRow = (row) => {
         if (!row) return 0;
         const fields = [
-            row.dv_right_sph,
-            row.dv_right_cyl,
-            row.dv_right_axis,
-            row.nv_right_sph,
-            row.nv_right_cyl,
-            row.nv_right_axis,
-            row.dv_left_sph,
-            row.dv_left_cyl,
-            row.dv_left_axis,
-            row.nv_left_sph,
-            row.nv_left_cyl,
-            row.nv_left_axis,
+            row.dv_re_sph,
+            row.dv_re_cyl,
+            row.dv_re_axis,
+            row.nv_re_sph,
+            row.nv_re_cyl,
+            row.nv_re_axis,
+            row.dv_le_sph,
+            row.dv_le_cyl,
+            row.dv_le_axis,
+            row.nv_le_sph,
+            row.nv_le_cyl,
+            row.nv_le_axis,
         ];
         return fields.reduce((acc, v) => acc + (isNonEmpty(v) ? 1 : 0), 0);
     };
@@ -71,7 +71,7 @@ export default function EditOrder({ userProfile }) {
     const [activeItemSearch, setActiveItemSearch] = useState(null);
     const [productSuggestions, setProductSuggestions] = useState({});
     const [showAddProductModal, setShowAddProductModal] = useState(false);
-    const [newProduct, setNewProduct] = useState({ name: '', category: '', category_id: '', price: '', stock: '10' });
+    const [newProduct, setNewProduct] = useState({ name: '', category: '', category_id: '', unit_price: '', stock: '10' });
     const [addingProduct, setAddingProduct] = useState(false);
     const [pendingItemIndex, setPendingItemIndex] = useState(null);
 
@@ -159,14 +159,14 @@ export default function EditOrder({ userProfile }) {
                 // Fetch Order & Customer
                 const { data: order, error: orderErr } = await supabase
                     .from('orders')
-                    .select('*, customers(*), eye_power(*), order_items(*, products_list(*, products_category(*)))')
+                    .select('*, customers(*), prescriptions(*), order_items(*, products(*, product_categories(*)))')
                     .eq('id', orderId)
                     .single();
 
                 if (orderErr) throw orderErr;
 
                 setSelectedStore(order.store_id);
-                setOrderStatus(order.status);
+                setOrderStatus((order.status === 'Advance' || order.status === 'Due') ? 'pending' : order.status);
                 setOrderDisabled(order.disabled || false);
 
                 if (order.customers) {
@@ -184,14 +184,15 @@ export default function EditOrder({ userProfile }) {
 
                 // Map Order Items
                 const mappedItems = order.order_items.map(item => {
-                    const prod = item.products_list || {};
-                    const cat = prod.products_category || {};
+                    const prod = item.products || {};
+                    const cat = prod?.product_categories || {};
 
                     // Load prescription from order_items if available (new way)
                     let prescription = null;
-                    if (item.prescription) {
+                    const itemPrescription = item.prescription || item.custom_lens_specs;
+                    if (itemPrescription) {
                         try {
-                            prescription = typeof item.prescription === 'string' ? JSON.parse(item.prescription) : item.prescription;
+                            prescription = typeof itemPrescription === 'string' ? JSON.parse(itemPrescription) : itemPrescription;
                         } catch (e) {
                             console.error('Failed to parse prescription:', e);
                         }
@@ -202,9 +203,9 @@ export default function EditOrder({ userProfile }) {
                         db_id: item.id, // reference for existing items
                         name: prod.name || "Unknown Product",
                         type: cat.name || (item.product_id ? 'Product' : 'Custom'),
-                        qty: item.qty,
-                        price: item.price,
-                        discount: item.discount_amt || 0,
+                        quantity: item.quantity,
+                        unit_price: item.unit_price,
+                        discount: item.discount_amount || 0,
                         product_id: item.product_id,
                         category_id: prod.category_id,
                         sgst: cat.sgst || 0,
@@ -214,20 +215,20 @@ export default function EditOrder({ userProfile }) {
                     };
                 });
 
-                // Fallback: Load prescription from eye_power table for old orders (order-level)
+                // Fallback: Load prescription from prescriptions table for old orders (order-level)
                 // Assign it to the first Lens/Contact Lens item
-                const ep = pickBestEyePower(order.eye_power);
+                const ep = pickBestEyePower(order.prescriptions);
                 if (ep && !mappedItems.some(i => i.prescription)) {
                     const firstLensItem = mappedItems.find(i => i.type === 'Lens' || i.type === 'Contact Lens');
                     if (firstLensItem) {
                         mappedItems.find(i => i.id === firstLensItem.id).prescription = {
                             isSamePower: false,
                             isCylindrical: false,
-                            re: { sph: ep.dv_right_sph || '', cyl: ep.dv_right_cyl || '', axis: ep.dv_right_axis || '' },
-                            le: { sph: ep.dv_left_sph || '', cyl: ep.dv_left_cyl || '', axis: ep.dv_left_axis || '' },
-                            adl_re: { sph: ep.nv_right_sph || '', cyl: ep.nv_right_cyl || '', axis: ep.nv_right_axis || '' },
-                            adl_le: { sph: ep.nv_left_sph || '', cyl: ep.nv_left_cyl || '', axis: ep.nv_left_axis || '' },
-                            hasAdditionalPower: !!(ep.nv_right_sph || ep.nv_left_sph),
+                            re: { sph: ep.dv_re_sph || '', cyl: ep.dv_re_cyl || '', axis: ep.dv_re_axis || '' },
+                            le: { sph: ep.dv_le_sph || '', cyl: ep.dv_le_cyl || '', axis: ep.dv_le_axis || '' },
+                            adl_re: { sph: ep.nv_re_sph || '', cyl: ep.nv_re_cyl || '', axis: ep.nv_re_axis || '' },
+                            adl_le: { sph: ep.nv_le_sph || '', cyl: ep.nv_le_cyl || '', axis: ep.nv_le_axis || '' },
+                            hasAdditionalPower: !!(ep.nv_re_sph || ep.nv_le_sph),
                             notes: ep.notes || ''
                         };
                     }
@@ -236,7 +237,7 @@ export default function EditOrder({ userProfile }) {
 
                 // Fetch payments if needed, but the original logic doesn't store a payment log per order yet?
                 // Actually, due_amount is stored. Let's assume for now we just show balance to pay.
-                setPayments([{ id: Date.now(), mode: 'Cash', amount: (order.gross_amount - order.due_amount).toFixed(2) }]);
+                setPayments([{ id: Date.now(), mode: 'Cash', amount: (order.net_amount - order.due_amount).toFixed(2) }]);
 
             } catch (err) {
                 console.error("Error fetching order:", err);
@@ -252,34 +253,28 @@ export default function EditOrder({ userProfile }) {
 
     useEffect(() => {
         if (isAdmin) {
-            supabase.from('store').select('*').order('name').then(({ data }) => setStores(data || []));
+            supabase.from('stores').select('*').order('name').then(({ data }) => setStores(data || []));
         }
     }, [isAdmin]);
 
     useEffect(() => {
         const fetchStoreCategories = async () => {
-            if (!currentStoreId) {
-                setStoreCategories([]);
-                return;
-            }
-
             try {
                 const { data, error } = await supabase
-                    .from('products_category')
-                    .select('id, name')
-                    .eq('store_id', currentStoreId)
+                    .from('product_categories')
+                    .select('id, name, sgst, cgst, igst')
                     .order('name', { ascending: true });
 
                 if (error) throw error;
                 setStoreCategories(data || []);
             } catch (err) {
-                console.error('Error fetching store categories:', err);
+                console.error('Error fetching categories:', err);
                 setStoreCategories([]);
             }
         };
 
         fetchStoreCategories();
-    }, [currentStoreId]);
+    }, []);
 
     const typeOptions = storeCategories.length > 0
         ? Array.from(new Set(storeCategories.map(c => c.name).filter(Boolean)))
@@ -328,13 +323,21 @@ export default function EditOrder({ userProfile }) {
         searchTimeoutRef.current[id] = setTimeout(async () => {
             try {
                 const { data, error } = await supabase
-                    .from('products_list')
-                    .select('id, name, price, stock, category_id, products_category(*)')
-                    .eq('store_id', currentStoreId)
+                    .from('products')
+                    .select('id, name, base_price, category_id, product_categories(*), store_inventory!inner(stock_quantity, unit_price)')
+                    .eq('store_inventory.store_id', currentStoreId)
                     .ilike('name', `%${value.trim()}%`)
                     .order('name', { ascending: true })
                     .limit(15);
-                if (!error) setProductSuggestions(prev => ({ ...prev, [id]: data || [] }));
+                
+                if (!error) {
+                    const mapped = data.map(p => ({
+                        ...p,
+                        price: p.store_inventory?.[0]?.unit_price || p.base_price,
+                        stock: p.store_inventory?.[0]?.stock_quantity || 0
+                    }));
+                    setProductSuggestions(prev => ({ ...prev, [id]: mapped || [] }));
+                }
             } finally {
                 setSearchingItems(prev => ({ ...prev, [id]: false }));
             }
@@ -346,21 +349,31 @@ export default function EditOrder({ userProfile }) {
         if (!currentStoreId) return;
         setAddingProduct(true);
         try {
-            const newId = generateId(ID_RULES.PRODUCTS.prefix, ID_RULES.PRODUCTS.digits);
-            const { data, error } = await supabase.from('products_list').insert([{
-                id: newId,
+            const customSku = generateId(ID_RULES.PRODUCTS.prefix, ID_RULES.PRODUCTS.digits);
+            
+            // 1. Insert into products (catalog)
+            const { data: prodData, error: prodError } = await supabase.from('products').insert([{
+                sku: customSku,
                 name: newProduct.name,
                 category_id: newProduct.category_id,
-                store_id: currentStoreId,
-                price: Number(newProduct.price),
-                stock: Number(newProduct.stock),
-                sales: 0
+                base_price: Number(newProduct.price)
             }]).select('id').single();
-            if (error) throw error;
+            
+            if (prodError) throw prodError;
+            const internalId = prodData.id;
+
+            // 2. Insert into store_inventory
+            const { error: invError } = await supabase.from('store_inventory').insert([{
+                store_id: currentStoreId,
+                product_id: internalId,
+                stock_quantity: Number(newProduct.stock),
+                unit_price: Number(newProduct.price)
+            }]);
+            if (invError) throw invError;
 
             let categoryTaxes = { category_id: null, sgst: 0, cgst: 0, igst: 0 };
             if (newProduct.category_id) {
-                const { data: catData } = await supabase.from('products_category').select('id, sgst, cgst, igst, name').eq('id', newProduct.category_id).maybeSingle();
+                const { data: catData } = await supabase.from('product_categories').select('id, sgst, cgst, igst, name').eq('id', newProduct.category_id).maybeSingle();
                 if (catData) {
                     categoryTaxes = {
                         category_id: catData.id,
@@ -374,8 +387,8 @@ export default function EditOrder({ userProfile }) {
                     setItems(items.map(i => i.id === pendingItemIndex ? {
                         ...i,
                         name: newProduct.name,
-                        price: newProduct.price,
-                        product_id: data.id,
+                        unit_price: newProduct.price,
+                        product_id: internalId,
                         type: selectedType,
                         ...categoryTaxes,
                         prescription: needsPrescription ? (i.prescription || {
@@ -389,8 +402,8 @@ export default function EditOrder({ userProfile }) {
                 setItems(items.map(i => i.id === pendingItemIndex ? {
                     ...i,
                     name: newProduct.name,
-                    price: newProduct.price,
-                    product_id: data.id,
+                    unit_price: newProduct.price,
+                    product_id: internalId,
                     type: newProduct.category,
                     category_id: newProduct.category_id
                 } : i));
@@ -406,15 +419,15 @@ export default function EditOrder({ userProfile }) {
     const selectProduct = async (item, product) => {
         let categoryTaxes = { category_id: null, sgst: 0, cgst: 0, igst: 0 };
         if (product.category_id) {
-            const { data } = await supabase.from('products_category').select('id, sgst, cgst, igst').eq('id', product.category_id).maybeSingle();
+            const { data } = await supabase.from('product_categories').select('id, sgst, cgst, igst').eq('id', product.category_id).maybeSingle();
             if (data) categoryTaxes = { category_id: data.id, sgst: data.sgst || 0, cgst: data.cgst || 0, igst: data.igst || 0 };
         }
-        const selectedType = product.products_category?.name || item.type || getDefaultItemType();
+        const selectedType = product?.product_categories?.name || item.type || getDefaultItemType();
         const needsPrescription = selectedType === 'Lens' || selectedType === 'Contact Lens';
         setItems(prev => prev.map(i => i.id === item.id ? {
             ...i,
             name: product.name,
-            price: product.price,
+            unit_price: product.price,
             product_id: product.id,
             type: selectedType,
             ...categoryTaxes,
@@ -445,7 +458,7 @@ export default function EditOrder({ userProfile }) {
 
             // 2. Inclusive Calculations
             const totalLineAmounts = items.map(item => {
-                const lineTotal = (Number(item.price) * Number(item.qty)) - Number(item.discount);
+                const lineTotal = (Number(item.price) * Number(item.quantity)) - Number(item.discount);
                 const taxRate = Number(item.sgst || 0) + Number(item.cgst || 0) + Number(item.igst || 0);
 
                 const taxable = lineTotal / (1 + (taxRate / 100));
@@ -461,7 +474,7 @@ export default function EditOrder({ userProfile }) {
                 };
             });
 
-            const subtotal = items.reduce((sum, i) => sum + (Number(i.price) * Number(i.qty)), 0);
+            const subtotal = items.reduce((sum, i) => sum + (Number(i.price) * Number(i.quantity)), 0);
             const totalDiscount = items.reduce((sum, i) => sum + Number(i.discount), 0);
 
             // Total amount customer pays
@@ -477,13 +490,11 @@ export default function EditOrder({ userProfile }) {
             // 3. Update Order record
             const { error: orderUpdateErr } = await supabase.from('orders').update({
                 status: orderStatus,
-                gross_amount: grossTotal,
+                net_amount: grossTotal,
                 due_amount: due,
                 subtotal: subtotal,
-                total_discount: totalDiscount,
-                taxable_amount: totalTaxable,
-                sgst_amt: totalSgst,
-                cgst_amt: totalCgst
+                discount_amount: totalDiscount,
+                tax_amount: totalSgst + totalCgst
             }).eq('id', orderId);
             if (orderUpdateErr) throw orderUpdateErr;
 
@@ -493,18 +504,15 @@ export default function EditOrder({ userProfile }) {
                 id: generateId(ID_RULES.ORDER_ITEMS.prefix, ID_RULES.ORDER_ITEMS.digits),
                 order_id: orderId,
                 product_id: item.product_id,
-                qty: Number(item.qty),
-                price: Number(item.price),
-                discount_amt: Number(item.discount || 0),
-                taxable_amount: item.taxable,
-                sgst_amt: item.sgstAmt,
-                cgst_amt: item.cgstAmt,
+                quantity: Number(item.quantity),
+                unit_price: Number(item.price),
+                discount_amount: Number(item.discount || 0),
                 total_price: item.lineTotal,
-                prescription: item.prescription ? JSON.stringify(item.prescription) : null
+                custom_lens_specs: item.prescription ? JSON.stringify(item.prescription) : null
             }));
             await supabase.from('order_items').insert(orderItemsPayload);
 
-            // 5. Eye Power - Now stored per-item in order_items, no separate eye_power table needed
+            // 5. Eye Power - Now stored per-item in order_items, no separate prescriptions table needed
             alert("Order updated successfully!");
             navigate('/orders');
         } catch (err) {
@@ -545,7 +553,7 @@ export default function EditOrder({ userProfile }) {
 
     if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#000000]" /></div>;
 
-    const subtotal = items.reduce((sum, item) => sum + (Number(item.price) * Number(item.qty)), 0);
+    const subtotal = items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
     const totalDiscount = items.reduce((sum, item) => sum + Number(item.discount), 0);
     const grossTotal = subtotal - totalDiscount;
 
@@ -747,10 +755,10 @@ export default function EditOrder({ userProfile }) {
                                     </div>
                                 </td>
                                 <td className="py-5 px-6 text-center">
-                                    <input type="number" disabled={!isAdmin} value={item.qty} onChange={e => isAdmin && setItems(items.map(i => i.id === item.id ? { ...i, qty: e.target.value } : i))} className="w-12 text-center bg-gray-50 border border-gray-100 rounded-xl py-1.5 text-[11px] font-black focus:outline-none focus:border-black disabled:opacity-50" />
+                                    <input type="number" disabled={!isAdmin} value={item.quantity} onChange={e => isAdmin && setItems(items.map(i => i.id === item.id ? { ...i, quantity: e.target.value } : i))} className="w-12 text-center bg-gray-50 border border-gray-100 rounded-xl py-1.5 text-[11px] font-black focus:outline-none focus:border-black disabled:opacity-50" />
                                 </td>
                                 <td className="py-5 px-6 text-right">
-                                    <input type="number" disabled={!isAdmin} value={item.price} onChange={e => isAdmin && setItems(items.map(i => i.id === item.id ? { ...i, price: e.target.value } : i))} className="w-24 text-right bg-gray-50 border border-gray-100 rounded-xl px-3 py-1.5 text-[11px] font-black tracking-tight focus:outline-none focus:border-black disabled:opacity-50" />
+                                    <input type="number" disabled={!isAdmin} value={item.price} onChange={e => isAdmin && setItems(items.map(i => i.id === item.id ? { ...i, unit_price: e.target.value } : i))} className="w-24 text-right bg-gray-50 border border-gray-100 rounded-xl px-3 py-1.5 text-[11px] font-black tracking-tight focus:outline-none focus:border-black disabled:opacity-50" />
                                 </td>
                                 <td className="py-5 px-6 text-right">
                                     <input type="number" disabled={!isAdmin} value={item.discount} onChange={e => isAdmin && setItems(items.map(i => i.id === item.id ? { ...i, discount: e.target.value } : i))} className="w-20 text-right bg-gray-50 border border-gray-100 rounded-xl px-3 py-1.5 text-[11px] font-black text-black tracking-tight focus:outline-none focus:border-black disabled:opacity-50" />
@@ -763,7 +771,7 @@ export default function EditOrder({ userProfile }) {
                                 </td>
                                 <td className="py-5 px-6 text-right">
                                     <span className="text-[11px] font-black text-black tracking-tighter">
-                                        ₹{((Number(item.price) * Number(item.qty)) - Number(item.discount)).toLocaleString()}
+                                        ₹{((Number(item.price) * Number(item.quantity)) - Number(item.discount)).toLocaleString()}
                                     </span>
                                 </td>
                                 <td className="py-5 px-6 text-center">
@@ -775,7 +783,7 @@ export default function EditOrder({ userProfile }) {
                         ))}
                     </tbody>
                 </table>
-                <button disabled={!isAdmin} onClick={() => isAdmin && setItems([...items, { id: Date.now(), name: "", type: "Frame", qty: 1, price: 0, discount: 0, sgst: 0, cgst: 0, igst: 0 }])} className="w-full py-4 bg-gray-50 text-[10px] font-black text-black uppercase tracking-[0.2em] hover:bg-black hover:text-white border-t border-gray-100 transition-all disabled:opacity-20">
+                <button disabled={!isAdmin} onClick={() => isAdmin && setItems([...items, { id: Date.now(), name: "", type: "Frame", quantity: 1, unit_price: 0, discount: 0, sgst: 0, cgst: 0, igst: 0 }])} className="w-full py-4 bg-gray-50 text-[10px] font-black text-black uppercase tracking-[0.2em] hover:bg-black hover:text-white border-t border-gray-100 transition-all disabled:opacity-20">
                     + Append New Line Item
                 </button>
             </div>
@@ -1218,7 +1226,7 @@ export default function EditOrder({ userProfile }) {
                                 <input
                                     type="number"
                                     value={newProduct.price}
-                                    onChange={e => setNewProduct({ ...newProduct, price: e.target.value })}
+                                    onChange={e => setNewProduct({ ...newProduct, unit_price: e.target.value })}
                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[14px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
                                     placeholder="0.00"
                                     required

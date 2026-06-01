@@ -57,7 +57,7 @@ export default function CreateOrder({ userProfile }) {
     }, [customer.phone]);
 
     const [items, setItems] = useState([
-        { id: 1, name: "", type: "Lens", qty: 1, price: 0, discount: 0, product_id: null, stock: null, prescription: null, category_id: null, sgst: 0, cgst: 0, igst: 0 }
+        { id: 1, name: "", type: "Lens", quantity: 1, unit_price: 0, discount: 0, product_id: null, stock: null, prescription: null, category_id: null, sgst: 0, cgst: 0, igst: 0 }
     ]);
 
     const [voucherCode, setVoucherCode] = useState("");
@@ -70,7 +70,7 @@ export default function CreateOrder({ userProfile }) {
     const [productSuggestions, setProductSuggestions] = useState({});
 
     const [showAddProductModal, setShowAddProductModal] = useState(false);
-    const [newProduct, setNewProduct] = useState({ name: '', category: '', category_id: '', price: '', stock: '10' });
+    const [newProduct, setNewProduct] = useState({ name: '', category: '', category_id: '', unit_price: '', stock: '10' });
     const [addingProduct, setAddingProduct] = useState(false);
     const [pendingItemIndex, setPendingItemIndex] = useState(null);
 
@@ -120,7 +120,7 @@ export default function CreateOrder({ userProfile }) {
 
     useEffect(() => {
         if (isAdmin) {
-            supabase.from('store').select('*').order('name').then(({ data }) => setStores(data || []));
+            supabase.from('stores').select('*').order('name').then(({ data }) => setStores(data || []));
         } else if (userProfile?.store_id) {
             setSelectedStore(userProfile.store_id);
         }
@@ -135,7 +135,7 @@ export default function CreateOrder({ userProfile }) {
 
             try {
                 const { data, error } = await supabase
-                    .from('products_category')
+                    .from('product_categories')
                     .select('id, name')
                     .eq('store_id', currentStoreId)
                     .order('name', { ascending: true });
@@ -212,7 +212,7 @@ export default function CreateOrder({ userProfile }) {
             return;
         }
 
-        setItems(prev => [...prev, { id: Date.now(), name: "", type: getDefaultItemType(), qty: 1, price: 0, discount: 0, product_id: null, stock: null, prescription: null, category_id: null, sgst: 0, cgst: 0, igst: 0 }]);
+        setItems(prev => [...prev, { id: Date.now(), name: "", type: getDefaultItemType(), quantity: 1, unit_price: 0, discount: 0, product_id: null, stock: null, prescription: null, category_id: null, sgst: 0, cgst: 0, igst: 0 }]);
     };
 
     const removeItem = (id) => {
@@ -543,17 +543,23 @@ export default function CreateOrder({ userProfile }) {
         searchTimeoutRef.current[id] = setTimeout(async () => {
             try {
                 const { data, error } = await supabase
-                    .from('products_list')
-                    .select('id, name, price, stock, category_id, products_category(*)')
-                    .eq('store_id', currentStoreId)
+                    .from('products')
+                    .select('id, name, base_price, category_id, product_categories(*), store_inventory!inner(stock_quantity, unit_price)')
+                    .eq('store_inventory.store_id', currentStoreId)
                     .ilike('name', `%${value.trim()}%`)
                     .order('name', { ascending: true })
                     .limit(15);
 
                 if (error) throw error;
 
+                const mapped = data.map(p => ({
+                    ...p,
+                    price: p.store_inventory?.[0]?.unit_price || p.base_price,
+                    stock: p.store_inventory?.[0]?.stock_quantity || 0
+                }));
+
                 // Store suggestions per item id so each row has its own independent list
-                setProductSuggestions(prev => ({ ...prev, [id]: data || [] }));
+                setProductSuggestions(prev => ({ ...prev, [id]: mapped || [] }));
             } catch (err) {
                 console.error('Error fetching products:', err);
                 updateItem(id, 'searchError', err.message);
@@ -579,25 +585,35 @@ export default function CreateOrder({ userProfile }) {
 
         setAddingProduct(true);
         try {
-            const newId = generateId(ID_RULES.PRODUCTS.prefix, ID_RULES.PRODUCTS.digits);
-            const { data, error } = await supabase.from('products_list').insert([{
-                id: newId,
+            const customSku = generateId(ID_RULES.PRODUCTS.prefix, ID_RULES.PRODUCTS.digits);
+            
+            // 1. Insert into products (catalog)
+            const { data: prodData, error: prodError } = await supabase.from('products').insert([{
+                sku: customSku,
                 name: newProduct.name,
                 category_id: newProduct.category_id,
-                store_id: currentStoreId,
-                price: Number(newProduct.price),
-                stock: Number(newProduct.stock),
-                sales: 0
+                base_price: Number(newProduct.price)
             }]).select('id').single();
-            if (error) throw error;
-            const newProductId = data.id;
+            
+            if (prodError) throw prodError;
+            const internalId = prodData.id;
+
+            // 2. Insert into store_inventory
+            const { error: invError } = await supabase.from('store_inventory').insert([{
+                store_id: currentStoreId,
+                product_id: internalId,
+                stock_quantity: Number(newProduct.stock),
+                unit_price: Number(newProduct.price)
+            }]);
+            if (invError) throw invError;
 
             setItems(items.map(i => i.id === pendingItemIndex ? {
                 ...i,
                 name: newProduct.name,
-                price: newProduct.price,
-                product_id: newProductId,
-                stock: newProduct.stock
+                unit_price: newProduct.price,
+                product_id: internalId,
+                stock: newProduct.stock,
+                category_id: newProduct.category_id
             } : i));
 
             setShowAddProductModal(false);
@@ -611,7 +627,7 @@ export default function CreateOrder({ userProfile }) {
     const selectProduct = async (item, product) => {
         if (items.some(i => i.id !== item.id && i.product_id === product.id)) {
             alert('This product is already added to the order.');
-            setItems(prev => prev.map(i => i.id === item.id ? { ...i, name: '', product_id: null, price: 0, stock: null, prescription: null, category_id: null, sgst: 0, cgst: 0, igst: 0 } : i));
+            setItems(prev => prev.map(i => i.id === item.id ? { ...i, name: '', product_id: null, unit_price: 0, stock: null, prescription: null, category_id: null, sgst: 0, cgst: 0, igst: 0 } : i));
             closeProductSearch();
             setProductSuggestions(prev => ({ ...prev, [item.id]: [] }));
             return;
@@ -622,7 +638,7 @@ export default function CreateOrder({ userProfile }) {
         if (product.category_id) {
             try {
                 const { data, error } = await supabase
-                    .from('products_category')
+                    .from('product_categories')
                     .select('id, sgst, cgst, igst')
                     .eq('id', product.category_id)
                     .maybeSingle();
@@ -640,13 +656,13 @@ export default function CreateOrder({ userProfile }) {
             }
         }
 
-        const selectedType = product.products_category?.name || item.type || getDefaultItemType();
+        const selectedType = product?.product_categories?.name || item.type || getDefaultItemType();
         const needsPrescription = selectedType === 'Lens' || selectedType === 'Contact Lens';
 
         setItems(prev => prev.map(i => i.id === item.id ? {
             ...i,
             name: product.name,
-            price: product.price,
+            unit_price: product.price,
             product_id: product.id,
             stock: product.stock,
             type: selectedType,
@@ -771,7 +787,7 @@ export default function CreateOrder({ userProfile }) {
     // Calculations
     // Inclusive Calculations
     const totalLineAmounts = items.map(item => {
-        const lineTotal = (Number(item.price) * Number(item.qty)) - Number(item.discount);
+        const lineTotal = (Number(item.price) * Number(item.quantity)) - Number(item.discount);
         const taxRate = Number(item.sgst || 0) + Number(item.cgst || 0) + Number(item.igst || 0);
         
         const taxable = lineTotal / (1 + (taxRate / 100));
@@ -790,7 +806,7 @@ export default function CreateOrder({ userProfile }) {
         };
     });
 
-    const subtotal = items.reduce((sum, item) => sum + (Number(item.price) * Number(item.qty)), 0);
+    const subtotal = items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
     const rowDiscounts = items.reduce((sum, item) => sum + (Number(item.discount)), 0);
     const voucherDiscountAmount = appliedVoucher ? (subtotal * (Number(appliedVoucher.discount_percent || 0) / 100)) : 0;
     const totalDiscount = rowDiscounts + voucherDiscountAmount;
@@ -836,9 +852,7 @@ export default function CreateOrder({ userProfile }) {
             if (existingCustomer) {
                 customerId = existingCustomer.id;
             } else {
-                const newCustId = generateId(ID_RULES.CUSTOMERS.prefix, ID_RULES.CUSTOMERS.digits);
                 const { data: newCust, error: custError } = await supabase.from('customers').insert([{
-                    id: newCustId,
                     name: customer.name,
                     phone: customer.phone,
                     street: customer.street,
@@ -853,42 +867,8 @@ export default function CreateOrder({ userProfile }) {
                 customerId = newCust.id;
             }
 
-            const newOrderId = generateId(ID_RULES.ORDERS.prefix, ID_RULES.ORDERS.digits);
-            const { data: orderData, error: orderError } = await supabase.from('orders').insert([{
-                id: newOrderId,
-                store_id: currentStoreId,
-                customer_id: customerId,
-                status: Number(finalDueAmount) > 0 ? "Due" : "Processing",
-                total_discount: totalDiscount,
-                due_amount: Number(finalDueAmount),
-                gross_amount: grossTotal,
-                subtotal: subtotal,
-                taxable_amount: totalTaxable,
-                sgst_amt: totalSgst,
-                cgst_amt: totalCgst,
-                created_at: new Date().toISOString()
-            }]).select('id').single();
-
-            if (orderError) throw orderError;
-            const orderId = orderData.id;
-
-            const orderItemsPayload = totalLineAmounts.map(item => ({
-                id: generateId(ID_RULES.ORDER_ITEMS.prefix, ID_RULES.ORDER_ITEMS.digits),
-                order_id: orderId,
-                product_id: item.product_id,
-                qty: Number(item.qty),
-                price: Number(item.price),
-                discount_amt: Number(item.discount || 0),
-                taxable_amount: item.taxable,
-                sgst_amt: item.sgstAmt,
-                cgst_amt: item.cgstAmt,
-                total_price: item.lineTotal
-            }));
-
-            const { error: itemsError } = await supabase.from('order_items').insert(orderItemsPayload);
-            if (itemsError) throw itemsError;
-
-            // Handle Eye Power saving
+            // Handle Eye Power saving first
+            let prescriptionId = null;
             {
                 const isNonEmpty = (v) => v != null && String(v).trim() !== '';
 
@@ -904,7 +884,6 @@ export default function CreateOrder({ userProfile }) {
                     const raw = String(val).trim();
                     const upper = raw.toUpperCase();
                     if (upper === 'PL' || upper === 'PLANO') return 'PL';
-                    // Allow values like "+1.75" or "-0.50"
                     const num = Number.parseFloat(raw);
                     if (!Number.isFinite(num)) return raw;
                     const fixed = num.toFixed(decimals);
@@ -940,61 +919,88 @@ export default function CreateOrder({ userProfile }) {
 
                 const preset = candidates[0];
                 if (preset) {
-                    const { error: eyeError } = await supabase.from('eye_power').insert([
+                    const { data: eyeData, error: eyeError } = await supabase.from('prescriptions').insert([
                         {
                             customer_id: customerId,
-                            order_id: orderId,
-                            // Distance Vision (DV)
-                            dv_right_sph: normalizeOptical(preset.re?.sph),
-                            dv_right_cyl: normalizeOptical(preset.re?.cyl),
-                            dv_right_axis: normalizeAxis(preset.re?.axis),
-                            dv_left_sph: normalizeOptical(preset.le?.sph),
-                            dv_left_cyl: normalizeOptical(preset.le?.cyl),
-                            dv_left_axis: normalizeAxis(preset.le?.axis),
-                            // Near Vision (NV)
-                            nv_right_sph: normalizeOptical(preset.adl_re?.sph),
-                            // If NV cyl/axis not provided, keep DV cyl/axis for the near entry
-                            nv_right_cyl: normalizeOptical(preset.adl_re?.cyl) ?? normalizeOptical(preset.re?.cyl),
-                            nv_right_axis: normalizeAxis(preset.adl_re?.axis) ?? normalizeAxis(preset.re?.axis),
-                            nv_left_sph: normalizeOptical(preset.adl_le?.sph),
-                            nv_left_cyl: normalizeOptical(preset.adl_le?.cyl) ?? normalizeOptical(preset.le?.cyl),
-                            nv_left_axis: normalizeAxis(preset.adl_le?.axis) ?? normalizeAxis(preset.le?.axis),
+                            dv_re_sph: normalizeOptical(preset.re?.sph),
+                            dv_re_cyl: normalizeOptical(preset.re?.cyl),
+                            dv_re_axis: normalizeAxis(preset.re?.axis),
+                            dv_le_sph: normalizeOptical(preset.le?.sph),
+                            dv_le_cyl: normalizeOptical(preset.le?.cyl),
+                            dv_le_axis: normalizeAxis(preset.le?.axis),
+                            nv_re_sph: normalizeOptical(preset.adl_re?.sph),
+                            nv_re_cyl: normalizeOptical(preset.adl_re?.cyl) ?? normalizeOptical(preset.re?.cyl),
+                            nv_re_axis: normalizeAxis(preset.adl_re?.axis) ?? normalizeAxis(preset.re?.axis),
+                            nv_le_sph: normalizeOptical(preset.adl_le?.sph),
+                            nv_le_cyl: normalizeOptical(preset.adl_le?.cyl) ?? normalizeOptical(preset.le?.cyl),
+                            nv_le_axis: normalizeAxis(preset.adl_le?.axis) ?? normalizeAxis(preset.le?.axis),
                             notes: isNonEmpty(preset.notes) ? String(preset.notes).trim() : null,
                         },
-                    ]);
+                    ]).select('id').single();
 
-                    if (eyeError) {
-                        console.error('Eye Power Insert Error:', eyeError);
-                        throw new Error(`Failed to save eye power: ${eyeError.message}`);
-                    }
+                    if (eyeError) throw eyeError;
+                    prescriptionId = eyeData.id;
                 }
             }
+
+            const newOrderNumber = generateId(ID_RULES.ORDERS.prefix, ID_RULES.ORDERS.digits);
+            const { data: orderData, error: orderError } = await supabase.from('orders').insert([{
+                order_number: newOrderNumber,
+                store_id: currentStoreId,
+                customer_id: customerId,
+                prescription_id: prescriptionId,
+                status: Number(finalDueAmount) > 0 ? "pending" : "processing",
+                discount_amount: totalDiscount,
+                due_amount: Number(finalDueAmount),
+                net_amount: grossTotal,
+                subtotal: subtotal,
+                tax_amount: totalSgst + totalCgst,
+                payment_status: Number(finalDueAmount) > 0 ? (Number(totalPaid) > 0 ? "partially_paid" : "unpaid") : "fully_paid",
+                created_at: new Date().toISOString()
+            }]).select('id').single();
+
+            if (orderError) throw orderError;
+            const orderId = orderData.id;
+
+            const orderItemsPayload = totalLineAmounts.map(item => ({
+                order_id: orderId,
+                product_id: item.product_id,
+                quantity: Number(item.quantity),
+                unit_price: Number(item.price),
+                discount_amount: Number(item.discount || 0),
+                total_price: item.lineTotal
+            }));
+
+            const { error: itemsError } = await supabase.from('order_items').insert(orderItemsPayload);
+            if (itemsError) throw itemsError;
 
             // Mark voucher as used
             if (appliedVoucher) {
                 await supabase.from('voucher').update({ order_id: orderId }).eq('id', appliedVoucher.id);
             }
 
-            // Update Stock and Sales in products_list
+            // Update Stock in store_inventory
             for (const item of items) {
-                // Fetch current stock & sales first because we need to calculate
-                const { data: prodData } = await supabase
-                    .from('products_list')
-                    .select('stock, sales')
-                    .eq('id', item.product_id)
-                    .single();
+                if (!item.product_id) continue;
+                
+                const { data: invData } = await supabase
+                    .from('store_inventory')
+                    .select('stock_quantity')
+                    .eq('store_id', currentStoreId)
+                    .eq('product_id', item.product_id)
+                    .maybeSingle();
 
-                if (prodData) {
-                    const newStock = Math.max(0, (prodData.stock || 0) - Number(item.qty));
-                    const newSales = (prodData.sales || 0) + Number(item.qty);
+                if (invData) {
+                    const newStock = Math.max(0, (invData.stock_quantity || 0) - Number(item.quantity));
                     await supabase
-                        .from('products_list')
-                        .update({ stock: newStock, sales: newSales })
-                        .eq('id', item.product_id);
+                        .from('store_inventory')
+                        .update({ stock_quantity: newStock })
+                        .eq('store_id', currentStoreId)
+                        .eq('product_id', item.product_id);
                 }
             }
 
-            alert(`Invoice ${orderId} Saved Successfully!`);
+            alert(`Invoice ${newOrderNumber} Saved Successfully!`);
             navigate('/orders');
         } catch (err) {
             alert('Error creating invoice: ' + err.message);
@@ -1048,7 +1054,7 @@ export default function CreateOrder({ userProfile }) {
             alert("Cannot save invoice due to the following errors:\n\n" + errors.join("\n"));
             if (incompleteItems.length > 0) {
                 const first = incompleteItems[0].item;
-                setNewProduct({ name: first.name, category: first.type, price: first.price || '', stock: '10' });
+                setNewProduct({ name: first.name, category: first.type, unit_price: first.price || '', stock: '10' });
                 setPendingItemIndex(first.id);
                 setShowAddProductModal(true);
             }
@@ -1207,7 +1213,7 @@ export default function CreateOrder({ userProfile }) {
                                                                     >
                                                                         <div>
                                                                             <div className="text-[11px] font-black text-black uppercase tracking-tight group-hover/item:text-white">{product.name}</div>
-                                                                            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{product.products_category?.category_name || 'Uncategorized'}</div>
+                                                                            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{product?.product_categories?.category_name || 'Uncategorized'}</div>
                                                                         </div>
                                                                         <div className="text-right">
                                                                             <div className="text-[11px] font-black text-black group-hover/item:text-white">₹{product.price?.toLocaleString()}</div>
@@ -1223,7 +1229,7 @@ export default function CreateOrder({ userProfile }) {
                                                                     <button
                                                                         onMouseDown={(e) => {
                                                                             e.preventDefault();
-                                                                            setNewProduct({ name: item.name, category: item.type, price: '', stock: '10' });
+                                                                            setNewProduct({ name: item.name, category: item.type, unit_price: '', stock: '10' });
                                                                             setPendingItemIndex(item.id);
                                                                             setShowAddProductModal(true);
                                                                             closeProductSearch();
@@ -1272,7 +1278,7 @@ export default function CreateOrder({ userProfile }) {
                                             </div>
                                         </td>
                                         <td className="py-4 px-6">
-                                            <input type="number" min="1" value={item.qty} onChange={e => updateItem(item.id, 'qty', e.target.value)} className="w-full text-center bg-transparent focus:outline-none text-[11px] font-black text-black" />
+                                            <input type="number" min="1" value={item.quantity} onChange={e => updateItem(item.id, 'quantity', e.target.value)} className="w-full text-center bg-transparent focus:outline-none text-[11px] font-black text-black" />
                                         </td>
                                         <td className="py-4 px-6">
                                             <div className="flex items-center justify-end gap-1">
@@ -1290,7 +1296,7 @@ export default function CreateOrder({ userProfile }) {
                                             <span className="text-[10px] font-black text-gray-400 uppercase">{(Number(item.sgst) + Number(item.cgst)).toFixed(0)}%</span>
                                         </td>
                                         <td className="py-4 px-6 text-right">
-                                            <span className="text-[11px] font-black text-black tracking-tight font-mono">₹{((Number(item.price) * Number(item.qty)) - Number(item.discount)).toLocaleString()}</span>
+                                            <span className="text-[11px] font-black text-black tracking-tight font-mono">₹{((Number(item.price) * Number(item.quantity)) - Number(item.discount)).toLocaleString()}</span>
                                         </td>
                                         <td className="py-4 px-6 text-center">
                                             <button onClick={() => removeItem(item.id)} className="text-gray-200 hover:text-black transition-all">
@@ -1455,7 +1461,7 @@ export default function CreateOrder({ userProfile }) {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
-                                <input required type="number" min="0" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
+                                <input required type="number" min="0" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, unit_price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Init Stock</label>

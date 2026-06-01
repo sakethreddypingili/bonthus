@@ -53,9 +53,19 @@ export const validatePassword = (password) => {
     errors
   };
 };
+/**
+ * Validates if a string is a valid UUID
+ * @param {string} uuid - UUID to validate
+ * @returns {boolean}
+ */
+export const isValidUUID = (uuid) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return typeof uuid === 'string' && uuidRegex.test(uuid);
+};
 
 /**
  * Sanitizes HTML to prevent XSS attacks
+...
  * Only allows safe text content, removes all HTML tags
  * @param {string} str - String to sanitize
  * @returns {string}

@@ -10,11 +10,12 @@ export default function Settings({ userProfile }) {
     email: "",
     phone: "",
     address: "",
+    gst_no: "",
   });
 
   useEffect(() => {
     if (userProfile?.store_id) {
-      supabase.from('store').select('*').eq('id', userProfile.store_id).single().then(({ data }) => {
+      supabase.from('stores').select('*').eq('id', userProfile.store_id).single().then(({ data }) => {
         if (data) setStoreInfo(data);
       });
     }
@@ -38,9 +39,28 @@ export default function Settings({ userProfile }) {
   const [showPassword, setShowPassword] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  async function handleSave() {
+    try {
+      if (userProfile?.store_id) {
+        const { error } = await supabase
+          .from('stores')
+          .update({
+            name: storeInfo.name,
+            email: storeInfo.email,
+            phone: storeInfo.phone,
+            address: storeInfo.address,
+            gst_no: storeInfo.gst_no,
+          })
+          .eq('id', userProfile.store_id);
+
+        if (error) throw error;
+      }
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      alert("Failed to save settings: " + err.message);
+    }
   }
 
   return (
@@ -98,6 +118,16 @@ export default function Settings({ userProfile }) {
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight"
                 />
               </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">GST Number</label>
+              <input
+                type="text"
+                value={storeInfo.gst_no || ""}
+                onChange={e => setStoreInfo({ ...storeInfo, gst_no: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight"
+                placeholder="GSTIN"
+              />
             </div>
             <div>
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Address</label>

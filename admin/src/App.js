@@ -29,6 +29,7 @@ import PasswordReset from "./pages/PasswordReset";
 import Reminders from "./pages/Reminders";
 import Notifications from "./pages/Notifications";
 import { PROFILE_CACHE_KEY, logout } from "./utils/auth";
+import { isValidUUID } from "./utils/securityUtils";
 
 function App() {
   const location = useLocation();
@@ -118,52 +119,44 @@ function App() {
         throw error;
       }
 
-      // If not found in auth_users, try employees table (for employee login)
+      // If not found in auth_users, try users table (for employee login)
       // Use supabaseAdmin to bypass RLS policies
       if (!data) {
-        console.log("Not found in auth_users, trying employees table...");
-        console.log("Looking for user_id:", activeSession.user.id);
+        console.log("Not found in auth_users, trying users table...");
         
         let { data: employeeData, error: empError } = await supabaseAdmin
-          .from("employees")
-          .select("id, name, employee_id, store_id, department, role, email, phone, status, joined_on, user_id")
+          .from("users")
+          .select("id, name, store_id, role, email, phone, is_active")
           .eq("user_id", activeSession.user.id)
           .maybeSingle();
         
-        console.log("Employee query result:", { employeeData, empError });
-        
         // Fallback to email lookup if user_id is missing
         if (!employeeData && activeSession.user.email) {
-          console.log("Not found by user_id, trying email:", activeSession.user.email);
-          const { data: emailData, error: emailError } = await supabaseAdmin
-            .from("employees")
-            .select("id, name, employee_id, store_id, department, role, email, phone, status, joined_on, user_id")
+          const { data: emailData } = await supabaseAdmin
+            .from("users")
+            .select("id, name, store_id, role, email, phone, is_active")
             .ilike("email", activeSession.user.email)
             .maybeSingle();
             
           if (emailData) {
             employeeData = emailData;
             // Update the user_id for future logins
-            await supabaseAdmin.from("employees").update({ user_id: activeSession.user.id }).eq("id", emailData.id);
-            console.log("Linked missing user_id to employee:", emailData.email);
-          } else if (emailError) {
-            console.error("Error querying employees by email:", emailError);
+            await supabaseAdmin.from("users").update({ user_id: activeSession.user.id }).eq("id", emailData.id);
           }
         }
 
-        if (empError) {
-          console.error("Error querying employees:", empError);
-        }
-        
         if (employeeData) {
-          // Fetch store name separately using admin client
-          const { data: storeData } = await supabaseAdmin
-            .from("store")
-            .select("name")
-            .eq("id", employeeData.store_id)
-            .maybeSingle();
+          let storeData = null;
+          // Fetch store name separately if valid UUID
+          if (isValidUUID(employeeData.store_id)) {
+            const { data: sData } = await supabaseAdmin
+              .from("stores")
+              .select("name")
+              .eq("id", employeeData.store_id)
+              .maybeSingle();
+            storeData = sData;
+          }
           
-          // Map employee data to same format as auth_users
           data = {
             id: activeSession.user.id,
             email: activeSession.user.email,
@@ -171,10 +164,9 @@ function App() {
             store_id: employeeData.store_id,
             name: employeeData.name,
             phone: employeeData.phone,
-            must_reset_password: employeeData.must_reset_password ?? true,
+            is_active: employeeData.is_active,
             store: storeData
           };
-          console.log("Employee profile created:", data);
         }
       }
 
@@ -426,11 +418,8 @@ function App() {
     </Routes>
   );
 
-  const isBoardPath = location.pathname === "/reminders" || location.pathname === "/notifications";
-
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8F9FB] font-sans relative">
-      {/* Mobile Overlay */}
       {!sidebarCollapsed && isMobile && (
         <div
           className="fixed inset-0 bg-[#000000]/40 backdrop-blur-sm z-40 md:hidden transition-opacity"
@@ -438,7 +427,6 @@ function App() {
         />
       )}
 
-      {/* Sidebar Wrapper */}
       <div className={`fixed inset-y-0 left-0 z-50 transform md:relative md:translate-x-0 transition-all duration-300 flex-shrink-0 ${isMobile
         ? (sidebarCollapsed ? '-translate-x-full w-64' : 'translate-x-0 w-64')
         : (sidebarCollapsed ? 'w-[66px]' : 'w-56')
@@ -451,7 +439,6 @@ function App() {
           onLogout={handleLogout}
         />
       </div>
-
 
       <div className="flex flex-col flex-1 overflow-hidden min-w-0">
         <Topbar
@@ -468,6 +455,3 @@ function App() {
 }
 
 export default App;
-
-
-

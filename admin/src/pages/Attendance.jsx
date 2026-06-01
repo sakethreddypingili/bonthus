@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Building2, Users, Camera, ChevronDown, Check, X, Clock } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
+import { isValidUUID } from "../utils/securityUtils";
 import { QRCodeCanvas } from "qrcode.react";
 import { Html5Qrcode } from "html5-qrcode";
 
@@ -18,14 +19,14 @@ export default function Attendance({ userProfile }) {
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('attendanceActiveTab');
     if (savedTab) return savedTab;
-    return isEmployee ? "history" : "employees";
+    return isEmployee ? "history" : "users";
   });
   const [stores, setStores] = useState([]);
   const [selectedStoreId, setSelectedStoreId] = useState("All");
 
   const [currentUserEmployee, setCurrentUserEmployee] = useState(null);
   const [employeeStoreName, setEmployeeStoreName] = useState("");
-  const [employees, setEmployees] = useState([]);
+  const [users, setEmployees] = useState([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
 
   const generateSecurePassword = () => {
@@ -48,9 +49,8 @@ export default function Attendance({ userProfile }) {
   const [employeeForm, setEmployeeForm] = useState({
     name: "",
     email: "",
-    phone: "",
-    status: "active",
-    joined_on: new Date().toISOString().split("T")[0],
+    role: "sales",
+    store_id: "",
     password: generateSecurePassword(),
     useDefaultPassword: true,
   });
@@ -90,14 +90,14 @@ export default function Attendance({ userProfile }) {
 
   const fetchStores = useCallback(async () => {
     if (!isSuperAdmin) return;
-    const { data, error } = await supabase.from("store").select("id, name").order("name");
+    const { data, error } = await supabase.from("stores").select("id, name").order("name");
     if (!error) setStores(data || []);
   }, [isSuperAdmin]);
 
   const fetchEmployees = useCallback(async () => {
     setEmployeesLoading(true);
     try {
-      let query = supabase.from("employees").select("id, name, employee_id, store_id, department, role, email, phone, status, joined_on, user_id, created_at").order("created_at", { ascending: false });
+      let query = supabase.from("users").select("id, name, store_id, role, email, is_active, created_at").order("created_at", { ascending: false });
       if (resolvedStoreId) query = query.eq("store_id", resolvedStoreId);
       const { data, error } = await query;
       if (!error) setEmployees(data || []);
@@ -125,19 +125,19 @@ export default function Attendance({ userProfile }) {
           const normalizedEmail = userProfile?.email?.trim().toLowerCase();
           
           if (normalizedEmail) {
-            const { data: emailData } = await supabase.from("employees").select("*").ilike("email", normalizedEmail).maybeSingle();
+            const { data: emailData } = await supabase.from("users").select("*").ilike("email", normalizedEmail).maybeSingle();
             employee = emailData;
           }
           
           if (!employee && userProfile.employee_id) {
-            const { data: idData } = await supabase.from("employees").select("*").eq("employee_id", userProfile.employee_id).maybeSingle();
+            const { data: idData } = await supabase.from("users").select("*").eq("employee_id", userProfile.employee_id).maybeSingle();
             employee = idData;
           }
           
           if (employee) {
             setCurrentUserEmployee(employee);
             if (employee.store_id) {
-              const { data: storeData } = await supabase.from("store").select("name").eq("id", employee.store_id).maybeSingle();
+              const { data: storeData } = await supabase.from("stores").select("name").eq("id", employee.store_id).maybeSingle();
               if (storeData) {
                 setEmployeeStoreName(storeData.name);
               }
@@ -162,7 +162,7 @@ export default function Attendance({ userProfile }) {
     const name = employeeForm.name.trim();
     const targetStoreId = isSuperAdmin ? employeeForm.store_id : userProfile?.store_id;
 
-    if (!name || !employeeForm.email || !employeeForm.phone) {
+    if (!name || !employeeForm.email) {
       setNotice({ type: "error", message: "Required fields missing." });
       return;
     }
@@ -181,19 +181,14 @@ export default function Attendance({ userProfile }) {
 
       if (authError) throw authError;
 
-      const randomId = Math.floor(100000 + Math.random() * 900000).toString();
-      const { error: empError } = await supabase.from("employees").insert([{
+      const { error: empError } = await supabase.from("users").insert([{
+        id: authData.user.id,
         name,
-        employee_id: randomId,
         store_id: targetStoreId,
-        department: employeeForm.department,
         role: employeeForm.role,
         email: employeeForm.email,
-        phone: employeeForm.phone.trim(),
-        status: employeeForm.status,
-        joined_on: employeeForm.joined_on,
-        user_id: authData.user.id,
-        must_reset_password: true,
+        password_hash: 'managed_by_auth',
+        is_active: true
       }]);
 
       if (empError) {
@@ -202,12 +197,11 @@ export default function Attendance({ userProfile }) {
       }
 
       setEmployeeForm({
-        name: "", store_id: isSuperAdmin ? employeeForm.store_id : "", department: "", role: "",
-        email: "", phone: "", status: "active", joined_on: new Date().toISOString().split("T")[0],
-        password: generateSecurePassword(), useDefaultPassword: true
+        name: "", store_id: isSuperAdmin ? "" : targetStoreId, role: "sales",
+        email: "", password: generateSecurePassword(), useDefaultPassword: true
       });
 
-      setNotice({ type: "success", message: `Employee account created successfully.` });
+      setNotice({ type: "success", message: `User account created successfully.` });
       fetchEmployees();
     } catch (err) {
       setNotice({ type: "error", message: err.message });
@@ -301,11 +295,11 @@ export default function Attendance({ userProfile }) {
 
       const nowIso = new Date().toISOString();
       const today = new Date().toISOString().split("T")[0];
-      const { data: existing } = await supabase.from("attendance").select("id").eq("employee_id", currentUserEmployee.id).eq("attendance_date", today).maybeSingle();
+      const { data: existing } = await supabase.from("attendance").select("id").eq("user_id", currentUserEmployee.id).eq("attendance_date", today).maybeSingle();
 
       if (qrRecord.qr_type === "check_in") {
         if (existing) await supabase.from("attendance").update({ check_in: nowIso }).eq("id", existing.id);
-        else await supabase.from("attendance").insert([{ employee_id: currentUserEmployee.id, attendance_date: today, status: "present", check_in: nowIso }]);
+        else await supabase.from("attendance").insert([{ user_id: currentUserEmployee.id, attendance_date: today, status: "present", check_in: nowIso }]);
       } else {
         if (!existing) throw new Error("Check-in first!");
         await supabase.from("attendance").update({ check_out: nowIso }).eq("id", existing.id);
@@ -326,12 +320,12 @@ export default function Attendance({ userProfile }) {
     setHistoryLoading(true);
     try {
       const targetStoreId = isSuperAdmin ? selectedStoreId : userProfile?.store_id;
-      let query = supabase.from("attendance").select("*, employees(*)").gte("attendance_date", historyFrom).lte("attendance_date", historyTo).order("attendance_date", { ascending: false });
+      let query = supabase.from("attendance").select("*, users(*)").gte("attendance_date", historyFrom).lte("attendance_date", historyTo).order("attendance_date", { ascending: false });
       
       if (isEmployee && currentUserEmployee) {
-        query = query.eq("employee_id", currentUserEmployee.id);
+        query = query.eq("user_id", currentUserEmployee.id);
       } else if (targetStoreId && targetStoreId !== "All") {
-        // Since store_id is on employees table, we filter after fetching or use a join if schema allows
+        // Since store_id is on users table, we filter after fetching or use a join if schema allows
         // For now, filtering after fetch as per existing logic
       }
 
@@ -340,10 +334,10 @@ export default function Attendance({ userProfile }) {
 
       let filtered = data || [];
       if (!isEmployee && targetStoreId && targetStoreId !== "All") {
-        filtered = filtered.filter(r => r.employees?.store_id === targetStoreId);
+        filtered = filtered.filter(r => r.users?.store_id === targetStoreId);
       }
       
-      setHistoryRows(filtered.map(r => ({ ...r, employee: r.employees })));
+      setHistoryRows(filtered.map(r => ({ ...r, employee: r.users })));
     } catch (err) {
       setNotice({ type: "error", message: err.message });
     } finally {
@@ -403,7 +397,7 @@ export default function Attendance({ userProfile }) {
       {/* Tabs */}
       <div className="bg-gray-50 p-1.5 rounded-2xl border border-gray-100 inline-flex w-full md:w-auto">
         {!isEmployee && (
-          <button onClick={() => setActiveTab("employees")} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "employees" ? "bg-black text-white shadow-lg" : "text-gray-400 hover:text-black"}`}>Staff</button>
+          <button onClick={() => setActiveTab("users")} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "users" ? "bg-black text-white shadow-lg" : "text-gray-400 hover:text-black"}`}>Staff</button>
         )}
         <button onClick={() => setActiveTab("scan")} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "scan" ? "bg-black text-white shadow-lg" : "text-gray-400 hover:text-black"}`}>Scan</button>
         <button onClick={() => setActiveTab("history")} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "history" ? "bg-black text-white shadow-lg" : "text-gray-400 hover:text-black"}`}>Ledger</button>
@@ -412,7 +406,7 @@ export default function Attendance({ userProfile }) {
         )}
       </div>
 
-      {activeTab === "employees" && !isEmployee && (
+      {activeTab === "users" && !isEmployee && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {isSuperAdmin && (
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8">
@@ -427,11 +421,7 @@ export default function Attendance({ userProfile }) {
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Email</label>
                     <input type="email" value={employeeForm.email} onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase" required />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Phone</label>
-                      <input type="tel" value={employeeForm.phone} onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase" required />
-                    </div>
+                  <div className="grid grid-cols-1 gap-4">
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Store</label>
                       <select value={employeeForm.store_id} onChange={(e) => setEmployeeForm({ ...employeeForm, store_id: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase" required>
@@ -451,7 +441,7 @@ export default function Attendance({ userProfile }) {
           <div className={`${isSuperAdmin ? "lg:col-span-2" : "lg:col-span-3"} bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[500px]`}>
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Registry</h2>
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{employees.length} Active Staff</span>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{users.length} Active Staff</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -463,19 +453,20 @@ export default function Attendance({ userProfile }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {employees.map((emp) => (
+                  {users.map((emp) => (
                     <tr key={emp.id} className="hover:bg-gray-50 transition">
                       <td className="px-6 py-4">
                         <div className="text-[11px] font-black text-black uppercase tracking-tight">{emp.name}</div>
-                        <div className="text-[9px] font-black text-gray-400 uppercase font-mono mt-0.5">#{emp.employee_id}</div>
+                        <div className="text-[9px] font-black text-gray-400 uppercase font-mono mt-0.5">{emp.email}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-[10px] font-black text-black uppercase tracking-widest">{stores.find(s => s.id === emp.store_id)?.name || "Warehouse"}</div>
                         <div className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">{emp.role || "Staff"}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-[10px] font-black text-black uppercase">{emp.phone}</div>
-                        <div className="text-[9px] font-bold text-gray-400 lowercase mt-0.5">{emp.email}</div>
+                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${emp.is_active ? 'bg-black text-white' : 'bg-gray-200 text-gray-400'}`}>
+                          {emp.is_active ? 'Active' : 'Inactive'}
+                        </span>
                       </td>
                     </tr>
                   ))}

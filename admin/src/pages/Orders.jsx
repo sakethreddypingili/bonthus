@@ -6,14 +6,13 @@ import CommandDialog from "../components/common/CommandDialog";
 import ConfirmSheet from "../components/common/ConfirmSheet";
 
 const STATUS_COLORS = {
-  Delivered: "bg-black text-white px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-  Advance: "border border-black text-black px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-  Due: "border border-black text-black px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-  Processing: "bg-gray-100 text-black px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-  Cancelled: "bg-gray-200 text-gray-500 line-through px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+  delivered: "bg-black text-white px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+  pending: "border border-black text-black px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+  processing: "bg-gray-100 text-black px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+  cancelled: "bg-gray-200 text-gray-500 line-through px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
 };
 
-const STATUSES = ["All", "Due", "Processing", "Delivered"];
+const STATUSES = ["All", "pending", "processing", "ready", "delivered", "cancelled"];
 
 export default function Orders({ userProfile }) {
   const [dbOrders, setDbOrders] = useState([]);
@@ -58,7 +57,7 @@ export default function Orders({ userProfile }) {
 
   async function fetchStores() {
     try {
-      const { data, error } = await supabase.from('store').select('*').order('name');
+      const { data, error } = await supabase.from('stores').select('*').order('name');
       if (!error && data) {
         setStores(data);
       }
@@ -77,20 +76,20 @@ export default function Orders({ userProfile }) {
           id,
           created_at,
           status,
-          gross_amount,
+          net_amount,
           due_amount,
           store_id,
           disabled,
           customers ( * ),
-          order_items ( id, qty, price, discount_amt, taxable_amount, sgst_amt, cgst_amt, total_price, products_list ( name, price ) ),
-          eye_power ( * )
+          order_items ( id, quantity, unit_price, discount_amount, total_price, products ( name, price ) ),
+          prescriptions ( * )
         `)
         .order('created_at', { ascending: false });
 
       // Store filtering: admins see all stores (or selected), managers see only their store
-      if (!isAdmin && userProfile?.store_id) {
+      if (!isAdmin && userProfile?.store_id && userProfile.store_id !== 'All') {
         query = query.eq('store_id', userProfile.store_id);
-      } else if (isAdmin && selectedStore && selectedStore !== 'All') {
+      } else if (isAdmin && selectedStore && selectedStore !== 'All' && selectedStore !== 'undefined') {
         query = query.or(`store_id.eq.${selectedStore},store_id.is.null`);
       }
 
@@ -99,21 +98,21 @@ export default function Orders({ userProfile }) {
       if (error) throw error;
 
       const mapped = data.map(o => {
-        const productNames = o.order_items?.map(item => item.products_list?.name).join(', ') || 'Custom Order';
+        const productNames = o.order_items?.map(item => item.products?.name).join(', ') || 'Custom Order';
         
-        // Calculate the inclusive total: (Qty * Price) - Discount
+        // Calculate the inclusive total: (Quantity * Unit Price) - Discount
         const calculatedTotal = o.order_items?.reduce((sum, item) => {
-          const lineTotal = (Number(item.qty || 0) * Number(item.price || 0)) - Number(item.discount_amt || 0);
+          const lineTotal = (Number(item.quantity || 0) * Number(item.unit_price || 0)) - Number(item.discount_amount || 0);
           return sum + lineTotal;
         }, 0);
 
         // Detect material difference for legacy orders (more than 1 rupee delta)
-        const gross = Number(o.gross_amount || 0);
+        const gross = Number(o.net_amount || 0);
         const finalAmount = Math.abs(calculatedTotal - gross) > 1.5 ? gross : calculatedTotal;
         
         return {
           ...o,
-          status: o.status === 'Advance' ? 'Due' : o.status,
+          status: (o.status === 'Advance' || o.status === 'Due') ? 'pending' : o.status,
           store_id: o.store_id,
           disabled: o.disabled ?? false,
           customer_name: o.customers?.name || 'Unknown User',
@@ -146,13 +145,13 @@ export default function Orders({ userProfile }) {
       }
 
       const updateData = {
-        status: Number(editingOrder.due_amount) > 0 ? 'Due' : editingOrder.status,
+        status: Number(editingOrder.due_amount) > 0 ? 'pending' : editingOrder.status,
         due_amount: Number(editingOrder.due_amount) || 0,
       };
 
-      // Only admins can edit gross_amount
+      // Only admins can edit net_amount
       if (isAdmin) {
-        updateData.gross_amount = Number(editingOrder.amount) || 0;
+        updateData.net_amount = Number(editingOrder.amount) || 0;
       }
 
       let q = supabase
@@ -476,11 +475,11 @@ export default function Orders({ userProfile }) {
                     onChange={e => setEditingOrder({ ...editingOrder, status: e.target.value })} 
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all appearance-none"
                   >
-                    {(Number(editingOrder.due_amount) > 0 || editingOrder.status === 'Due') && (
-                      <option value="Due">Pending Due</option>
+                    {(Number(editingOrder.due_amount) > 0 || editingOrder.status === 'pending') && (
+                      <option value="pending">Pending Due</option>
                     )}
-                    <option value="Processing">In Process</option>
-                    <option value="Delivered">Completed</option>
+                    <option value="processing">In Process</option>
+                    <option value="delivered">Completed</option>
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -640,7 +639,7 @@ export default function Orders({ userProfile }) {
                     try {
                       const totalToClear = payments.filter(p => p.mode !== 'Due').reduce((sum, p) => sum + Number(p.amount || 0), 0);
                       const newDue = Math.max(0, Number(editingOrder.due_amount) - totalToClear);
-                      const newStatus = newDue > 0 ? 'Due' : 'Delivered';
+                      const newStatus = newDue > 0 ? 'pending' : 'delivered';
                       const { error } = await supabase
                         .from('orders')
                         .update({ 

@@ -12,7 +12,7 @@ export default function InventoryEntities({ userProfile }) {
   const [search, setSearch] = useState("");
   const [view, setView] = useState("list");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newProduct, setNewProduct] = useState({ name: '', price: '', stock: '' });
+  const [newProduct, setNewProduct] = useState({ name: '', unit_price: '', stock: '' });
   const [adding, setAdding] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [selectedProductIds, setSelectedProductIds] = useState([]);
@@ -32,7 +32,7 @@ export default function InventoryEntities({ userProfile }) {
 
   useEffect(() => {
     if (isSuperAdmin) {
-      supabase.from('store').select('*').order('name').then(({ data }) => setStores(data || []));
+      supabase.from('stores').select('*').order('name').then(({ data }) => setStores(data || []));
     } else if (userProfile?.store_id) {
       setSelectedStore(userProfile.store_id);
     }
@@ -48,14 +48,17 @@ export default function InventoryEntities({ userProfile }) {
     setLoading(true);
     try {
       let query = supabase
-        .from("products_list")
-        .select('*, store(name)')
-        .order('name', { ascending: true });
+        .from("store_inventory")
+        .select('*, products(*), stores(name)')
+        .order('products(name)', { ascending: true });
 
-      if (!isSuperAdmin && userProfile?.store_id) {
+      if (!isSuperAdmin && userProfile?.store_id && userProfile.store_id !== 'All') {
         query = query.eq('store_id', userProfile.store_id);
-      } else if (isSuperAdmin && selectedStore && selectedStore !== 'All' && selectedStore !=="") {
+      } else if (isSuperAdmin && selectedStore && selectedStore !== 'All' && selectedStore !== "") {
         query = query.eq('store_id', selectedStore);
+      } else if (!isSuperAdmin && !userProfile?.store_id) {
+        // If no store_id and not super admin, we probably shouldn't fetch yet or fetch all?
+        // Let's assume we fetch nothing to be safe, or just skip filter
       }
 
       const { data, error } = await query;
@@ -63,8 +66,12 @@ export default function InventoryEntities({ userProfile }) {
 
       const mapped = data.map(p => ({
         ...p,
-        store_name: p.store?.name || '',
-        status: p.stock === 0 ?"Out of Stock" : p.stock < 20 ?"Low Stock" :"Active"
+        id: p.product_id,
+        name: p.products?.name || '',
+        unit_price: p.unit_price,
+        stock: p.stock_quantity,
+        store_name: p.stores?.name || '',
+        status: p.stock_quantity === 0 ?"Out of Stock" : p.stock_quantity < 20 ?"Low Stock" :"Active"
       }));
 
       setDbProducts(mapped);
@@ -85,18 +92,29 @@ export default function InventoryEntities({ userProfile }) {
     try {
       if (!productStoreId) throw new Error("Store is required");
 
-      const newId = generateId(ID_RULES.PRODUCTS.prefix, ID_RULES.PRODUCTS.digits);
-      const { error } = await supabase.from("products_list").insert([{
-        id: newId,
+      const customSku = generateId(ID_RULES.PRODUCTS.prefix, ID_RULES.PRODUCTS.digits);
+      
+      // 1. Insert into global catalog (products)
+      const { data: prodData, error: prodError } = await supabase.from("products").insert([{
+        sku: customSku,
         name: newProduct.name,
-        price: Number(newProduct.price),
-        stock: Number(newProduct.stock),
+        base_price: Number(newProduct.price)
+      }]).select('id').single();
+      
+      if (prodError) throw prodError;
+      const internalId = prodData.id;
+
+      // 2. Insert into store inventory
+      const { error: invError } = await supabase.from("store_inventory").insert([{
         store_id: productStoreId,
-        sales: 0
+        product_id: internalId,
+        stock_quantity: Number(newProduct.stock),
+        unit_price: Number(newProduct.price)
       }]);
-      if (error) throw error;
+      if (invError) throw invError;
+
       setShowAddModal(false);
-      setNewProduct({ name: '', price: '', stock: '' });
+      setNewProduct({ name: '', unit_price: '', stock: '' });
       setProductStoreId("");
       fetchProducts();
     } catch (err) {
@@ -128,16 +146,28 @@ export default function InventoryEntities({ userProfile }) {
     e.preventDefault();
     setSavingProduct(true);
     try {
-      const { error } = await supabase
-        .from('products_list')
+      // 1. Update global catalog (products)
+      const { error: prodError } = await supabase
+        .from('products')
         .update({
           name: editingProduct.name,
-          price: Number(editingProduct.price),
-          stock: Number(editingProduct.stock)
+          base_price: Number(editingProduct.price)
         })
         .eq('id', editingProduct.id);
+      if (prodError) throw prodError;
+
+      // 2. Update store inventory
+      const { error: invError } = await supabase
+        .from('store_inventory')
+        .update({
+          stock_quantity: Number(editingProduct.stock),
+          unit_price: Number(editingProduct.price)
+        })
+        .eq('product_id', editingProduct.id)
+        .eq('store_id', editingProduct.store_id);
       
-      if (error) throw error;
+      if (invError) throw invError;
+      
       setEditingProduct(null);
       fetchProducts();
     } catch (err) {
@@ -149,7 +179,7 @@ export default function InventoryEntities({ userProfile }) {
 
   const openAddProduct = () => {
     setProductStoreId(getDefaultStoreId());
-    setNewProduct({ name: '', price: '', stock: '' });
+    setNewProduct({ name: '', unit_price: '', stock: '' });
     setShowAddModal(true);
   };
 
@@ -338,7 +368,7 @@ export default function InventoryEntities({ userProfile }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
-                  <input required type="number" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black  text-[11px] font-black tracking-tight" placeholder="0" />
+                  <input required type="number" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, unit_price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black  text-[11px] font-black tracking-tight" placeholder="0" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Stock</label>
@@ -373,7 +403,7 @@ export default function InventoryEntities({ userProfile }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
-                  <input required type="number" value={editingProduct?.price || ''} onChange={e => setEditingProduct({ ...editingProduct, price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black  text-[11px] font-black tracking-tight" />
+                  <input required type="number" value={editingProduct?.price || ''} onChange={e => setEditingProduct({ ...editingProduct, unit_price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black  text-[11px] font-black tracking-tight" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Stock</label>

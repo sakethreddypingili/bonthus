@@ -22,18 +22,18 @@ This directory manages the Supabase database infrastructure, including schema de
 - **Use Case 1: System Bootstrapping** -> Use `reset_schema.sql` to initialize the database environment.
 - **Use Case 2: Secure Access Control** -> RLS scripts define what managers vs. staff can see and do.
 - **Use Case 3: Feature Implementation** -> SQL scripts add fields for new features like attendance tracking or advanced order details.
-- **Use Case 4: Data Maintenance** -> Scripts to link employees to auth accounts or fix schema drift.
+- **Use Case 4: Data Maintenance** -> Scripts to link users to auth accounts or fix schema drift.
 
 ## 5. File-by-File Detailed Mapping Table
 | File Name | Primary Operational Use Case / Core Responsibility |
 | :--- | :--- |
 | `add_employee_id_rpc.sql` | Provides `get_email_by_employee_id` function for custom login flows. |
-| `add_must_reset_to_employees.sql` | Adds mandatory password reset tracking for new employees. |
+| `add_must_reset_to_employees.sql` | Adds mandatory password reset tracking for new users. |
 | `add_store_id_and_details.sql` | Extends orders and store tables with tax rates and contact info. |
 | `attendance_rls.sql` | Implements scoped access for attendance tracking (managers vs. admins). |
 | `fix_categories.sql` | Relaxes product category constraints for greater flexibility. |
 | `fix_employee_user_id.sql` | Links existing employee records to Supabase auth users via email. |
-| `fix_employees_rls.sql` | Enforces record-level visibility for employees. |
+| `fix_employees_rls.sql` | Enforces record-level visibility for users. |
 | `fix_store_address.sql` | Adds address field to stores to match master schema specs. |
 | `new_schema.sql` | Defines the standard table structures and basic RLS policies. |
 | `reset_schema.sql` | Master script for a clean-slate database reconstruction. |

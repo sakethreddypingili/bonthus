@@ -5,6 +5,7 @@ import { supabaseAdmin } from "../server/supabase/supabaseAdmin";
 import { ROLES_FOR_SUPER_ADMIN, ROLES_FOR_ADMIN } from "../server/database/mocks/constants";
 import SlideDrawer from '../components/common/SlideDrawer';
 import { generateId, ID_RULES } from "../server/supabase/idGenerator";
+import { isValidUUID } from "../utils/securityUtils";
 
 export default function StoreManagement({ userProfile }) {
     const isSuperAdmin = userProfile?.role === 'super_admin';
@@ -38,7 +39,7 @@ export default function StoreManagement({ userProfile }) {
     const [productStocks, setProductStocks] = useState([]);
     const [selectedStockStore, setSelectedStockStore] = useState('');
 
-    const [newStore, setNewStore] = useState({ name: '', address: '', gst_no: '', phone_no: '' });
+    const [newStore, setNewStore] = useState({ name: '', address: '', gst_no: '', phone: '' });
     const [creatingNewUser, setCreatingNewUser] = useState(false);
     const [transferringStock, setTransferringStock] = useState(false);
     const [creatingStore, setCreatingStore] = useState(false);
@@ -51,7 +52,7 @@ export default function StoreManagement({ userProfile }) {
         destCategoryId: '',
         productId: '',
         productName: '',
-        qty: 1
+        quantity: 1
     });
     const [productSearch, setProductSearch] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -76,7 +77,7 @@ export default function StoreManagement({ userProfile }) {
     const closeDrawer = () => {
         setEditingUser(null);
         setEditingStore(null);
-        setNewStore({ name: '', address: '', gst_no: '', phone_no: '' });
+        setNewStore({ name: '', address: '', gst_no: '', phone: '' });
     };
 
     useEffect(() => {
@@ -89,22 +90,21 @@ export default function StoreManagement({ userProfile }) {
     const fetchTaxCategories = useCallback(async () => {
         try {
             const { data, error } = await supabase
-                .from("products_category")
+                .from('product_categories')
                 .select("*")
-                .eq("store_id", taxStoreId)
                 .order("name");
             if (error) throw error;
             setTaxCategories(data || []);
         } catch (err) {
             console.error("Error fetching tax categories:", err.message);
         }
-    }, [taxStoreId]);
+    }, []);
 
     useEffect(() => {
-        if (activeDrawer === 'tax' && taxStoreId) {
+        if (activeDrawer === 'tax') {
             fetchTaxCategories();
         }
-    }, [activeDrawer, taxStoreId, fetchTaxCategories]);
+    }, [activeDrawer, fetchTaxCategories]);
 
     const handleEditTaxClick = (cat) => {
         setEditingTaxCat(cat);
@@ -120,7 +120,7 @@ export default function StoreManagement({ userProfile }) {
         setSavingTax(true);
         try {
             const { error } = await supabase
-                .from("products_category")
+                .from('product_categories')
                 .update({
                     cgst: Number(taxForm.cgst),
                     sgst: Number(taxForm.sgst),
@@ -142,11 +142,18 @@ export default function StoreManagement({ userProfile }) {
     async function fetchProductStocks() {
         try {
             const { data, error } = await supabase
-                .from('products_list')
-                .select('id, name, stock, store_id, store(name)')
-                .order('name', { ascending: true });
+                .from('store_inventory')
+                .select('stock_quantity, store_id, stores(name), products(id, name)')
+                .order('products(name)', { ascending: true });
             if (!error && data) {
-                setProductStocks(data);
+                const mapped = data.map(d => ({
+                    id: d.products?.id,
+                    name: d.products?.name,
+                    stock: d.stock_quantity,
+                    store_id: d.store_id,
+                    store: d.stores
+                }));
+                setProductStocks(mapped);
             }
         } catch (err) {
             console.error("Error fetching stocks:", err);
@@ -166,7 +173,7 @@ export default function StoreManagement({ userProfile }) {
 
     async function fetchStores() {
         try {
-            const { data, error } = await supabase.from('store').select('*, store_tax_rates(sgst, cgst, igst)').order('name');
+            const { data, error } = await supabase.from('stores').select('*').order('name');
             if (!error && data) {
                 setStores(data);
                 if (data.length > 0) {
@@ -185,8 +192,8 @@ export default function StoreManagement({ userProfile }) {
         setLoading(true);
         try {
             const { data, error } = await supabase
-                .from('auth_users')
-                .select('*, store(name)')
+                .from('users')
+                .select('*, stores(name)')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -202,11 +209,11 @@ export default function StoreManagement({ userProfile }) {
         e.preventDefault();
         try {
             const { error } = await supabaseAdmin
-                .from('auth_users')
+                .from('users')
                 .update({
                     role: editingUser.role,
                     store_id: editingUser.store_id || null,
-                    status: editingUser.status
+                    is_active: editingUser.is_active
                 })
                 .eq('id', editingUser.id);
 
@@ -236,11 +243,11 @@ export default function StoreManagement({ userProfile }) {
 
             setTimeout(async () => {
                 const { error: updateError } = await supabaseAdmin
-                    .from('auth_users')
+                    .from('users')
                     .update({
                         role: newUser.role,
                         store_id: newUser.store_id || null,
-                        must_reset_password: true
+                        is_active: true
                     })
                     .eq('id', authData.user.id);
 
@@ -276,34 +283,89 @@ export default function StoreManagement({ userProfile }) {
         showNotification("Edit canceled", "info");
     };
 
+    const buildStorePayload = () => ({
+            name: newStore.name,
+            address: newStore.address?.trim() || null,
+            phone: newStore.phone?.trim() || null,
+            gst_no: newStore.gst_no?.trim() || null
+    });
+
+    const getMissingStoreColumnFromSchemaError = (err) => {
+        const message = String(err?.message || '');
+        const match = message.match(/could not find the '([^']+)' column of 'store' in the schema cache/i);
+        return match?.[1] || null;
+    };
+
+    const formatSkippedColumnsNotice = (columns, actionVerb) => {
+        if (!columns.length) return null;
+        const uniqueColumns = [...new Set(columns)];
+        const formattedColumns = uniqueColumns.join(', ');
+        return `Store ${actionVerb}, but these fields could not be saved until schema migration is applied: ${formattedColumns}.`;
+    };
+
     const handleSaveStore = async (e) => {
         e.preventDefault();
         setCreatingStore(true);
         try {
-            if (editingStore) {
-                const { error } = await supabase
-                    .from('store')
-                    .update({
-                        name: newStore.name,
-                        address: newStore.address?.trim() || null,
-                        gst_no: newStore.gst_no?.trim() || null,
-                        phone_no: newStore.phone_no?.trim() || null
-                    })
-                    .eq('id', editingStore.id);
+            if (editingStore && editingStore.id) {
+                let payload = buildStorePayload();
+                const skippedColumns = [];
+                let error = null;
+
+                for (let attempt = 0; attempt < 6; attempt += 1) {
+                    ({ error } = await supabase
+                        .from('stores')
+                        .update(payload)
+                        .eq('id', editingStore.id));
+
+                    if (!error) break;
+
+                    const missingColumn = getMissingStoreColumnFromSchemaError(error);
+                    if (!missingColumn || !(missingColumn in payload)) break;
+
+                    skippedColumns.push(missingColumn);
+                    const { [missingColumn]: _omitted, ...nextPayload } = payload;
+                    payload = nextPayload;
+
+                    if (!Object.keys(payload).length) break;
+                }
+
                 if (error) throw error;
+                const skipNotice = formatSkippedColumnsNotice(skippedColumns, 'updated');
+                if (skipNotice) showNotification(skipNotice, "info");
                 showNotification("Store updated successfully!", "success");
             } else {
-                const { data, error } = await supabase.from('store').insert([{
-                    name: newStore.name,
-                    address: newStore.address?.trim() || null,
-                    gst_no: newStore.gst_no?.trim() || null,
-                    phone_no: newStore.phone_no?.trim() || null
-                }]).select('id').single();
+                let payload = buildStorePayload();
+                const skippedColumns = [];
+                let data = null;
+                let error = null;
+
+                for (let attempt = 0; attempt < 6; attempt += 1) {
+                    ({ data, error } = await supabase
+                        .from('stores')
+                        .insert([payload])
+                        .select('id')
+                        .single());
+
+                    if (!error) break;
+
+                    const missingColumn = getMissingStoreColumnFromSchemaError(error);
+                    if (!missingColumn || !(missingColumn in payload)) break;
+
+                    skippedColumns.push(missingColumn);
+                    const { [missingColumn]: _omitted, ...nextPayload } = payload;
+                    payload = nextPayload;
+
+                    if (!Object.keys(payload).length) break;
+                }
+
                 if (error) throw error;
-                showNotification(`Store created successfully! ID: ${data.id}`, "success");
+                const skipNotice = formatSkippedColumnsNotice(skippedColumns, 'created');
+                if (skipNotice) showNotification(skipNotice, "info");
+                showNotification(`Store created successfully!`, "success");
             }
             closeDrawer();
-            setNewStore({ name: '', address: '', gst_no: '', phone_no: '' });
+            setNewStore({ name: '', address: '', gst_no: '', phone: '' });
             fetchStores();
         } catch (err) {
             showNotification(err.message, "error");
@@ -319,25 +381,32 @@ export default function StoreManagement({ userProfile }) {
             name: store.name || '', 
             address: store.address || '', 
             gst_no: store.gst_no || '',
-            phone_no: store.phone_no || ''
+            phone: store.phone || ''
         });
     };
 
     const handleProductSearch = async (query) => {
         setProductSearch(query);
-        if (!query.trim()) {
+        if (!query.trim() || !isValidUUID(transferData.sourceStore)) {
             setSearchResults([]);
             return;
         }
         setSearchingProducts(true);
         try {
             const { data, error } = await supabase
-                .from('products_list')
-                .select('id, name, stock, category_id')
-                .ilike('name', `%${query}%`)
+                .from('store_inventory')
+                .select('stock_quantity, products!inner(id, name, category_id)')
+                .ilike('products.name', `%${query}%`)
+                .eq('store_id', transferData.sourceStore)
                 .limit(10);
             if (error) throw error;
-            setSearchResults(data || []);
+            const mapped = data.map(d => ({
+                id: d.products?.id,
+                name: d.products?.name,
+                stock: d.stock_quantity,
+                category_id: d.products?.category_id
+            }));
+            setSearchResults(mapped || []);
         } catch (err) {
             console.error(err);
         } finally {
@@ -347,12 +416,12 @@ export default function StoreManagement({ userProfile }) {
 
     const handleTransferStock = async (e) => {
         e.preventDefault();
-        if (!transferData.productId) {
+        if (!transferData.productId || !isValidUUID(transferData.productId)) {
             showNotification("Please select a valid product.", "error");
             return;
         }
-        if (!transferData.destCategoryId) {
-            showNotification("Please select a destination category.", "error");
+        if (!isValidUUID(transferData.sourceStore) || !isValidUUID(transferData.destStore)) {
+            showNotification("Valid source and destination stores are required.", "error");
             return;
         }
         if (transferData.sourceStore === transferData.destStore) {
@@ -361,59 +430,56 @@ export default function StoreManagement({ userProfile }) {
         }
         setTransferring(true);
         try {
-            // 1. Fetch Source Product Details
-            const { data: srcProd, error: srcErr } = await supabase.from('products_list')
-                .select('*, products_category(*)')
-                .eq('id', transferData.productId)
+            // 1. Fetch Source Inventory Details
+            const { data: srcInv, error: srcErr } = await supabase.from('store_inventory')
+                .select('*, products(*)')
+                .eq('product_id', transferData.productId)
+                .eq('store_id', transferData.sourceStore)
                 .single();
 
-            if (srcErr || !srcProd) throw new Error("Could not fetch source product details");
-            if (srcProd.stock < transferData.qty) throw new Error(`Insufficient stock in source store. Available: ${srcProd.stock}`);
+            if (srcErr || !srcInv) throw new Error("Could not fetch source inventory details");
+            if (srcInv.stock_quantity < transferData.quantity) throw new Error(`Insufficient stock in source store. Available: ${srcInv.stock_quantity}`);
 
-            // 2. Check if Product exists in Destination Store
-            const { data: destProd } = await supabase.from('products_list')
-                .select('id, stock')
-                .ilike('name', srcProd.name)
+            // 2. Check if Product exists in Destination Store Inventory
+            const { data: destInv } = await supabase.from('store_inventory')
+                .select('stock_quantity')
+                .eq('product_id', transferData.productId)
                 .eq('store_id', transferData.destStore)
                 .maybeSingle();
 
-            if (destProd) {
-                // Update existing product stock
-                const { error: updateDestErr } = await supabase.from('products_list')
-                    .update({ stock: destProd.stock + transferData.qty })
-                    .eq('id', destProd.id);
-                if (updateDestErr) throw new Error("Failed to update destination product stock");
+            if (destInv) {
+                // Update existing product stock in destination
+                const { error: updateDestErr } = await supabase.from('store_inventory')
+                    .update({ stock_quantity: destInv.stock_quantity + transferData.quantity })
+                    .eq('product_id', transferData.productId)
+                    .eq('store_id', transferData.destStore);
+                if (updateDestErr) throw new Error("Failed to update destination inventory stock");
             } else {
-                // Create new product in selected category
-                const newId = generateId(ID_RULES.PRODUCTS.prefix, ID_RULES.PRODUCTS.digits);
-                const { error: insertDestErr } = await supabase.from('products_list')
+                // Create new inventory record in destination store
+                const { error: insertDestErr } = await supabase.from('store_inventory')
                     .insert([{
-                        id: newId,
-                        name: srcProd.name,
-                        category_id: transferData.destCategoryId,
-                        price: srcProd.price || 0,
-                        stock: transferData.qty,
                         store_id: transferData.destStore,
-                        sales: 0,
-                        hsn_code: srcProd.hsn_code || "",
-                        item_detail: srcProd.item_detail || ""
+                        product_id: transferData.productId,
+                        stock_quantity: transferData.quantity,
+                        unit_price: srcInv.unit_price || 0
                     }]);
-                if (insertDestErr) throw new Error("Failed to create product in destination store: " + insertDestErr.message);
+                if (insertDestErr) throw new Error("Failed to create inventory in destination store: " + insertDestErr.message);
             }
 
             // 3. Deduct Stock from Source
-            const { error: updateSrcErr } = await supabase.from('products_list')
-                .update({ stock: srcProd.stock - transferData.qty })
-                .eq('id', srcProd.id);
-            if (updateSrcErr) throw new Error("Failed to deduct stock from source product");
+            const { error: updateSrcErr } = await supabase.from('store_inventory')
+                .update({ stock_quantity: srcInv.stock_quantity - transferData.quantity })
+                .eq('product_id', transferData.productId)
+                .eq('store_id', transferData.sourceStore);
+            if (updateSrcErr) throw new Error("Failed to deduct stock from source inventory");
 
             // Success
             const destStoreName = stores.find(s => s.id === transferData.destStore)?.name || "Destination Store";
             const srcStoreName = stores.find(s => s.id === transferData.sourceStore)?.name || "Source Store";
 
-            showNotification(`Successfully transferred ${transferData.qty} ${transferData.productName}(s) from ${srcStoreName} to ${destStoreName}!`, "success");
+            showNotification(`Successfully transferred ${transferData.quantity} ${transferData.productName}(s) from ${srcStoreName} to ${destStoreName}!`, "success");
             setTransferringStock(false);
-            setTransferData({ sourceStore: stores[0]?.id || 'All', destStore: '', destCategoryId: '', productId: '', productName: '', qty: 1 });
+            setTransferData({ sourceStore: stores[0]?.id || 'All', destStore: '', destCategoryId: '', productId: '', productName: '', quantity: 1 });
             setProductSearch('');
             setSearchResults([]);
             setDestCategories([]);
@@ -546,7 +612,7 @@ export default function StoreManagement({ userProfile }) {
                                                 destCategoryId: '',
                                                 productId: '',
                                                 productName: '',
-                                                qty: 1
+                                                quantity: 1
                                             });
                                             setProductSearch('');
                                             setSearchResults([]);
@@ -628,9 +694,9 @@ export default function StoreManagement({ userProfile }) {
                                                     </td>
                                                     <td className="px-8 py-6">
                                                         <span className="text-[10px] font-black text-black uppercase tracking-widest">{u.role.replace('_', ' ')}</span>
-                                                        <div className={`flex items-center gap-1.5 text-[9px] mt-1 font-bold uppercase tracking-wider ${u.status === 'inactive' ? 'text-gray-300 line-through' : 'text-gray-400'}`}>
-                                                            <div className={`w-1 h-1 rounded-full ${u.status === 'inactive' ? 'bg-gray-200' : 'bg-black animate-pulse'}`} />
-                                                            {u.status || 'Active'}
+                                                        <div className={`flex items-center gap-1.5 text-[9px] mt-1 font-bold uppercase tracking-wider ${!u.is_active ? 'text-gray-300 line-through' : 'text-gray-400'}`}>
+                                                            <div className={`w-1 h-1 rounded-full ${!u.is_active ? 'bg-gray-200' : 'bg-black animate-pulse'}`} />
+                                                            {u.is_active ? 'Active' : 'Inactive'}
                                                         </div>
                                                     </td>
                                                     <td className="px-8 py-6 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
@@ -659,7 +725,7 @@ export default function StoreManagement({ userProfile }) {
                                     <button
                                         onClick={() => {
                                             setEditingStore({});
-                                            setNewStore({ name: '', address: '', gst_no: '', phone_no: '' });
+                                            setNewStore({ name: '', address: '', gst_no: '', phone: '' });
                                         }}
                                         className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all"
                                     >
@@ -683,7 +749,7 @@ export default function StoreManagement({ userProfile }) {
                                                         <div className="text-[9px] font-mono text-gray-400 mt-1 uppercase tracking-widest">{store.gst_no || 'Non-Taxable Entity'}</div>
                                                     </td>
                                                     <td className="px-8 py-6">
-                                                        <div className="text-[10px] font-black text-black tracking-widest uppercase">{store.phone_no || 'No Contact Link'}</div>
+                                                        <div className="text-[10px] font-black text-black tracking-widest uppercase">{store.phone || 'No Contact Link'}</div>
                                                         <div className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tight truncate max-w-xs">{store.address || 'Location Hidden'}</div>
                                                     </td>
                                                     <td className="px-8 py-6 text-right">
@@ -890,8 +956,8 @@ export default function StoreManagement({ userProfile }) {
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Operational State</label>
                                     <div className="relative group">
                                         <select
-                                            value={editingUser.status || 'active'}
-                                            onChange={e => setEditingUser({ ...editingUser, status: e.target.value })}
+                                            value={editingUser.is_active ? 'active' : 'inactive'}
+                                            onChange={e => setEditingUser({ ...editingUser, is_active: e.target.value === 'active' })}
                                             className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
                                         >
                                             <option value="active">Active Entity</option>
@@ -924,7 +990,7 @@ export default function StoreManagement({ userProfile }) {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Contact Link</label>
-                                        <input type="text" value={newStore.phone_no} onChange={e => setNewStore({ ...newStore, phone_no: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all" placeholder="+91 ..." />
+                                        <input type="text" value={newStore.phone} onChange={e => setNewStore({ ...newStore, phone: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all" placeholder="+91 ..." />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -932,7 +998,7 @@ export default function StoreManagement({ userProfile }) {
                                     <input required type="text" value={newStore.address} onChange={e => setNewStore({ ...newStore, address: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all" placeholder="Physical location Link..." />
                                 </div>
                                 <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
-                                    <button type="button" onClick={() => { setEditingStore(null); setNewStore({ name: '', address: '', gst_no: '', phone_no: '' }); }} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
+                                    <button type="button" onClick={() => { setEditingStore(null); setNewStore({ name: '', address: '', gst_no: '', phone: '' }); }} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
                                     <button type="submit" disabled={creatingStore} className="flex-1 py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all">
                                         {creatingStore ? 'Syncing...' : (editingStore.id ? 'Update Unit' : 'Deploy Unit')}
                                     </button>
@@ -1115,7 +1181,7 @@ export default function StoreManagement({ userProfile }) {
 
             <SlideDrawer
                 isOpen={transferringStock}
-                onClose={() => { setTransferringStock(false); setTransferData({ sourceStore: stores[0]?.id || 'All', destStore: '', destCategoryId: '', productId: '', productName: '', qty: 1 }); setProductSearch(''); setSearchResults([]); }}
+                onClose={() => { setTransferringStock(false); setTransferData({ sourceStore: stores[0]?.id || 'All', destStore: '', destCategoryId: '', productId: '', productName: '', quantity: 1 }); setProductSearch(''); setSearchResults([]); }}
                 title="Inventory Vector"
                 subtitle="Cross-Unit Stock Transfer"
             >
@@ -1189,8 +1255,8 @@ export default function StoreManagement({ userProfile }) {
                                     type="number"
                                     min="1"
                                     required
-                                    value={transferData.qty}
-                                    onChange={e => setTransferData({ ...transferData, qty: parseInt(e.target.value) || 1 })}
+                                    value={transferData.quantity}
+                                    onChange={e => setTransferData({ ...transferData, quantity: parseInt(e.target.value) || 1 })}
                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[18px] font-mono font-black focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
                                 />
                             </div>
@@ -1202,7 +1268,7 @@ export default function StoreManagement({ userProfile }) {
                                 >
                                     {transferring ? "Syncing..." : "Commit Vector Transfer"}
                                 </button>
-                                <button type="button" onClick={() => { setTransferringStock(false); setTransferData({ sourceStore: stores[0]?.id || 'All', destStore: '', destCategoryId: '', productId: '', productName: '', qty: 1 }); setProductSearch(''); setSearchResults([]); }} className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors">Abort Operation</button>
+                                <button type="button" onClick={() => { setTransferringStock(false); setTransferData({ sourceStore: stores[0]?.id || 'All', destStore: '', destCategoryId: '', productId: '', productName: '', quantity: 1 }); setProductSearch(''); setSearchResults([]); }} className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors">Abort Operation</button>
                             </div>
                         </div>
                     </form>

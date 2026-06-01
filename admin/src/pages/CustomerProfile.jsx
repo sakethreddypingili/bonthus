@@ -41,9 +41,9 @@ export default function CustomerProfile({ userProfile }) {
             *,
             order_items(
               id,
-              qty,
+              quantity,
               price,
-              products_list(name)
+              products(name)
             )
           `)
           .eq('customer_id', id)
@@ -65,7 +65,7 @@ export default function CustomerProfile({ userProfile }) {
 
         if (storeIds.length > 0) {
           const { data: storeData, error: storeError } = await supabase
-            .from('store')
+            .from('stores')
             .select('id, name')
             .in('id', storeIds);
 
@@ -86,9 +86,9 @@ export default function CustomerProfile({ userProfile }) {
 
         setOrders(enrichedOrders);
 
-        // Fetch eye powers (no disabled field for eye_power table)
+        // Fetch eye powers (no disabled field for prescriptions table)
         const { data: eyeData, error: eyeError } = await supabase
-          .from('eye_power')
+          .from('prescriptions')
           .select('*')
           .eq('customer_id', id)
           .order('created_at', { ascending: false });
@@ -128,7 +128,7 @@ export default function CustomerProfile({ userProfile }) {
     );
   }
 
-  const totalSpent = orders.reduce((sum, order) => sum + Number(order.gross_amount || 0), 0);
+  const totalSpent = orders.reduce((sum, order) => sum + Number(order.net_amount || 0), 0);
   const totalOrders = orders.length;
 
   return (
@@ -243,9 +243,9 @@ export default function CustomerProfile({ userProfile }) {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {eyePowers.map((pow, idx) => {
-                      const hasNearVision = (p) => p.nv_right_sph != null || p.nv_left_sph != null || 
-                                              p.nv_right_cyl != null || p.nv_left_cyl != null || 
-                                              p.nv_right_axis != null || p.nv_left_axis != null;
+                      const hasNearVision = (p) => p.nv_re_sph != null || p.nv_le_sph != null || 
+                                              p.nv_re_cyl != null || p.nv_le_cyl != null || 
+                                              p.nv_re_axis != null || p.nv_le_axis != null;
                       const showNV = hasNearVision(pow);
                       const groupRowSpan = showNV ? 4 : 2;
 
@@ -257,18 +257,18 @@ export default function CustomerProfile({ userProfile }) {
                               {new Date(pow.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </td>
                             <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">RE (DV)</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_right_sph ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_right_cyl ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_right_axis ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_re_sph ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_re_cyl ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_re_axis ?? '-'}</td>
                             <td rowSpan={groupRowSpan} className="px-5 py-4 text-xs text-gray-500 max-w-[200px] italic border-l border-gray-100">
                               {pow.notes || '-'}
                             </td>
                           </tr>
                           <tr className="hover:bg-gray-50/50 border-b border-gray-50">
                             <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">LE (DV)</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_left_sph ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_left_cyl ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_left_axis ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_le_sph ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_le_cyl ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_le_axis ?? '-'}</td>
                           </tr>
                           
                           {/* Near Vision Row (Conditional) */}
@@ -276,15 +276,15 @@ export default function CustomerProfile({ userProfile }) {
                             <>
                               <tr className="hover:bg-gray-50/50">
                                 <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">RE (NV)</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_right_sph ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_right_cyl ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_right_axis ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_re_sph ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_re_cyl ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_re_axis ?? '-'}</td>
                               </tr>
                               <tr className="hover:bg-gray-50/50 border-b border-gray-100">
                                 <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">LE (NV)</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_left_sph ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_left_cyl ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_left_axis ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_le_sph ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_le_cyl ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_le_axis ?? '-'}</td>
                               </tr>
                             </>
                           )}
@@ -336,8 +336,8 @@ export default function CustomerProfile({ userProfile }) {
                           <div className="flex flex-col gap-0.5">
                             {order.order_items?.map((item, idx) => (
                               <div key={item.id} className="truncate">
-                                • {item.products_list?.name || 'Unknown Product'} 
-                                <span className="text-[10px] opacity-70 ml-1">(x{item.qty})</span>
+                                • {item.products?.name || 'Unknown Product'} 
+                                <span className="text-[10px] opacity-70 ml-1">(x{item.quantity})</span>
                               </div>
                             )) || <span className="italic">No products</span>}
                           </div>
@@ -352,7 +352,7 @@ export default function CustomerProfile({ userProfile }) {
                           </span>
                         </td>
                         <td className="px-5 py-4 text-right font-bold text-[#000000] whitespace-nowrap">
-                          ₹{order.gross_amount?.toLocaleString()}
+                          ₹{order.net_amount?.toLocaleString()}
                         </td>
                         <td className="px-5 py-4 text-center">
                           <button 

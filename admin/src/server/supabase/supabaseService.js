@@ -7,7 +7,7 @@ import { supabase } from './supabase';
 export const getUserData = async () => {
   try {
     const { data, error } = await supabase
-      .from('user_data')
+      .from('users')
       .select('*');
     
     if (error) throw error;
@@ -21,7 +21,7 @@ export const getUserData = async () => {
 export const getUserById = async (userId) => {
   try {
     const { data, error } = await supabase
-      .from('user_data')
+      .from('users')
       .select('*')
       .eq('id', userId)
       .single();
@@ -37,7 +37,7 @@ export const getUserById = async (userId) => {
 export const updateUser = async (userId, updates) => {
   try {
     const { data, error } = await supabase
-      .from('user_data')
+      .from('users')
       .update(updates)
       .eq('id', userId)
       .select()
@@ -54,7 +54,7 @@ export const updateUser = async (userId, updates) => {
 export const deleteUser = async (userId) => {
   try {
     const { error } = await supabase
-      .from('user_data')
+      .from('users')
       .delete()
       .eq('id', userId);
     
@@ -113,7 +113,7 @@ export const subscribeToUserChanges = (callback) => {
       { 
         event: '*', 
         schema: 'public', 
-        table: 'user_data' 
+        table: 'users' 
       },
       (payload) => {
         callback(payload);

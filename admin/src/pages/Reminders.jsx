@@ -1,66 +1,103 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Plus, X, Users, Clock, CheckCircle2, Circle } from 'lucide-react';
 import { supabase } from '../server/supabase/supabase';
 import SlideDrawer from '../components/common/SlideDrawer';
 
 export default function Reminders({ userProfile }) {
   const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [employees, setEmployees] = useState([]);
+  const [users, setEmployees] = useState([]);
   
   const [newTask, setNewTask] = useState({
     title: '',
     date: '',
     time: '',
     assigned_to: '',
-    type: 'meeting' // 'meeting' or 'task'
+    type: 'task' // Default to 'task' as per new schema constraints
   });
 
-  useEffect(() => {
-    // Fetch employees for assignment
-    const fetchEmployees = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('employees')
-          .select('id, name, role, department')
-          .eq('status', 'active');
-        if (!error && data) {
-          setEmployees(data);
-        }
-      } catch (err) {
-        console.error("Error fetching employees:", err);
+  const fetchTasks = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('schedules')
+        .select('*, users(name)')
+        .order('scheduled_date', { ascending: true });
+      
+      if (!error && data) {
+        setTasks(data.map(t => ({
+          id: t.id,
+          title: t.title,
+          date: t.scheduled_date,
+          time: t.scheduled_time,
+          assigned_to: t.users?.name || 'Unassigned',
+          type: t.type,
+          status: t.status
+        })));
       }
-    };
-    fetchEmployees();
-
-    // Mock initial tasks
-    setTasks([
-      { id: 1, title: 'Weekly Operational Sync', date: '2026-05-28', time: '10:00 AM', assigned_to: 'Store Manager', type: 'meeting', status: 'pending' },
-      { id: 2, title: 'Inventory Audit', date: '2026-05-29', time: '02:00 PM', assigned_to: 'Warehouse Staff', type: 'task', status: 'completed' },
-    ]);
+    } catch (err) {
+      console.error("Error fetching tasks:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const handleAddTask = (e) => {
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, role')
+        .eq('is_active', true);
+      if (!error && data) {
+        setEmployees(data);
+      }
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchTasks();
+  }, [fetchEmployees, fetchTasks]);
+
+  const handleAddTask = async (e) => {
     e.preventDefault();
-    const assignedEmp = employees.find(emp => emp.id === newTask.assigned_to) || { name: 'Unassigned' };
-    
-    const taskRecord = {
-      id: Date.now(),
-      title: newTask.title,
-      date: newTask.date,
-      time: newTask.time,
-      assigned_to: assignedEmp.name,
-      type: newTask.type,
-      status: 'pending'
-    };
-    
-    setTasks([taskRecord, ...tasks]);
-    setShowModal(false);
-    setNewTask({ title: '', date: '', time: '', assigned_to: '', type: 'meeting' });
+    try {
+      const { error } = await supabase.from('schedules').insert([{
+        title: newTask.title,
+        scheduled_date: newTask.date,
+        scheduled_time: newTask.time,
+        assigned_to_id: newTask.assigned_to || null,
+        type: newTask.type,
+        status: 'pending',
+        store_id: userProfile?.store_id
+      }]);
+
+      if (error) throw error;
+      
+      setShowModal(false);
+      setNewTask({ title: '', date: '', time: '', assigned_to: '', type: 'task' });
+      fetchTasks();
+    } catch (err) {
+      alert('Failed to add schedule: ' + err.message);
+    }
   };
 
-  const toggleTaskStatus = (id) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, status: t.status === 'pending' ? 'completed' : 'pending' } : t));
+  const toggleTaskStatus = async (id, currentStatus) => {
+    const nextStatus = currentStatus === 'pending' ? 'completed' : 'pending';
+    try {
+      const { error } = await supabase
+        .from('schedules')
+        .update({ status: nextStatus })
+        .eq('id', id);
+      
+      if (error) throw error;
+      fetchTasks();
+    } catch (err) {
+      console.error("Error updating task status:", err);
+    }
   };
 
   return (
@@ -79,7 +116,11 @@ export default function Reminders({ userProfile }) {
         </button>
       </div>
 
-      {tasks.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+        </div>
+      ) : tasks.length === 0 ? (
         <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm p-20 text-center flex flex-col items-center justify-center min-h-[400px]">
           <div className="w-20 h-20 bg-gray-50 rounded-[24px] flex items-center justify-center mx-auto mb-6 shadow-inner">
             <Calendar size={40} className="text-gray-200" strokeWidth={3} />
@@ -94,10 +135,10 @@ export default function Reminders({ userProfile }) {
           {tasks.map(task => (
             <div key={task.id} className={`bg-white rounded-[32px] p-8 border ${task.status === 'completed' ? 'border-gray-100 opacity-60 grayscale' : 'border-gray-200 shadow-xl hover:border-black'} transition-all duration-300 relative overflow-hidden group`}>
               <div className="flex justify-between items-start mb-6 border-b border-gray-50 pb-4">
-                <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${task.type === 'meeting' ? 'bg-black text-white' : 'border border-black text-black'}`}>
-                  {task.type}
+                <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${task.type === 'staff_meeting' || task.type === 'eye_test' ? 'bg-black text-white' : 'border border-black text-black'}`}>
+                  {task.type.replace('_', ' ')}
                 </div>
-                <button onClick={() => toggleTaskStatus(task.id)} className="text-black hover:scale-110 transition-transform">
+                <button onClick={() => toggleTaskStatus(task.id, task.status)} className="text-black hover:scale-110 transition-transform">
                   {task.status === 'completed' ? <CheckCircle2 size={24} strokeWidth={3} /> : <Circle size={24} strokeWidth={3} className="text-gray-300 group-hover:text-black" />}
                 </button>
               </div>
@@ -126,21 +167,17 @@ export default function Reminders({ userProfile }) {
       >
         <div className="flex flex-col h-full">
           <form onSubmit={handleAddTask} className="space-y-6">
-            <div className="flex gap-4 p-1 bg-gray-50 rounded-2xl border border-gray-100">
-              <button 
-                type="button" 
-                onClick={() => setNewTask({...newTask, type: 'meeting'})}
-                className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${newTask.type === 'meeting' ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}
-              >
-                Meeting
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setNewTask({...newTask, type: 'task'})}
-                className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${newTask.type === 'task' ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}
-              >
-                Task Directive
-              </button>
+            <div className="flex flex-wrap gap-2 p-1 bg-gray-50 rounded-2xl border border-gray-100">
+              {['eye_test', 'follow_up', 'staff_meeting', 'task'].map(type => (
+                <button 
+                  key={type}
+                  type="button" 
+                  onClick={() => setNewTask({...newTask, type: type})}
+                  className={`flex-1 min-w-[120px] py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${newTask.type === type ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}
+                >
+                  {type.replace('_', ' ')}
+                </button>
+              ))}
             </div>
 
             <div className="space-y-2">
@@ -187,7 +224,7 @@ export default function Reminders({ userProfile }) {
                 className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all appearance-none cursor-pointer"
               >
                 <option value="" disabled>Select Operator...</option>
-                {employees.map(emp => (
+                {users.map(emp => (
                   <option key={emp.id} value={emp.id}>{emp.name} — {emp.role}</option>
                 ))}
               </select>
