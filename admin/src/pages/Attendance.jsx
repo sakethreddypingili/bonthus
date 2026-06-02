@@ -89,10 +89,9 @@ export default function Attendance({ userProfile }) {
   }, [isSuperAdmin, selectedStoreId, userProfile?.store_id]);
 
   const fetchStores = useCallback(async () => {
-    if (!isSuperAdmin) return;
     const { data, error } = await supabase.from("stores").select("id, name").order("name");
     if (!error) setStores(data || []);
-  }, [isSuperAdmin]);
+  }, []);
 
   const fetchEmployees = useCallback(async () => {
     setEmployeesLoading(true);

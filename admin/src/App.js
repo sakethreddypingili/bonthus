@@ -284,7 +284,7 @@ function App() {
   if (!session && window.location.pathname.startsWith('/invoice/')) {
     return (
       <Routes>
-        <Route path="/invoice/:id" element={<InvoiceView userProfile={null} />} />
+        <Route path="/invoice/:orderNumber" element={<InvoiceView userProfile={null} />} />
       </Routes>
     );
   }
@@ -351,7 +351,7 @@ function App() {
       <Route path="/attendance" element={<Attendance userProfile={userProfile} />} />
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
-      <Route path="/invoice/:id" element={<InvoiceView userProfile={userProfile} />} />
+      <Route path="/invoice/:orderNumber" element={<InvoiceView userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/attendance" replace />} />
     </Routes>
   );
@@ -379,7 +379,7 @@ function App() {
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/store-management" element={<StoreManagement userProfile={userProfile} />} />
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
-      <Route path="/invoice/:id" element={<InvoiceView userProfile={userProfile} />} />
+      <Route path="/invoice/:orderNumber" element={<InvoiceView userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

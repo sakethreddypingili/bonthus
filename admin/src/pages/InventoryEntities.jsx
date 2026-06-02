@@ -31,9 +31,8 @@ export default function InventoryEntities({ userProfile }) {
   }, [selectedStore, userProfile?.store_id, stores]);
 
   useEffect(() => {
-    if (isSuperAdmin) {
-      supabase.from('stores').select('*').order('name').then(({ data }) => setStores(data || []));
-    } else if (userProfile?.store_id) {
+    supabase.from('stores').select('*').order('name').then(({ data }) => setStores(data || []));
+    if (!isSuperAdmin && userProfile?.store_id) {
       setSelectedStore(userProfile.store_id);
     }
   }, [isSuperAdmin, userProfile]);
@@ -98,7 +97,7 @@ export default function InventoryEntities({ userProfile }) {
       const { data: prodData, error: prodError } = await supabase.from("products").insert([{
         sku: customSku,
         name: newProduct.name,
-        base_price: Number(newProduct.price)
+        base_price: Number(newProduct.unit_price)
       }]).select('id').single();
       
       if (prodError) throw prodError;
@@ -109,7 +108,7 @@ export default function InventoryEntities({ userProfile }) {
         store_id: productStoreId,
         product_id: internalId,
         stock_quantity: Number(newProduct.stock),
-        unit_price: Number(newProduct.price)
+        unit_price: Number(newProduct.unit_price)
       }]);
       if (invError) throw invError;
 
@@ -151,7 +150,7 @@ export default function InventoryEntities({ userProfile }) {
         .from('products')
         .update({
           name: editingProduct.name,
-          base_price: Number(editingProduct.price)
+          base_price: Number(editingProduct.unit_price)
         })
         .eq('id', editingProduct.id);
       if (prodError) throw prodError;
@@ -161,7 +160,7 @@ export default function InventoryEntities({ userProfile }) {
         .from('store_inventory')
         .update({
           stock_quantity: Number(editingProduct.stock),
-          unit_price: Number(editingProduct.price)
+          unit_price: Number(editingProduct.unit_price)
         })
         .eq('product_id', editingProduct.id)
         .eq('store_id', editingProduct.store_id);
@@ -296,7 +295,7 @@ export default function InventoryEntities({ userProfile }) {
                           <span className="text-[9px] font-black text-gray-400 uppercase font-mono">#{p.id.slice(0, 8)}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right text-[11px] font-black text-black tracking-tight">₹{p.price.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right text-[11px] font-black text-black tracking-tight">₹{(p.unit_price || 0).toLocaleString()}</td>
                       <td className="px-6 py-4 text-right">
                         <span className={`text-[11px] font-black ${p.stock === 0 ?"text-gray-400 line-through" :"text-black"}`}>{p.stock}</span>
                       </td>
@@ -328,7 +327,7 @@ export default function InventoryEntities({ userProfile }) {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">Price</span>
-                    <span className="text-[12px] font-black text-black tracking-tight">₹{p.price.toLocaleString()}</span>
+                    <span className="text-[12px] font-black text-black tracking-tight">₹{(p.unit_price || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-gray-50">
                     {statusBadge(p.stock)}
@@ -368,7 +367,7 @@ export default function InventoryEntities({ userProfile }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
-                  <input required type="number" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, unit_price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black  text-[11px] font-black tracking-tight" placeholder="0" />
+                  <input required type="number" value={newProduct.unit_price} onChange={e => setNewProduct({ ...newProduct, unit_price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black  text-[11px] font-black tracking-tight" placeholder="0" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Stock</label>
@@ -403,7 +402,7 @@ export default function InventoryEntities({ userProfile }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
-                  <input required type="number" value={editingProduct?.price || ''} onChange={e => setEditingProduct({ ...editingProduct, unit_price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black  text-[11px] font-black tracking-tight" />
+                  <input required type="number" value={editingProduct?.unit_price || ''} onChange={e => setEditingProduct({ ...editingProduct, unit_price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black  text-[11px] font-black tracking-tight" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Stock</label>

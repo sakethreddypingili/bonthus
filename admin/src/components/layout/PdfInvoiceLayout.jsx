@@ -1,6 +1,7 @@
 import React from 'react';
 import { Phone, MapPin } from 'lucide-react';
-const logoImg = '/assets/images/image.png';;
+import { INVOICE_BRAND } from '../../constants/brand';
+const logoImg = '/assets/images/logo.png';
 
 const numberToWords = (num) => {
   const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
@@ -72,44 +73,21 @@ const PdfInvoiceLayout = React.forwardRef(({
       className="bg-white font-sans shrink-0"
       style={style}
     >
-      {/* Header / Business Identity */}
-      <div className="flex items-center gap-4 px-8 pt-4 pb-2">
-        <div className="w-[100px] h-14 bg-black rounded-xl overflow-hidden shadow-sm shrink-0">
-          <img src={logoImg} alt="Company logo" className="w-full h-full object-cover" />
-        </div>
-        <div className="flex flex-col justify-center">
-          <span className="text-[11px] font-bold text-black tracking-wider uppercase mb-0.5">THE LENSCARE</span>
-          <h1 className="text-xl font-black text-slate-800 tracking-tight leading-none uppercase">{headerTitle || 'BONTHUS OPTICALS'}</h1>
-          <p className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-[0.1em] uppercase whitespace-nowrap">Pvt Ltd</p>
-        </div>
-      </div>
-
-      {/* Primary Info Cards */}
-      <div className="grid grid-cols-2 gap-3 px-8 mb-3">
-        {/* Company Details */}
-        <div className="bg-[#f8f9fc] rounded-2xl p-4 border border-slate-100 flex flex-col gap-2 min-h-[100px]">
-          <div className="flex items-center gap-2">
-            <Phone size={14} className="text-slate-400" />
-            <span className="text-[13px] text-slate-800">Phone: {displayPhone}</span>
+      {/* Header: logo left, invoice meta top-right */}
+      <div className="flex flex-row items-start gap-4 px-8 pt-4 pb-2">
+        <div className="w-1/2 flex items-center gap-4">
+          <div className="w-14 h-14 bg-slate-900 flex items-center justify-center rounded-xl overflow-hidden shadow-sm shrink-0">
+            <img src={logoImg} alt="Company logo" className="w-full h-full object-contain" />
           </div>
-          <div className="flex items-start gap-2">
-            <MapPin size={14} className="text-slate-400 mt-0.5 shrink-0" />
-            <div className="text-[12px] text-slate-600 leading-tight">
-              <p>{displayAddress}</p>
-            </div>
+          <div className="flex flex-col justify-center">
+            <h1 className="text-xl font-black text-slate-800 tracking-tight leading-none uppercase">{INVOICE_BRAND.headerTitle}</h1>
+            <p className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-[0.1em] uppercase whitespace-nowrap">{INVOICE_BRAND.headerSubtitle}</p>
           </div>
-          {displayGstin && (
-            <div className="flex items-center gap-2 text-slate-600 border-t border-slate-100 pt-2 mt-2">
-              <span className="text-[13px] font-medium">GST No: <span className="font-semibold text-slate-800">{displayGstin}</span></span>
-            </div>
-          )}
         </div>
-
-        {/* Invoice Info */}
-        <div className="bg-[#f8f9fc] rounded-2xl p-4 border border-slate-100 flex flex-col items-start justify-start min-h-[100px]">
+        <div className="w-1/2 bg-[#f8f9fc] rounded-2xl p-4 border border-slate-100 flex flex-col items-start justify-start">
           <h2 className="text-[24px] font-black text-slate-900 mb-1">INVOICE</h2>
           <div className="space-y-0.5">
-            <p className="text-[14px] text-slate-700 font-medium text-left italic opacity-90">Invoice: <span className="font-bold text-slate-900 not-italic">{order?.id || '-'}</span></p>
+            <p className="text-[14px] text-slate-700 font-medium text-left italic opacity-90">Invoice: <span className="font-bold text-slate-900 not-italic">{order?.order_number || '-'}</span></p>
             <p className="text-[14px] text-slate-700 font-medium text-left italic opacity-90">Date: <span className="font-bold text-slate-900 not-italic">{new Date(order?.created_at || new Date()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></p>
           </div>
         </div>
@@ -119,12 +97,17 @@ const PdfInvoiceLayout = React.forwardRef(({
       <div className="grid grid-cols-2 gap-4 px-8 mb-6">
         <div className="bg-[#f8f9fc] rounded-2xl p-6 border border-slate-100 flex flex-col min-h-[120px]">
           <p className="text-[12px] text-slate-500 font-bold tracking-wider mb-2 uppercase">BILLED FROM</p>
-          <p className="font-extrabold text-black text-[18px] mb-1">THE LENSCARE</p>
-          <p className="font-bold text-slate-900 text-[15px] uppercase mb-1">{storeName}</p>
+          <p className="font-extrabold text-black text-[18px] mb-1">{INVOICE_BRAND.billedFromName}</p>
           <p className="text-slate-600 text-[13px] leading-relaxed">
             Phone: {displayPhone}
             <br />
             {displayAddress}
+            {displayGstin && (
+              <>
+                <br />
+                GST No: {displayGstin}
+              </>
+            )}
           </p>
         </div>
 
@@ -142,26 +125,26 @@ const PdfInvoiceLayout = React.forwardRef(({
           <table className="w-full text-[13px] border-collapse border border-slate-400">
             <thead>
               <tr className="bg-[#f8f9fc] border-b border-slate-400">
-                <th className="border-r border-slate-400 text-left py-3 px-4 font-bold text-slate-800 w-[20%]">Product</th>
+                <th className="border-r border-slate-400 text-center py-3 px-4 font-bold text-slate-800 w-[20%]">Product</th>
                 <th className="border-r border-slate-400 text-center py-3 px-2 font-bold text-slate-800 w-[5%]">Qty</th>
-                <th className="border-r border-slate-400 text-right py-3 px-2 font-bold text-slate-800 w-[10%]">Price</th>
-                <th className="border-r border-slate-400 text-right py-3 px-2 font-bold text-slate-800 w-[10%]">Disc</th>
-                <th className="border-r border-slate-400 text-right py-3 px-2 font-bold text-slate-800 w-[11%]">Taxable</th>
+                <th className="border-r border-slate-400 text-center py-3 px-2 font-bold text-slate-800 w-[10%]">Price</th>
+                <th className="border-r border-slate-400 text-center py-3 px-2 font-bold text-slate-800 w-[10%]">Disc</th>
+                <th className="border-r border-slate-400 text-center py-3 px-2 font-bold text-slate-800 w-[11%]">Taxable</th>
                 <th className="border-r border-slate-400 text-center py-3 px-2 font-bold text-slate-800 w-[8%]">SGST<br/>%</th>
-                <th className="border-r border-slate-400 text-right py-3 px-2 font-bold text-slate-800 w-[8%]">SGST</th>
+                <th className="border-r border-slate-400 text-center py-3 px-2 font-bold text-slate-800 w-[8%]">SGST</th>
                 <th className="border-r border-slate-400 text-center py-3 px-2 font-bold text-slate-800 w-[8%]">CGST<br/>%</th>
-                <th className="border-r border-slate-400 text-right py-3 px-2 font-bold text-slate-800 w-[8%]">CGST</th>
-                <th className="text-right py-3 px-4 font-bold text-slate-800 w-[12%]">Total</th>
+                <th className="border-r border-slate-400 text-center py-3 px-2 font-bold text-slate-800 w-[8%]">CGST</th>
+                <th className="text-center py-3 px-4 font-bold text-slate-800 w-[12%]">Total</th>
               </tr>
             </thead>
             <tbody>
               {order?.order_items?.map((item) => {
                 const q = Number(item.quantity || 0);
-                const p = Number(item.price || 0);
+                const p = Number(item.unit_price ?? item.price ?? 0);
                 const d = Number(item.discount_amount || 0);
 
-                const sgstR = Number(item.products?.product_categories?.sgst || 0);
-                const cgstR = Number(item.products?.product_categories?.cgst || 0);
+                const sgstR = Number(item.products?.categories?.sgst || item.products?.product_categories?.sgst || 0);
+                const cgstR = Number(item.products?.categories?.cgst || item.products?.product_categories?.cgst || 0);
                 const totalTaxR = sgstR + cgstR;
 
                 let taxable, sgstA, cgstA, total;
@@ -179,32 +162,32 @@ const PdfInvoiceLayout = React.forwardRef(({
 
                 return (
                   <tr key={item.id} className="bg-white border-b border-slate-400 last:border-b-0">
-                    <td className="border-r border-slate-400 py-1.5 px-4 text-slate-600 font-medium uppercase text-[11px]">
+                    <td className="border-r border-slate-400 py-1.5 px-4 text-slate-600 font-medium uppercase text-[11px] text-center">
                       {item.products?.name || 'Custom Product'}
                     </td>
                     <td className="border-r border-slate-400 py-1.5 px-2 text-center text-slate-600">{q}</td>
-                    <td className="border-r border-slate-400 py-1.5 px-2 text-right text-slate-600">{p.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="border-r border-slate-400 py-1.5 px-2 text-right text-black">-{d.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="border-r border-slate-400 py-1.5 px-2 text-right text-slate-600 text-[11px] font-bold">{taxable.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="border-r border-slate-400 py-1.5 px-2 text-center text-slate-600">₹{p.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="border-r border-slate-400 py-1.5 px-2 text-center text-black">-₹{d.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="border-r border-slate-400 py-1.5 px-2 text-center text-slate-600 text-[11px] font-bold">₹{taxable.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="border-r border-slate-400 py-1.5 px-2 text-center text-slate-500 text-[10px]">{sgstR.toFixed(1)}%</td>
-                    <td className="border-r border-slate-400 py-1.5 px-2 text-right text-slate-500 text-[10px]">{sgstA.toFixed(2)}</td>
+                    <td className="border-r border-slate-400 py-1.5 px-2 text-center text-slate-500 text-[10px]">₹{sgstA.toFixed(2)}</td>
                     <td className="border-r border-slate-400 py-1.5 px-2 text-center text-slate-500 text-[10px]">{cgstR.toFixed(1)}%</td>
-                    <td className="border-r border-slate-400 py-1.5 px-2 text-right text-slate-500 text-[10px]">{cgstA.toFixed(2)}</td>
-                    <td className="py-1.5 px-4 text-right font-bold text-slate-900">₹{Math.round(total).toLocaleString()}</td>
+                    <td className="border-r border-slate-400 py-1.5 px-2 text-center text-slate-500 text-[10px]">₹{cgstA.toFixed(2)}</td>
+                    <td className="py-1.5 px-4 text-center font-bold text-slate-900">₹{Math.round(total).toLocaleString()}</td>
                   </tr>
                 );
               })}
               <tr className="bg-[#f8f9fc] border-t border-slate-400 font-bold text-[12px]">
-                <td className="border-r border-slate-400 py-2 px-4 text-slate-900 uppercase italic">Total</td>
+                <td className="border-r border-slate-400 py-2 px-4 text-slate-900 uppercase italic text-center">Total</td>
                 <td className="border-r border-slate-400 py-2 px-2 text-center text-slate-900">{order?.order_items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0)}</td>
                 <td className="border-r border-slate-400 py-2 px-2"></td>
-                <td className="border-r border-slate-400 py-2 px-2 text-right text-black">₹{Number(totals.itemDiscount || 0).toLocaleString()}</td>
-                <td className="border-r border-slate-400 py-2 px-2 text-right text-slate-900 text-[11px]">₹{Number(totals.taxableAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td className="border-r border-slate-400 py-2 px-2 text-center text-black">₹{Number(totals.itemDiscount || 0).toLocaleString()}</td>
+                <td className="border-r border-slate-400 py-2 px-2 text-center text-slate-900 text-[11px]">₹{Number(totals.taxableAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 <td className="border-r border-slate-400 py-2 px-2"></td>
-                <td className="border-r border-slate-400 py-2 px-2 text-right text-slate-900 text-[10px]">₹{Number(totals.sgst || 0).toFixed(2)}</td>
+                <td className="border-r border-slate-400 py-2 px-2 text-center text-slate-900 text-[10px]">₹{Number(totals.sgst || 0).toFixed(2)}</td>
                 <td className="border-r border-slate-400 py-2 px-2"></td>
-                <td className="py-2 px-1 text-right border-r border-slate-400 text-[10px]">₹{Number(totals.cgst || 0).toFixed(2)}</td>
-                <td className="py-2 px-4 text-right font-black text-slate-900 text-[13px]">₹{Math.round(Number(totals.total || 0)).toLocaleString()}</td>
+                <td className="py-2 px-1 text-center border-r border-slate-400 text-[10px]">₹{Number(totals.cgst || 0).toFixed(2)}</td>
+                <td className="py-2 px-4 text-center font-black text-slate-900 text-[13px]">₹{Math.round(Number(totals.total || 0)).toLocaleString()}</td>
               </tr>
             </tbody>
           </table>
@@ -425,7 +408,7 @@ const PdfInvoiceLayout = React.forwardRef(({
         {/* Right Column: Signatures */}
         <div className="flex flex-col justify-end items-end text-right">
           <div className="mt-4 flex flex-col items-center">
-            <p className="text-[11px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For "The Lenscare" {storeName}</p>
+            <p className="text-[11px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For {INVOICE_BRAND.billedFromName}</p>
             <div className="w-40 h-[1px] bg-slate-400 mb-1"></div>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Authorized Signatory</p>
           </div>
@@ -438,7 +421,7 @@ const PdfInvoiceLayout = React.forwardRef(({
         <p className="text-[14px] font-bold text-slate-800">Thank you for your business!</p>
         <div className="px-5 py-1.5 border border-slate-200 rounded-full">
             <p className="text-xs text-slate-400 font-medium tracking-wide">
-              © {new Date().getFullYear()} {(storeName || '').toUpperCase()}
+              © {new Date().getFullYear()} {INVOICE_BRAND.headerTitle}
             </p>
         </div>
       </div>

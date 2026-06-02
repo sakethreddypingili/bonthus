@@ -173,17 +173,17 @@ export default function StoreManagement({ userProfile }) {
     async function fetchStores() {
         try {
             const { data, error } = await supabaseAdmin.from('stores').select('*').order('name');
-            if (!error && data) {
-                setStores(data);
-                if (data.length > 0) {
-                   setNewUser(prev => ({ ...prev, store_id: data[0].id }));
-                   setTransferData(prev => ({ ...prev, sourceStore: data[0].id }));
-                   setTaxStoreId(data[0].id);
-                   setSelectedStockStore(data[0].id);
-                }
+            if (error) throw error;
+            setStores(data || []);
+            if (data?.length > 0) {
+                setNewUser(prev => ({ ...prev, store_id: data[0].id }));
+                setTransferData(prev => ({ ...prev, sourceStore: data[0].id }));
+                setTaxStoreId(data[0].id);
+                setSelectedStockStore(data[0].id);
             }
         } catch (err) {
             console.error("Error fetching stores:", err);
+            showNotification(err.message || "Failed to load stores.", "error");
         }
     }
 

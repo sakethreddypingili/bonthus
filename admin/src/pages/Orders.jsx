@@ -39,7 +39,10 @@ export default function Orders({ userProfile }) {
   const navigate = useNavigate();
 
   const isSuperAdmin = userProfile?.role === 'super_admin';
-  const isAdmin = userProfile?.role === 'admin' || isSuperAdmin;
+  const isAdmin =
+    userProfile?.role === 'admin' ||
+    isSuperAdmin ||
+    userProfile?.store_name === 'All';
   const canEditOrder = isAdmin || userProfile?.role === 'store_manager';
 
   const [stores, setStores] = useState([]);
@@ -74,6 +77,7 @@ export default function Orders({ userProfile }) {
         .from(table)
         .select(`
           id,
+          order_number,
           created_at,
           status,
           net_amount,
@@ -81,7 +85,7 @@ export default function Orders({ userProfile }) {
           store_id,
           disabled,
           customers ( * ),
-          order_items ( id, quantity, unit_price, discount_amount, total_price, products ( name, price ) ),
+          order_items ( id, quantity, unit_price, discount_amount, total_price, products ( name, base_price ) ),
           prescriptions ( * )
         `)
         .order('created_at', { ascending: false });
@@ -126,6 +130,7 @@ export default function Orders({ userProfile }) {
       setDbOrders(mapped);
     } catch (err) {
       console.error("Error fetching orders:", err.message);
+      setDbOrders([]);
     } finally {
       setLoading(false);
     }
@@ -383,7 +388,7 @@ export default function Orders({ userProfile }) {
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button disabled={o.disabled} onClick={() => navigate(`/invoice/${o.id}`, { state: { order: o } })} className="p-2 rounded-lg bg-black text-white shadow-lg hover:scale-110 transition-all disabled:opacity-20" title="View Details">
+                      <button disabled={o.disabled} onClick={() => navigate(`/invoice/${encodeURIComponent(o.order_number || o.id)}`, { state: { order: o } })} className="p-2 rounded-lg bg-black text-white shadow-lg hover:scale-110 transition-all disabled:opacity-20" title="View Details">
                         <Eye size={14} strokeWidth={3} />
                       </button>
                       {canEditOrder && (

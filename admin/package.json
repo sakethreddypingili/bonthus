@@ -23,13 +23,17 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.31",
+    "patch-package": "^8.0.1",
+    "postcss": "^8.5.15",
     "tailwindcss": "^3.3.5"
   },
   "scripts": {
+    "postinstall": "patch-package",
     "dev": "PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem react-scripts start",
     "dev:nostrict": "PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem FAST_REFRESH=false react-scripts start",
     "start": "PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem react-scripts start",
+    "db:grants": "node ../scripts/run_unified_schema_update.cjs --grants-only",
+    "db:policies": "node ../scripts/run_unified_schema_update.cjs --policies-only",
     "build": "GENERATE_SOURCEMAP=false CI=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -51,5 +55,13 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "overrides": {
+    "@tootallnate/once": "^2.0.1",
+    "nth-check": "^2.0.1",
+    "postcss": "^8.5.15",
+    "serialize-javascript": "^7.0.5",
+    "uuid": "^11.1.1",
+    "webpack-dev-server": "^5.2.4"
   }
 }

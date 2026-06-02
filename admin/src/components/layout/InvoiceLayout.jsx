@@ -1,6 +1,7 @@
 import React from 'react';
-import { Phone, MapPin } from 'lucide-react';
-const logoImg = '/assets/images/image.png';;
+import { Phone, MapPin, Building2, User, Mail, FileText } from 'lucide-react';
+import { INVOICE_BRAND } from '../../constants/brand';
+const logoImg = '/assets/images/logo.png';
 
 const numberToWords = (num) => {
   const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
@@ -72,52 +73,26 @@ const InvoiceLayout = React.forwardRef(({
       className="bg-white shadow-2xl rounded-xl p-10 font-sans border border-gray-100 shrink-0"
       style={style}
     >
-      {/* Header / Business Identity */}
-      <div className="flex flex-col gap-4 mb-4">
-        {/* Top: Branding - Logo & Company Name */}
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-slate-900 flex items-center justify-center rounded-xl overflow-hidden shadow-sm ring-1 ring-slate-200">
+      {/* Header: logo left, invoice meta top-right (same row) */}
+      <div className="flex flex-row items-start gap-6 mb-4">
+        <div className="w-1/2 flex items-center gap-4">
+          <div className="w-14 h-14 bg-slate-900 flex items-center justify-center rounded-xl overflow-hidden shadow-sm ring-1 ring-slate-200 shrink-0">
             <img src={logoImg} alt="Company logo" className="w-full h-full object-contain" />
           </div>
           <div className="flex flex-col justify-center">
-            <span className="text-[10px] font-extrabold text-black tracking-widest uppercase mb-0.5">THE LENSCARE</span>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">{headerTitle || 'BONTHUS OPTICALS'}</h1>
-            <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-0.5">Pvt Ltd</p>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">{INVOICE_BRAND.headerTitle}</h1>
+            <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-0.5">{INVOICE_BRAND.headerSubtitle}</p>
           </div>
         </div>
-
-        {/* Middle: Invoice Meta (Left) & Company Contact (Right) */}
-        <div className="flex flex-row items-stretch gap-6">
-          {/* Left: Company Details */}
-          <div className="w-1/2 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col justify-center gap-2">
-            <div className="flex items-center gap-2 text-slate-600">
-              <Phone size={14} className="text-slate-400" />
-              <span className="text-xs font-medium">Mobile: <span className="text-slate-900">{displayPhone}</span></span>
-            </div>
-            <div className="flex items-start gap-2 text-slate-600">
-              <MapPin size={14} className="text-slate-400 mt-0.5 shrink-0" />
-              <div className="text-xs leading-relaxed">
-                <p>{displayAddress}</p>
-              </div>
-            </div>
-            {displayGstin && (
-              <div className="flex items-center gap-2 text-slate-600 border-t border-slate-100 pt-2 mt-2">
-                <span className="text-xs font-medium">GST No: <span className="text-slate-900 font-semibold">{displayGstin}</span></span>
-              </div>
-            )}
+        <div className="w-1/2 flex flex-col bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 shadow-sm -mt-1">
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase mb-3">Invoice</h2>
+          <div className="w-full flex justify-between items-center gap-8 mb-2 border-b border-slate-200/60 pb-2">
+            <span className="text-sm font-medium text-slate-500">Invoice No.</span>
+            <span className="text-sm font-bold text-slate-900">{order?.order_number || '-'}</span>
           </div>
-
-          {/* Right: Invoice Block */}
-          <div className="w-1/2 flex flex-col bg-slate-50 border border-slate-100 rounded-2xl px-6 py-5 shadow-sm">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase mb-4">Invoice</h2>
-            <div className="w-full flex justify-between items-center gap-8 mb-3 border-b border-slate-200/60 pb-3">
-              <span className="text-sm font-medium text-slate-500">Invoice No.</span>
-              <span className="text-sm font-bold text-slate-900">{order?.id || '-'}</span>
-            </div>
-            <div className="w-full flex justify-between items-center gap-8">
-              <span className="text-sm font-medium text-slate-500">Issue Date</span>
-              <span className="text-sm font-bold text-slate-900">{new Date(order?.created_at || new Date()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-            </div>
+          <div className="w-full flex justify-between items-center gap-8">
+            <span className="text-sm font-medium text-slate-500">Issue Date</span>
+            <span className="text-sm font-bold text-slate-900">{new Date(order?.created_at || new Date()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
           </div>
         </div>
       </div>
@@ -125,30 +100,86 @@ const InvoiceLayout = React.forwardRef(({
       <hr className="border-slate-300 mb-4" />
 
       {/* Company & Customer Details */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-slate-200/50 flex items-center justify-center text-slate-500">
-              <MapPin size={12} />
+      <div className="grid grid-cols-2 gap-6 mb-4">
+        {/* Billed From */}
+        <div className="relative overflow-hidden bg-white rounded-xl border border-slate-200 shadow-sm">
+          {/* Accent top border */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-black"></div>
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
+                <Building2 size={14} />
+              </div>
+              <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest">Billed From</p>
             </div>
-            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Billed From</p>
+            
+            <div className="space-y-2">
+              <h3 className="font-black text-slate-900 text-lg leading-tight tracking-tight">
+                {INVOICE_BRAND.billedFromName}
+              </h3>
+              
+              <div className="flex flex-col gap-1.5 mt-2">
+                {displayPhone && (
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Phone size={12} className="text-slate-400" />
+                    <span className="text-xs font-medium">{displayPhone}</span>
+                  </div>
+                )}
+                
+                {displayAddress && (
+                  <div className="flex items-start gap-2 text-slate-600">
+                    <MapPin size={12} className="text-slate-400 mt-0.5 shrink-0" />
+                    <span className="text-xs leading-snug">{displayAddress}</span>
+                  </div>
+                )}
+                
+                {displayGstin && (
+                  <div className="flex items-center gap-2 text-slate-600 mt-0.5">
+                    <FileText size={12} className="text-slate-400" />
+                    <span className="text-[11px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
+                      GST: {displayGstin}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          <p className="font-extrabold text-black text-lg mb-0.5">THE LENSCARE</p>
-          <p className="font-bold text-slate-900 text-sm mb-0.5 uppercase">{storeName}</p>
-          <p className="text-slate-600 text-xs font-medium">Phone: {displayPhone}</p>
-          <p className="text-slate-600 text-xs leading-tight">{displayAddress}</p>
         </div>
 
-        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-black">
-              <span className="font-bold text-xs font-black">To</span>
+        {/* Billed To */}
+        <div className="relative overflow-hidden bg-white rounded-xl border border-slate-200 shadow-sm">
+          {/* Accent top border */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-slate-300"></div>
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
+                <User size={14} />
+              </div>
+              <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest">Billed To</p>
             </div>
-            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Billed To</p>
+            
+            <div className="space-y-2">
+              <h3 className="font-black text-slate-900 text-lg leading-tight tracking-tight">
+                {customerName}
+              </h3>
+              
+              <div className="flex flex-col gap-1.5 mt-2">
+                {customerPhone && (
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Phone size={12} className="text-slate-400" />
+                    <span className="text-xs font-medium">{customerPhone}</span>
+                  </div>
+                )}
+                
+                {order?.customers?.email && (
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Mail size={12} className="text-slate-400" />
+                    <span className="text-xs">{order.customers.email}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          <p className="font-bold text-slate-900 text-base mb-0.5">{customerName}</p>
-          <p className="text-slate-600 text-sm font-medium leading-none">{customerPhone}</p>
-          {order?.customers?.email && <p className="text-slate-500 text-xs mt-0.5 lowercase">{order?.customers?.email}</p>}
         </div>
       </div>
 
@@ -157,26 +188,26 @@ const InvoiceLayout = React.forwardRef(({
         <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-400 text-slate-600 font-semibold">
-              <th className="text-left py-4 px-4 uppercase tracking-wider text-[10px] w-[25%] border-r border-slate-400">Product</th>
+              <th className="text-center py-4 px-4 uppercase tracking-wider text-[10px] w-[25%] border-r border-slate-400">Product</th>
               <th className="text-center py-4 px-1 uppercase tracking-wider text-[10px] w-[5%] whitespace-nowrap border-r border-slate-400">Qty</th>
-              <th className="text-right py-4 px-1 uppercase tracking-wider text-[10px] w-[9%] whitespace-nowrap border-r border-slate-400">Price</th>
-              <th className="text-right py-4 px-1 uppercase tracking-wider text-[10px] w-[9%] whitespace-nowrap border-r border-slate-400">Disc.</th>
-              <th className="text-right py-4 px-1 uppercase tracking-wider text-[10px] w-[10%] whitespace-nowrap border-r border-slate-400">Taxable</th>
+              <th className="text-center py-4 px-1 uppercase tracking-wider text-[10px] w-[9%] whitespace-nowrap border-r border-slate-400">Price</th>
+              <th className="text-center py-4 px-1 uppercase tracking-wider text-[10px] w-[9%] whitespace-nowrap border-r border-slate-400">Disc.</th>
+              <th className="text-center py-4 px-1 uppercase tracking-wider text-[10px] w-[10%] whitespace-nowrap border-r border-slate-400">Taxable</th>
               <th className="text-center py-4 px-1 uppercase tracking-wider text-[10px] w-[6%] whitespace-nowrap border-r border-slate-400">SGST%</th>
-              <th className="text-right py-4 px-1 uppercase tracking-wider text-[10px] w-[8%] whitespace-nowrap border-r border-slate-400">SGST</th>
+              <th className="text-center py-4 px-1 uppercase tracking-wider text-[10px] w-[8%] whitespace-nowrap border-r border-slate-400">SGST</th>
               <th className="text-center py-4 px-1 uppercase tracking-wider text-[10px] w-[6%] whitespace-nowrap border-r border-slate-400">CGST%</th>
-              <th className="text-right py-4 px-1 uppercase tracking-wider text-[10px] w-[8%] whitespace-nowrap border-r border-slate-400">CGST</th>
-              <th className="text-right py-4 px-4 uppercase tracking-wider text-[10px] w-[14%] text-slate-900 whitespace-nowrap">Total</th>
+              <th className="text-center py-4 px-1 uppercase tracking-wider text-[10px] w-[8%] whitespace-nowrap border-r border-slate-400">CGST</th>
+              <th className="text-center py-4 px-4 uppercase tracking-wider text-[10px] w-[14%] text-slate-900 whitespace-nowrap">Total</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-400">
             {order?.order_items?.map((item) => {
               const q = Number(item.quantity || 0);
-              const p = Number(item.price || 0);
+              const p = Number(item.unit_price ?? item.price ?? 0);
               const d = Number(item.discount_amount || 0);
 
-              const sgstR = Number(item.products?.product_categories?.sgst || 0);
-              const cgstR = Number(item.products?.product_categories?.cgst || 0);
+              const sgstR = Number(item.products?.categories?.sgst || item.products?.product_categories?.sgst || 0);
+              const cgstR = Number(item.products?.categories?.cgst || item.products?.product_categories?.cgst || 0);
               const totalTaxR = sgstR + cgstR;
 
               let taxable, sgstA, cgstA, total;
@@ -194,34 +225,34 @@ const InvoiceLayout = React.forwardRef(({
 
               return (
                 <tr key={item.id} className="bg-white hover:bg-slate-50 transition-colors">
-                  <td className="py-2 px-4 font-bold text-slate-900 text-xs border-r border-slate-400">
+                  <td className="py-2 px-4 font-bold text-slate-900 text-xs border-r border-slate-400 text-center uppercase">
                     {item.products?.name || 'Custom Product'}
                   </td>
                   <td className="py-2 px-1 text-center font-medium text-slate-900 border-r border-slate-400">{q}</td>
-                  <td className="py-2 px-1 text-right font-medium text-slate-900 border-r border-slate-400">₹{p.toLocaleString()}</td>
-                  <td className="py-2 px-1 text-right font-medium text-black border-r border-slate-400">-₹{d.toLocaleString()}</td>
-                  <td className="py-2 px-1 text-right font-medium text-slate-900 text-[10px] border-r border-slate-400">₹{taxable.toFixed(2)}</td>
+                  <td className="py-2 px-1 text-center font-medium text-slate-900 border-r border-slate-400">₹{p.toLocaleString()}</td>
+                  <td className="py-2 px-1 text-center font-medium text-black border-r border-slate-400">-₹{d.toLocaleString()}</td>
+                  <td className="py-2 px-1 text-center font-medium text-slate-900 text-[10px] border-r border-slate-400">₹{taxable.toFixed(2)}</td>
                   <td className="py-2 px-1 text-center font-medium text-slate-500 text-[10px] border-r border-slate-400">{sgstR.toFixed(1)}%</td>
-                  <td className="py-2 px-1 text-right font-medium text-slate-500 text-[10px] border-r border-slate-400">₹{sgstA.toFixed(2)}</td>
+                  <td className="py-2 px-1 text-center font-medium text-slate-500 text-[10px] border-r border-slate-400">₹{sgstA.toFixed(2)}</td>
                   <td className="py-2 px-1 text-center font-medium text-slate-500 text-[10px] border-r border-slate-400">{cgstR.toFixed(1)}%</td>
-                  <td className="py-2 px-1 text-right font-medium text-slate-500 text-[10px] border-r border-slate-400">₹{cgstA.toFixed(2)}</td>
-                  <td className="py-2 px-4 text-right font-black text-slate-900 text-xs">₹{Math.round(total).toLocaleString()}</td>
+                  <td className="py-2 px-1 text-center font-medium text-slate-500 text-[10px] border-r border-slate-400">₹{cgstA.toFixed(2)}</td>
+                  <td className="py-2 px-4 text-center font-black text-slate-900 text-xs">₹{Math.round(total).toLocaleString()}</td>
                 </tr>
               );
             })}
           </tbody>
           <tfoot>
             <tr className="bg-slate-50 border-t border-slate-400 font-bold text-slate-900 text-xs">
-              <td className="py-2 px-4 text-left border-r border-slate-400 uppercase tracking-tighter">Total</td>
+              <td className="py-2 px-4 text-center border-r border-slate-400 uppercase tracking-tighter">Total</td>
               <td className="py-2 px-1 text-center border-r border-slate-400">{order?.order_items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0)}</td>
               <td className="py-2 px-1 border-r border-slate-400"></td>
-              <td className="py-2 px-1 text-right border-r border-slate-400 text-black">₹{Number(totals.itemDiscount || 0).toLocaleString()}</td>
-              <td className="py-2 px-1 text-right border-r border-slate-400 text-[10px]">₹{Number(totals.taxableAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+              <td className="py-2 px-1 text-center border-r border-slate-400 text-black">₹{Number(totals.itemDiscount || 0).toLocaleString()}</td>
+              <td className="py-2 px-1 text-center border-r border-slate-400 text-[10px]">₹{Number(totals.taxableAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
               <td className="py-2 px-1 border-r border-slate-400"></td>
-              <td className="py-2 px-1 text-right border-r border-slate-400 text-[10px]">₹{Number(totals.sgst || 0).toFixed(2)}</td>
+              <td className="py-2 px-1 text-center border-r border-slate-400 text-[10px]">₹{Number(totals.sgst || 0).toFixed(2)}</td>
               <td className="py-2 px-1 border-r border-slate-400"></td>
-              <td className="py-2 px-1 text-right border-r border-slate-400 text-[10px]">₹{Number(totals.cgst || 0).toFixed(2)}</td>
-              <td className="py-2 px-4 text-right">₹{Math.round(Number(totals.total || 0)).toLocaleString()}</td>
+              <td className="py-2 px-1 text-center border-r border-slate-400 text-[10px]">₹{Number(totals.cgst || 0).toFixed(2)}</td>
+              <td className="py-2 px-4 text-center">₹{Math.round(Number(totals.total || 0)).toLocaleString()}</td>
             </tr>
           </tfoot>
         </table>
@@ -442,7 +473,7 @@ const InvoiceLayout = React.forwardRef(({
         <div className="flex flex-col justify-end items-end">
           <div className="flex flex-col items-center gap-6 mt-4">
             <div className="text-center">
-              <p className="text-[10px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For "The Lenscare" {storeName}</p>
+              <p className="text-[10px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For {INVOICE_BRAND.billedFromName}</p>
               <div className="w-40 h-[1px] bg-slate-300 mb-1"></div>
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Authorized Signatory</p>
             </div>
@@ -455,7 +486,7 @@ const InvoiceLayout = React.forwardRef(({
         <div className="w-12 h-1 bg-slate-200 rounded-full mb-2"></div>
         <p className="text-sm font-semibold text-slate-800">Thank you for your business!</p>
         <p className="text-xs text-slate-400 font-medium tracking-wide border px-3 py-1 rounded-full border-slate-200">
-          © {new Date().getFullYear()} {(storeName || '').toUpperCase()}
+          © {new Date().getFullYear()} {INVOICE_BRAND.headerTitle}
         </p>
       </div>
     </div>

@@ -16,7 +16,7 @@ export default function Categories() {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('product_categories')
+        .from('categories')
         .select(`
           *,
           products(count)
@@ -44,7 +44,7 @@ export default function Categories() {
     e.preventDefault();
     setSaving(true);
     try {
-      const { error } = await supabase.from('product_categories').insert([{
+      const { error } = await supabase.from('categories').insert([{
         name: newCat.name,
         // description: newCat.description // Schema doesn't have description yet, let's keep it simple
       }]);
@@ -66,7 +66,7 @@ export default function Categories() {
     if (!window.confirm("Are you sure you want to delete this category?")) return;
 
     try {
-      const { error } = await supabase.from('product_categories').delete().eq('id', id);
+      const { error } = await supabase.from('categories').delete().eq('id', id);
       if (error) throw error;
       fetchCategories();
     } catch (err) {

@@ -1,7 +1,15 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../server/supabase/supabase';
+import { supabaseAdmin } from '../server/supabase/supabaseAdmin';
 import { sendWhatsAppInvoice } from '../server/supabase/whatsappApi';
+import {
+  INVOICE_ORDER_SELECT,
+  orderLookupFilter,
+  isUuid,
+  lineUnitPrice,
+} from '../utils/invoiceOrderQuery';
+import { INVOICE_BRAND } from '../constants/brand';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import InvoiceLayout from '../components/layout/InvoiceLayout';
@@ -11,7 +19,10 @@ import { Copy, MessageCircle, Download, Eye, Share2 } from 'lucide-react';
 
 
 export default function InvoiceView({ userProfile }) {
-  const { id } = useParams();
+  const { orderNumber: routeOrderKeyRaw } = useParams();
+  const routeOrderKey = routeOrderKeyRaw
+    ? decodeURIComponent(routeOrderKeyRaw)
+    : '';
   const location = useLocation();
   const navigate = useNavigate();
   const [order, setOrder] = useState(location.state?.order || null);
@@ -61,16 +72,17 @@ export default function InvoiceView({ userProfile }) {
   }, [showShareMenu]);
 
   // Poll for order status changes (e.g., when status changes from Processing to Delivered)
+  // Authenticated session uses RLS; service role only for logged-out public invoice links.
+  const dbClient = userProfile ? supabase : supabaseAdmin;
+
   useEffect(() => {
-    if (!id) return;
+    if (!routeOrderKey) return;
 
     const pollInterval = setInterval(async () => {
       try {
-        const { data: freshData, error } = await supabase
-          .from('orders')
-          .select('status')
-          .eq('id', id)
-          .single();
+        let statusQuery = dbClient.from('orders').select('status');
+        statusQuery = orderLookupFilter(statusQuery, routeOrderKey);
+        const { data: freshData, error } = await statusQuery.single();
 
         if (!error && freshData) {
           setOrder((prevOrder) => {
@@ -86,7 +98,7 @@ export default function InvoiceView({ userProfile }) {
     }, 3000);
 
     return () => clearInterval(pollInterval);
-  }, [id]);
+  }, [routeOrderKey, dbClient]);
 
   // WhatsApp Business API credentials - LOAD FROM ENVIRONMENT ONLY
   const WA_PHONE_NUMBER_ID = process.env.REACT_APP_WA_PHONE_NUMBER_ID;
@@ -110,7 +122,7 @@ export default function InvoiceView({ userProfile }) {
       if (!to || to.length < 10) throw new Error("No valid customer phone number");
 
       const template = "invoice_template_v2";
-      const invoiceId = order?.id ? String(order.id) : "";
+      const invoiceId = order?.order_number ? String(order.order_number) : "";
       const customerName = order?.customers?.name || "Customer";
       const supportNo = "+91 9000028168";
 
@@ -153,62 +165,37 @@ export default function InvoiceView({ userProfile }) {
     }
   }
 
-  const fetchOrder = useCallback(async (orderId) => {
+  const fetchOrder = useCallback(async (lookupKey) => {
     setLoading(true);
     try {
       setStoreDetails(null);
 
-      // 1. Fetch Order + Items + Customer with product category details
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          customers(*),
-          prescriptions(*),
-          order_items(
-            *,
-            products(
-              id,
-              name, 
-              base_price,
-              category_id,
-              product_categories(id, name, sgst, cgst)
-            )
-          )
-        `)
-        .eq('id', orderId)
-        .single();
-      
-      if (error) throw error;
-      
-      console.log('Fetched order with categories:', JSON.stringify(data?.order_items?.[0], null, 2));
-      
-      setOrder(data);
+      let query = dbClient.from('orders').select(INVOICE_ORDER_SELECT);
+      query = orderLookupFilter(query, lookupKey);
+      const { data, error } = await query.single();
 
-      // 2. Fetch Store Details 
-      if (data.store_id) {
-        const { data: storeData } = await supabase
-          .from('stores')
-          .select('*')
-          .eq('id', data.store_id)
-          .single();
-        
-        console.log('Store Data:', storeData);
-        
-        if (storeData) {
-          setStoreDetails(storeData);
-        }
+      if (error) throw error;
+
+      setOrder(data);
+      setStoreDetails(data.stores || null);
+
+      if (data.order_number && isUuid(lookupKey) && lookupKey !== data.order_number) {
+        navigate(`/invoice/${encodeURIComponent(data.order_number)}`, {
+          replace: true,
+          state: location.state,
+        });
       }
     } catch (err) {
-      console.error('Invoice Debug - Fetch Error:', err);
+      console.error('Invoice fetch error:', err);
+      if (!location.state?.order) setOrder(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dbClient, navigate, location.state]);
 
   useEffect(() => {
-    if (id) fetchOrder(id);
-  }, [id, fetchOrder]);
+    if (routeOrderKey) fetchOrder(routeOrderKey);
+  }, [routeOrderKey, fetchOrder]);
 
   const totals = useMemo(() => {
     if (!order?.order_items?.length) {
@@ -224,7 +211,7 @@ export default function InvoiceView({ userProfile }) {
 
     // 1. Calculate the inclusive sum of items (current standard)
     const inclusiveItemSum = order.order_items.reduce((sum, item) => {
-      return sum + (Number(item.quantity || 0) * Number(item.price || 0)) - Number(item.discount_amount || 0);
+      return sum + (Number(item.quantity || 0) * lineUnitPrice(item)) - Number(item.discount_amount || 0);
     }, 0);
 
     // 2. Detect if this is a legacy order where tax was added ON TOP of the prices
@@ -235,12 +222,12 @@ export default function InvoiceView({ userProfile }) {
 
     order.order_items.forEach(item => {
       const q = Number(item.quantity || 0);
-      const p = Number(item.price || 0);
+      const p = lineUnitPrice(item);
       const d = Number(item.discount_amount || 0);
       
       const sub = q * p;
-      const sgstRate = Number(item.products?.product_categories?.sgst || 0);
-      const cgstRate = Number(item.products?.product_categories?.cgst || 0);
+      const sgstRate = Number(item.products?.categories?.sgst || item.products?.product_categories?.sgst || 0);
+      const cgstRate = Number(item.products?.categories?.cgst || item.products?.product_categories?.cgst || 0);
       const totalTaxRate = sgstRate + cgstRate;
 
       let taxable, sgstAmt, cgstAmt, lineTotal;
@@ -373,7 +360,7 @@ export default function InvoiceView({ userProfile }) {
         pageIndex += 1;
       }
 
-      doc.save(`invoice-${order?.id || 'document'}.pdf`);
+      doc.save(`invoice-${order?.order_number || order?.id || 'document'}.pdf`);
     } catch (err) {
       console.error('PDF Generation Error:', err);
       setDownloadError('Failed to generate PDF. Please try again.');
@@ -392,7 +379,7 @@ export default function InvoiceView({ userProfile }) {
   }
 
   function handleWhatsApp() {
-    const text = `Invoice ${order?.id || ''}\nAmount: ₹${totals.total}\nView: ${window.location.href}`;
+    const text = `Invoice ${order?.order_number || order?.id || ''}\nAmount: ₹${totals.total}\nView: ${window.location.href}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   }
 
@@ -411,15 +398,14 @@ export default function InvoiceView({ userProfile }) {
   }
 
 
-  const rawStoreName = storeDetails?.name || '';
-  const storeName = rawStoreName || 'BONTHUS OPTICALS';
-  const headerTitle = 'BONTHUS OPTICALS';
+  const storeName = INVOICE_BRAND.billedFromName;
+  const headerTitle = INVOICE_BRAND.headerTitle;
   const customerName = order?.customers?.name || 'Customer';
   const customerPhone = order?.customers?.phone || 'N/A';
 
-  const displayAddress = storeDetails?.address || 'No Address Provided';
-  const displayGstin = storeDetails?.gst_no || storeDetails?.gst_no || 'Not Available';
-  const displayPhone = storeDetails?.phone || storeDetails?.phone || 'No Contact Provided';
+  const displayAddress = storeDetails?.address?.trim() || 'No Address Provided';
+  const displayGstin = storeDetails?.gst_no?.trim() || 'Not Available';
+  const displayPhone = storeDetails?.phone?.trim() || 'No Contact Provided';
   
   // If order status is "Delivered", treat payment as successful.
   const isDelivered = String(order?.status || '').toLowerCase() === 'delivered';
@@ -444,7 +430,7 @@ export default function InvoiceView({ userProfile }) {
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
         {/* Action Bar */}
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Invoice {order?.id}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Invoice {order?.order_number || routeOrderKey}</h1>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={handleDownload}

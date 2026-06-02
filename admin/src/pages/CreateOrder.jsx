@@ -6,6 +6,7 @@ import { supabase } from "../server/supabase/supabase";
 import { generateId, ID_RULES } from "../server/supabase/idGenerator";
 import CommandDialog from "../components/common/CommandDialog";
 import SlideDrawer from "../components/common/SlideDrawer";
+import AlertDialog from "../components/common/AlertDialog";
 import { OVERLAY_CHROME_STYLE } from "../components/common/overlayChrome";
 
 export default function CreateOrder({ userProfile }) {
@@ -13,6 +14,24 @@ export default function CreateOrder({ userProfile }) {
     const location = useLocation();
     const initialCustomer = location.state?.customer || {};
     const [loading, setLoading] = useState(false);
+
+    const [alertDialog, setAlertDialog] = useState({
+        isOpen: false,
+        title: "",
+        message: "",
+        type: "warning",
+        onClose: null
+    });
+
+    const showAlert = (title, message, type = "warning", onClose = null) => {
+        setAlertDialog({
+            isOpen: true,
+            title,
+            message,
+            type,
+            onClose
+        });
+    };
 
     const [customer, setCustomer] = useState({
         name: initialCustomer.name || "",
@@ -128,28 +147,22 @@ export default function CreateOrder({ userProfile }) {
 
     useEffect(() => {
         const fetchStoreCategories = async () => {
-            if (!currentStoreId) {
-                setStoreCategories([]);
-                return;
-            }
-
             try {
                 const { data, error } = await supabase
-                    .from('product_categories')
+                    .from('categories')
                     .select('id, name')
-                    .eq('store_id', currentStoreId)
                     .order('name', { ascending: true });
 
                 if (error) throw error;
                 setStoreCategories(data || []);
             } catch (err) {
-                console.error('Error fetching store categories:', err);
+                console.error('Error fetching categories:', err);
                 setStoreCategories([]);
             }
         };
 
         fetchStoreCategories();
-    }, [currentStoreId]);
+    }, []);
 
     const closeProductSearch = useCallback(() => {
         setActiveItemSearch(null);
@@ -208,7 +221,7 @@ export default function CreateOrder({ userProfile }) {
 
     const addItem = () => {
         if (storeSelectionRequired) {
-            alert("Please select a store first.");
+            showAlert("Required", "Please select a store first.", "warning");
             return;
         }
 
@@ -579,7 +592,7 @@ export default function CreateOrder({ userProfile }) {
         e.preventDefault();
 
         if (!currentStoreId) {
-            alert('Please select a store first.');
+            showAlert("Required", "Please select a store first.", "warning");
             return;
         }
 
@@ -592,7 +605,7 @@ export default function CreateOrder({ userProfile }) {
                 sku: customSku,
                 name: newProduct.name,
                 category_id: newProduct.category_id,
-                base_price: Number(newProduct.price)
+                base_price: Number(newProduct.unit_price)
             }]).select('id').single();
             
             if (prodError) throw prodError;
@@ -603,14 +616,14 @@ export default function CreateOrder({ userProfile }) {
                 store_id: currentStoreId,
                 product_id: internalId,
                 stock_quantity: Number(newProduct.stock),
-                unit_price: Number(newProduct.price)
+                unit_price: Number(newProduct.unit_price)
             }]);
             if (invError) throw invError;
 
             setItems(items.map(i => i.id === pendingItemIndex ? {
                 ...i,
                 name: newProduct.name,
-                unit_price: newProduct.price,
+                unit_price: newProduct.unit_price,
                 product_id: internalId,
                 stock: newProduct.stock,
                 category_id: newProduct.category_id
@@ -618,7 +631,7 @@ export default function CreateOrder({ userProfile }) {
 
             setShowAddProductModal(false);
         } catch (err) {
-            alert('Failed to add product: ' + err.message);
+            showAlert("Failed", 'Failed to add product: ' + err.message, "error");
         } finally {
             setAddingProduct(false);
         }
@@ -626,7 +639,7 @@ export default function CreateOrder({ userProfile }) {
 
     const selectProduct = async (item, product) => {
         if (items.some(i => i.id !== item.id && i.product_id === product.id)) {
-            alert('This product is already added to the order.');
+            showAlert("Duplicate Product", 'This product is already added to the order.', "warning");
             setItems(prev => prev.map(i => i.id === item.id ? { ...i, name: '', product_id: null, unit_price: 0, stock: null, prescription: null, category_id: null, sgst: 0, cgst: 0, igst: 0 } : i));
             closeProductSearch();
             setProductSuggestions(prev => ({ ...prev, [item.id]: [] }));
@@ -1000,10 +1013,11 @@ export default function CreateOrder({ userProfile }) {
                 }
             }
 
-            alert(`Invoice ${newOrderNumber} Saved Successfully!`);
-            navigate('/orders');
+            showAlert("Success", `Invoice ${newOrderNumber} Saved Successfully!`, "success", () => {
+                navigate('/orders');
+            });
         } catch (err) {
-            alert('Error creating invoice: ' + err.message);
+            showAlert("Error", 'Error creating invoice: ' + err.message, "error");
         } finally {
             setLoading(false);
             setShowPaymentModal(false);
@@ -1014,12 +1028,12 @@ export default function CreateOrder({ userProfile }) {
         e.preventDefault();
 
         if (!currentStoreId) {
-            alert("Please select a store before creating the invoice.");
+            showAlert("Required", "Please select a store before creating the invoice.", "warning");
             return;
         }
 
         if (!customer.name || !customer.phone) {
-            alert("Customer Name and Phone are required.");
+            showAlert("Required", "Customer Name and Phone are required.", "warning");
             return;
         }
 
@@ -1037,27 +1051,29 @@ export default function CreateOrder({ userProfile }) {
         });
 
         if (items.length === 1 && emptyItems.length === 1) {
-            alert("Please add at least one valid product to the order.");
+            showAlert("Required", "Please add at least one valid product to the order.", "warning");
             return;
         }
 
         if (emptyItems.length > 0) {
-            errors.push(`Row(s) [${emptyItems.join(', ')}] are completely empty. Please remove them.`);
+            errors.push(`Row(s) ${emptyItems.join(', ')}: Please enter product details or remove the empty row.`);
         }
 
         if (incompleteItems.length > 0) {
-            const rowNums = incompleteItems.map(i => i.rowNum).join(', ');
-            errors.push(`Row(s) [${rowNums}] have a typed name but no valid product selected.`);
+            incompleteItems.forEach(({ item, rowNum }) => {
+                errors.push(`Row ${rowNum}: You typed "${item.name}" but didn't select it. Please select a product from the dropdown list.`);
+            });
         }
 
         if (errors.length > 0) {
-            alert("Cannot save invoice due to the following errors:\n\n" + errors.join("\n"));
-            if (incompleteItems.length > 0) {
-                const first = incompleteItems[0].item;
-                setNewProduct({ name: first.name, category: first.type, unit_price: first.price || '', stock: '10' });
-                setPendingItemIndex(first.id);
-                setShowAddProductModal(true);
-            }
+            showAlert("Validation Check", "Please fix the following issues before continuing:\n\n" + errors.join("\n\n"), "error", () => {
+                if (incompleteItems.length > 0) {
+                    const first = incompleteItems[0].item;
+                    setNewProduct({ name: first.name, category: first.type, unit_price: first.price || '', stock: '10' });
+                    setPendingItemIndex(first.id);
+                    setShowAddProductModal(true);
+                }
+            });
             return;
         }
 
@@ -1461,7 +1477,7 @@ export default function CreateOrder({ userProfile }) {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Price (₹)</label>
-                                <input required type="number" min="0" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, unit_price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
+                                <input required type="number" min="0" value={newProduct.unit_price} onChange={e => setNewProduct({ ...newProduct, unit_price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="0" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Init Stock</label>
@@ -1681,6 +1697,17 @@ export default function CreateOrder({ userProfile }) {
                     </div>
                 </div>
             </CommandDialog>
+
+            <AlertDialog
+                isOpen={alertDialog.isOpen}
+                onClose={() => {
+                    setAlertDialog(prev => ({ ...prev, isOpen: false }));
+                    if (alertDialog.onClose) alertDialog.onClose();
+                }}
+                title={alertDialog.title}
+                message={alertDialog.message}
+                type={alertDialog.type}
+            />
 
         </div>
     );

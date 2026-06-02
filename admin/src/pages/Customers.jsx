@@ -18,9 +18,8 @@ export default function Customers({ userProfile }) {
   const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || userProfile?.store_name === "All";
 
   useEffect(() => {
-    if (isSuperAdmin) {
-      supabase.from('stores').select('*').order('name').then(({ data }) => setStores(data || []));
-    } else if (userProfile?.store_id) {
+    supabase.from('stores').select('*').order('name').then(({ data }) => setStores(data || []));
+    if (!isSuperAdmin && userProfile?.store_id) {
       setSelectedStore(userProfile.store_id);
     }
   }, [isSuperAdmin, userProfile]);
