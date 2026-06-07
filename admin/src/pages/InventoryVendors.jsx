@@ -6,7 +6,7 @@ import {
 import { supabase } from "../server/supabase/supabase";
 import SlideDrawer from "../components/common/SlideDrawer";
 
-export default function Vendors({ userProfile }) {
+export default function InventoryVendors({ userProfile }) {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

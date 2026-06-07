@@ -4,7 +4,7 @@ import { Search, Plus, LayoutGrid, List, X, MoreVertical, ChevronDown, Check, Ta
 import { supabase } from "../server/supabase/supabase";
 import SlideDrawer from "../components/common/SlideDrawer";
 
-export default function Products({ userProfile }) {
+export default function ProductList({ userProfile }) {
   const navigate = useNavigate();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);

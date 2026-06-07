@@ -19,7 +19,7 @@ const setFavicon = (href) => {
 
 // Use public path for favicon
 setFavicon("/assets/images/favicon.ico");
-document.title = "The Lenscare - Admin";
+document.title = "Bonthus - Admin";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 

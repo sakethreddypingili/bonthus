@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer 
 } from 'recharts';
 import { PackageSearch, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
+import { supabase } from "../server/supabase/supabase";
 
 const MOCK_STOCK_TRENDS = [
   { month: 'Jan', stockValue: 1200000, requests: 45 },
@@ -12,13 +13,6 @@ const MOCK_STOCK_TRENDS = [
   { month: 'Apr', stockValue: 1250000, requests: 65 },
   { month: 'May', stockValue: 1400000, requests: 48 },
   { month: 'Jun', stockValue: 1350000, requests: 55 },
-];
-
-const MOCK_STORE_REQUESTS = [
-  { store: 'Downtown Core', requests: 120 },
-  { store: 'Uptown Plaza', requests: 85 },
-  { store: 'Airport Terminal', requests: 40 },
-  { store: 'Westside Mall', requests: 65 },
 ];
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -40,15 +34,69 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-export default function Analytics() {
+export default function InventoryAnalytics() {
   const [timeRange, setTimeRange] = useState('6M');
+  const [metrics, setMetrics] = useState([
+    { label: "Total Inventory Value", value: "₹0", trend: "0%", icon: PackageSearch },
+    { label: "Requisition Fulfillment", value: "0%", trend: "0%", icon: TrendingUp },
+    { label: "Critical Stock Alerts", value: "0", trend: "0", icon: AlertTriangle },
+    { label: "Avg. Transfer Time", value: "0 hrs", trend: "0 hrs", icon: Clock },
+  ]);
+  const [storeRequests, setStoreRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const metrics = [
-    { label:"Total Inventory Value", value:"₹1,350,000", trend:"+4.2%", icon: PackageSearch },
-    { label:"Requisition Fulfillment", value:"94.5%", trend:"+1.5%", icon: TrendingUp },
-    { label:"Critical Stock Alerts", value:"12", trend:"-3", icon: AlertTriangle },
-    { label:"Avg. Transfer Time", value:"4.2 hrs", trend:"-0.5 hrs", icon: Clock },
-  ];
+  const fetchAnalytics = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 1. Total Inventory Value
+      const { data: invData } = await supabase.from('store_inventory').select('stock_quantity, unit_price');
+      const totalValue = invData?.reduce((sum, item) => sum + (item.stock_quantity * (item.unit_price || 0)), 0) || 0;
+
+      // 2. Requisition Fulfillment
+      const { data: reqData } = await supabase.from('store_requisitions').select('status');
+      const totalReqs = reqData?.length || 0;
+      const fulfilledReqs = reqData?.filter(r => r.status === 'fulfilled').length || 0;
+      const fulfillmentRate = totalReqs > 0 ? (fulfilledReqs / totalReqs) * 100 : 0;
+
+      // 3. Critical Stock Alerts
+      const { data: alertData } = await supabase.from('store_inventory').select('stock_quantity, low_stock_threshold');
+      const criticalCount = alertData?.filter(item => item.stock_quantity <= item.low_stock_threshold).length || 0;
+
+      setMetrics([
+        { label: "Total Inventory Value", value: `₹${totalValue.toLocaleString()}`, trend: "+0%", icon: PackageSearch },
+        { label: "Requisition Fulfillment", value: `${fulfillmentRate.toFixed(1)}%`, trend: "+0%", icon: TrendingUp },
+        { label: "Critical Stock Alerts", value: criticalCount.toString(), trend: "0", icon: AlertTriangle },
+        { label: "Avg. Transfer Time", value: "4.2 hrs", trend: "0", icon: Clock },
+      ]);
+
+      // 4. Requisitions by Store
+      const { data: storeReqData } = await supabase
+        .from('store_requisitions')
+        .select('from_store:stores(name)');
+      
+      const counts = storeReqData?.reduce((acc, r) => {
+        const name = r.from_store?.name || 'Unknown';
+        acc[name] = (acc[name] || 0) + 1;
+        return acc;
+      }, {}) || {};
+
+      const mappedStoreRequests = Object.entries(counts).map(([name, count]) => ({
+        store: name,
+        requests: count
+      })).sort((a, b) => b.requests - a.requests);
+
+      setStoreRequests(mappedStoreRequests);
+
+    } catch (err) {
+      console.error("Error fetching analytics:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
   return (
     <div className="space-y-8 pb-20 animate-fast-slide">
@@ -125,7 +173,7 @@ export default function Analytics() {
           </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={MOCK_STORE_REQUESTS} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+              <BarChart layout="vertical" data={storeRequests.length > 0 ? storeRequests : [{store: 'No Data', requests: 0}]} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" horizontal={false} />
                 <XAxis type="number" hide />
                 <YAxis dataKey="store" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: '#000' }} width={80} />
@@ -134,25 +182,6 @@ export default function Analytics() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      </div>
-
-      {/* Transfer Velocity */}
-      <div className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm">
-        <div className="mb-8 border-b border-gray-50 pb-6">
-          <h3 className="text-xl font-black text-black uppercase tracking-tighter">Operational Velocity</h3>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Requisition vs Fulfillment Correlation</p>
-        </div>
-        <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={MOCK_STOCK_TRENDS} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" vertical={false} />
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#999' }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#999' }} />
-              <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: '#f1f1f1', strokeWidth: 2 }} />
-              <Line type="monotone" dataKey="requests" name="Requisitions" stroke="#000000" strokeWidth={3} dot={{ r: 4, fill: '#000', strokeWidth: 0 }} activeDot={{ r: 6 }} />
-            </LineChart>
-          </ResponsiveContainer>
         </div>
       </div>
     </div>

@@ -14,9 +14,24 @@ export default function EntityDetails({ userProfile }) {
       setLoading(true);
       try {
         const { data, error } = await supabase
-          .from('products_list')
-          .select('*, store(name)')
-          .eq('id', id)
+          .from('store_inventory')
+          .select(`
+            id,
+            stock_quantity,
+            unit_price,
+            low_stock_threshold,
+            product:products (
+              id,
+              name,
+              sku,
+              brand,
+              description,
+              category:categories(name)
+            ),
+            store:stores(name)
+          `)
+          .eq('product_id', id)
+          .limit(1)
           .single();
         
         if (error) throw error;
@@ -48,6 +63,8 @@ export default function EntityDetails({ userProfile }) {
     );
   }
 
+  const p = entity.product;
+
   return (
     <div className="space-y-10 animate-fast-slide pb-20">
       {/* Header */}
@@ -57,15 +74,15 @@ export default function EntityDetails({ userProfile }) {
             <ArrowLeft size={24} strokeWidth={3} />
           </button>
           <div>
-            <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-1">{entity.name}</h1>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Operational Vector Detail: <span className="font-mono text-black">#{entity.id.slice(0, 12)}</span></p>
+            <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-1">{p?.name}</h1>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">SKU: <span className="font-mono text-black">{p?.sku}</span> | Brand: <span className="text-black">{p?.brand}</span></p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${
-            entity.stock === 0 ? "bg-gray-100 text-gray-400 line-through" : "bg-black text-white shadow-lg"
+            entity.stock_quantity === 0 ? "bg-gray-100 text-gray-400 line-through" : "bg-black text-white shadow-lg"
           }`}>
-            {entity.stock === 0 ? "Zero Volume" : "Operational"}
+            {entity.stock_quantity === 0 ? "Zero Volume" : entity.stock_quantity <= entity.low_stock_threshold ? "Low Stock" : "Operational"}
           </span>
         </div>
       </div>
@@ -83,25 +100,32 @@ export default function EntityDetails({ userProfile }) {
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Current Volume</p>
                 <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
-                  <span className="text-4xl font-black text-black tracking-tighter">{entity.stock}</span>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase mt-2">Units in storage</p>
+                  <span className="text-4xl font-black text-black tracking-tighter">{entity.stock_quantity}</span>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase mt-2">Units in storage (Min: {entity.low_stock_threshold})</p>
                 </div>
               </div>
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Unit Valuation</p>
                 <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
-                  <span className="text-4xl font-black text-black tracking-tighter">₹{entity.price.toLocaleString()}</span>
+                  <span className="text-4xl font-black text-black tracking-tighter">₹{(entity.unit_price || 0).toLocaleString()}</span>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mt-2">Per operational unit</p>
                 </div>
               </div>
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Deployment</p>
                 <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
-                  <span className="text-xl font-black text-black uppercase tracking-tight">{entity.store?.name || "Global Hub"}</span>
+                  <span className="text-xl font-black text-black uppercase tracking-tight">{entity.store?.name}</span>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mt-2">Node location</p>
                 </div>
               </div>
             </div>
+            
+            {p?.description && (
+              <div className="pt-10 border-t border-gray-50">
+                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Description</h4>
+                <p className="text-sm text-gray-600 leading-relaxed uppercase tracking-tight font-medium">{p.description}</p>
+              </div>
+            )}
           </div>
 
           {/* Activity Placeholder */}
@@ -145,7 +169,7 @@ export default function EntityDetails({ userProfile }) {
             <div className="space-y-4">
                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                   <Tag size={16} className="text-black" strokeWidth={3} />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Category: {entity.category || "General"}</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Category: {p?.category?.name || "General"}</span>
                </div>
                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                   <Info size={16} className="text-black" strokeWidth={3} />

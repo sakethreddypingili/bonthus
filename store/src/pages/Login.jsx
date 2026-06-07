@@ -63,24 +63,18 @@ export default function Login() {
 
             // 1. Phone number detection (Exactly 10 digits)
             if (/^\d{10}$/.test(loginEmail)) {
-                const { data: resolvedEmail, error: rpcErr } = await supabase
-                    .rpc('get_email_by_phone', { p_phone: loginEmail });
+                const { data: userData, error: userErr } = await supabase
+                    .from('users')
+                    .select('email')
+                    .eq('phone', loginEmail)
+                    .maybeSingle();
                 
-                if (rpcErr) throw rpcErr;
-                if (!resolvedEmail) throw new Error("This phone number is not registered.");
-                loginEmail = resolvedEmail;
-            }
-            // 2. Employee ID detection (6 digits)
-            else if (/^\d{6}$/.test(loginEmail)) {
-                const { data: resolvedEmail, error: rpcErr } = await supabase
-                    .rpc('get_email_by_employee_id', { p_employee_id: loginEmail });
-                
-                if (rpcErr) throw rpcErr;
-                if (!resolvedEmail) throw new Error("This employee ID is not registered.");
-                loginEmail = resolvedEmail;
+                if (userErr) throw userErr;
+                if (!userData) throw new Error("This phone number is not registered.");
+                loginEmail = userData.email;
             }
 
-            // 3. Auth Attempt
+            // 2. Auth Attempt
             const { error: authError } = await supabase.auth.signInWithPassword({
                 email: loginEmail,
                 password,

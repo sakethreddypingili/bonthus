@@ -1,5 +1,6 @@
 import React from 'react';
 import { Phone, MapPin } from 'lucide-react';
+import { INVOICE_BRAND } from '../../constants/brand';
 const logoImg = '/assets/images/image.png';;
 
 const numberToWords = (num) => {
@@ -81,8 +82,8 @@ const InvoiceLayout = React.forwardRef(({
           </div>
           <div className="flex flex-col justify-center">
             <span className="text-[10px] font-extrabold text-black tracking-widest uppercase mb-0.5">THE LENSCARE</span>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">{headerTitle || 'BONTHUS OPTICALS'}</h1>
-            <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-0.5">Pvt Ltd</p>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">{INVOICE_BRAND.headerTitle}</h1>
+            <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-0.5">{INVOICE_BRAND.headerSubtitle}</p>
           </div>
         </div>
 
@@ -133,8 +134,7 @@ const InvoiceLayout = React.forwardRef(({
             </div>
             <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Billed From</p>
           </div>
-          <p className="font-extrabold text-black text-lg mb-0.5">THE LENSCARE</p>
-          <p className="font-bold text-slate-900 text-sm mb-0.5 uppercase">{storeName}</p>
+          <p className="font-extrabold text-black text-lg mb-0.5">{INVOICE_BRAND.billedFromName}</p>
           <p className="text-slate-600 text-xs font-medium">Phone: {displayPhone}</p>
           <p className="text-slate-600 text-xs leading-tight">{displayAddress}</p>
         </div>
@@ -455,7 +455,7 @@ const InvoiceLayout = React.forwardRef(({
         <div className="w-12 h-1 bg-slate-200 rounded-full mb-2"></div>
         <p className="text-sm font-semibold text-slate-800">Thank you for your business!</p>
         <p className="text-xs text-slate-400 font-medium tracking-wide border px-3 py-1 rounded-full border-slate-200">
-          © {new Date().getFullYear()} {(storeName || '').toUpperCase()}
+          © {new Date().getFullYear()} {INVOICE_BRAND.headerTitle}
         </p>
       </div>
     </div>

@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from"react";
 import { Routes, Route, Navigate, useLocation } from"react-router-dom";
 import { supabase } from"./server/supabase/supabase";
-import { supabaseAdmin } from"./server/supabase/supabaseAdmin";
 import Sidebar from"./components/common/Sidebar";
 import Topbar from"./components/common/Topbar";
-import InventoryEntities from"./pages/InventoryEntities";
+import ProductList from"./pages/ProductList";
 import EntityDetails from"./pages/EntityDetails";
 import Attendance from"./pages/Attendance";
 import Settings from"./pages/Settings";
@@ -17,8 +16,8 @@ import Categories from"./pages/Categories";
 import Barcodes from"./pages/Barcodes";
 import BarcodeCreator from"./pages/BarcodeCreator";
 import Analytics from"./pages/Analytics";
-import Store from"./pages/Store";
-import Shipment from"./pages/Shipment";
+import StoreIntelligence from"./pages/StoreIntelligence";
+import Shipments from"./pages/Shipments";
 import ShipmentOverview from"./pages/ShipmentOverview";
 import Vendors from"./pages/Vendors";
 import Provisioning from"./pages/Provisioning";
@@ -97,11 +96,25 @@ function App() {
     }
 
     try {
+      // 1. Primary Lookup: Try matching public.users.id with Auth UID
       let { data, error } = await supabase
-        .from("auth_users")
-        .select("*, store(name)")
+        .from("users")
+        .select("*, store:stores(name)")
         .eq("id", activeSession.user.id)
         .maybeSingle();
+
+      // 2. Secondary Lookup: Try matching by email if ID match fails
+      if (!data && activeSession.user.email) {
+        const { data: emailMatch } = await supabase
+          .from("users")
+          .select("*, store:stores(name)")
+          .ilike("email", activeSession.user.email)
+          .maybeSingle();
+        
+        if (emailMatch) {
+          data = emailMatch;
+        }
+      }
 
       // Ignore stale responses from older in-flight profile requests.
       if (requestId !== profileRequestRef.current) {
@@ -112,70 +125,12 @@ function App() {
         throw error;
       }
 
-      // If not found in auth_users, try employees table (for employee login)
-      // Use supabaseAdmin to bypass RLS policies
-      if (!data) {
-        console.log("Not found in auth_users, trying employees table...");
-        console.log("Looking for user_id:", activeSession.user.id);
-        
-        let { data: employeeData, error: empError } = await supabaseAdmin
-          .from("employees")
-          .select("id, name, employee_id, store_id, department, role, email, phone, status, joined_on, user_id")
-          .eq("user_id", activeSession.user.id)
-          .maybeSingle();
-        
-        console.log("Employee query result:", { employeeData, empError });
-        
-        // Fallback to email lookup if user_id is missing
-        if (!employeeData && activeSession.user.email) {
-          console.log("Not found by user_id, trying email:", activeSession.user.email);
-          const { data: emailData, error: emailError } = await supabaseAdmin
-            .from("employees")
-            .select("id, name, employee_id, store_id, department, role, email, phone, status, joined_on, user_id")
-            .ilike("email", activeSession.user.email)
-            .maybeSingle();
-            
-          if (emailData) {
-            employeeData = emailData;
-            // Update the user_id for future logins
-            await supabaseAdmin.from("employees").update({ user_id: activeSession.user.id }).eq("id", emailData.id);
-            console.log("Linked missing user_id to employee:", emailData.email);
-          } else if (emailError) {
-            console.error("Error querying employees by email:", emailError);
-          }
-        }
-
-        if (empError) {
-          console.error("Error querying employees:", empError);
-        }
-        
-        if (employeeData) {
-          // Fetch store name separately using admin client
-          const { data: storeData } = await supabaseAdmin
-            .from("store")
-            .select("name")
-            .eq("id", employeeData.store_id)
-            .maybeSingle();
-          
-          // Map employee data to same format as auth_users
-          data = {
-            id: activeSession.user.id,
-            email: activeSession.user.email,
-            role: 'employee',
-            store_id: employeeData.store_id,
-            name: employeeData.name,
-            phone: employeeData.phone,
-            must_reset_password: employeeData.must_reset_password ?? true,
-            store: storeData
-          };
-          console.log("Employee profile created:", data);
-        }
-      }
-
-      setUserProfile(data ?? null);
       if (data) {
+        setUserProfile(data);
         writeCachedProfile(data);
       } else {
+        console.error("Unauthorized: No profile found for", activeSession.user.email);
+        setUserProfile(null);
         clearCachedProfile();
       }
       return data ?? null;
@@ -335,19 +290,21 @@ function App() {
   }
 
   const role = userProfile?.role;
-  const isEmployee = role ==="employee";
-  const isAdminOrManager = role ==="admin" || role ==="super_admin" || role ==="store_manager";
+  const isEmployee = role === "sales" || role === "optometrist" || role === "employee";
+  const isAdminOrManager = role === "admin" || role === "manager" || role === "super_admin" || role === "store_manager";
 
   if (!isEmployee && !isAdminOrManager) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB] p-6">
-        <div className="max-w-md w-full bg-white border border-gray-200 rounded-2xl p-6 text-center shadow-sm">
-          <h2 className="text-lg font-bold text-[#000000]">Unauthorized role</h2>
-          <p className="text-sm text-gray-500 mt-2">This account role is not configured for this app.</p>
+        <div className="max-w-md w-full bg-white border border-gray-100 rounded-3xl p-10 text-center shadow-sm">
+          <h2 className="text-xl font-black text-black uppercase tracking-tighter">Unauthorized Identity</h2>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4 leading-relaxed">
+            This account role is not registered for the warehouse operations dashboard.
+          </p>
           <button
             type="button"
             onClick={() => void handleLogout()}
-            className="mt-5 px-4 py-2 rounded-lg bg-[#000000] text-white text-sm font-semibold"
+            className="mt-8 px-10 py-4 rounded-2xl bg-black text-white text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all"
           >
             Sign out
           </button>
@@ -355,6 +312,7 @@ function App() {
       </div>
     );
   }
+
 
   const employeeRoutes = (
     <Routes>
@@ -369,15 +327,15 @@ function App() {
   const adminRoutes = (
     <Routes>
       <Route path="/" element={<Dashboard userProfile={userProfile} />} />
-      <Route path="/inventory-entities" element={<InventoryEntities userProfile={userProfile} />} />
-      <Route path="/inventory-entities/:id" element={<EntityDetails userProfile={userProfile} />} />
+      <Route path="/products" element={<ProductList userProfile={userProfile} />} />
+      <Route path="/products/:id" element={<EntityDetails userProfile={userProfile} />} />
       <Route path="/analytics" element={<Analytics userProfile={userProfile} />} />
-      <Route path="/store" element={<Store userProfile={userProfile} />} />
-      <Route path="/shipment" element={<Shipment userProfile={userProfile} />} />
+      <Route path="/store-intelligence" element={<StoreIntelligence userProfile={userProfile} />} />
+      <Route path="/shipments" element={<Shipments userProfile={userProfile} />} />
       <Route path="/shipment-overview" element={<ShipmentOverview userProfile={userProfile} />} />
       <Route path="/provisioning" element={<Provisioning userProfile={userProfile} />} />
       <Route path="/vendors" element={<Vendors userProfile={userProfile} />} />
-      <Route path="/requests" element={<Store userProfile={userProfile} />} />
+      <Route path="/requests" element={<StoreIntelligence userProfile={userProfile} />} />
       <Route path="/barcode-creator" element={<BarcodeCreator userProfile={userProfile} />} />
       <Route path="/categories" element={<Categories userProfile={userProfile} />} />
       <Route path="/barcodes" element={<Barcodes userProfile={userProfile} />} />

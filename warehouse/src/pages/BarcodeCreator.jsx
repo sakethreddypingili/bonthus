@@ -1,36 +1,80 @@
-import React, { useState } from 'react';
-import { Plus, Search, Layers, ScanBarcode, QrCode, Download, Printer, CheckCircle2 } from 'lucide-react';
-
-const MOCK_BARCODES = [
-  { id:"V-1005", barcode:"8901234567894", status:"unassigned" },
-  { id:"V-1006", barcode:"8901234567895", status:"unassigned" },
-];
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Search, Layers, ScanBarcode, QrCode, Download, Printer, CheckCircle2, Database } from 'lucide-react';
+import { supabase } from "../server/supabase/supabase";
 
 export default function BarcodeCreator() {
-  const [generateMode, setGenerateMode] = useState("bulk"); //"single" or"bulk"
+  const [generateMode, setGenerateMode] = useState("bulk");
   const [quantity, setQuantity] = useState(10);
   const [createdBarcodes, setCreatedBarcodes] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  const [products, setProducts] = useState([]);
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [loadingProducts, setLoadingLoadingProducts] = useState(true);
 
-  const handleGenerate = (e) => {
+  const fetchProducts = useCallback(async () => {
+    setLoadingLoadingProducts(true);
+    try {
+      const { data, error } = await supabase.from('products').select('id, name, sku').order('name');
+      if (error) throw error;
+      setProducts(data || []);
+      if (data?.length > 0) setSelectedProductId(data[0].id);
+    } catch (err) {
+      console.error("Error fetching products:", err.message);
+    } finally {
+      setLoadingLoadingProducts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  const handleGenerate = async (e) => {
     e.preventDefault();
-    setIsGenerating(true);
+    if (!selectedProductId) {
+      alert("Please select a product first.");
+      return;
+    }
     
-    // Simulate generation delay
-    setTimeout(() => {
-      const count = generateMode ==="single" ? 1 : parseInt(quantity, 10);
+    setIsGenerating(true);
+    try {
+      const count = generateMode === "single" ? 1 : parseInt(quantity, 10);
       const newVectors = [];
+      const dbEntries = [];
+      
       for (let i = 0; i < count; i++) {
-        const newBarcodeVal ="8901" + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
+        // EAN-13 style simulation
+        const newBarcodeVal = "8901" + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
         newVectors.push({
-          id: `V-${Date.now() + i}`,
           barcode: newBarcodeVal,
-          status:"unassigned"
+          product_id: selectedProductId
+        });
+        dbEntries.push({
+          barcode: newBarcodeVal,
+          product_id: selectedProductId
         });
       }
-      setCreatedBarcodes(newVectors);
+
+      const { data, error } = await supabase
+        .from('product_barcodes')
+        .insert(dbEntries)
+        .select();
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error("Duplicate barcode detected during generation. Please retry.");
+        }
+        throw error;
+      }
+
+      setCreatedBarcodes(data || []);
+      alert(`Successfully generated and saved ${data?.length} barcodes.`);
+    } catch (err) {
+      alert("Generation failed: " + err.message);
+    } finally {
       setIsGenerating(false);
-    }, 800);
+    }
   };
 
   return (
@@ -51,6 +95,23 @@ export default function BarcodeCreator() {
           </div>
 
           <form onSubmit={handleGenerate} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-1">
+                <Database size={10} /> Target Product
+              </label>
+              <select
+                value={selectedProductId}
+                onChange={e => setSelectedProductId(e.target.value)}
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest outline-none focus:bg-white focus:border-black"
+                required
+                disabled={loadingProducts}
+              >
+                {loadingProducts ? <option>Syncing Catalog...</option> : 
+                  products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)
+                }
+              </select>
+            </div>
+
             <div className="flex gap-4 p-1 bg-gray-50 rounded-2xl border border-gray-100">
               <button 
                 type="button" 
@@ -85,7 +146,7 @@ export default function BarcodeCreator() {
 
             <button 
               type="submit"
-              disabled={isGenerating}
+              disabled={isGenerating || loadingProducts}
               className="w-full py-5 bg-black text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-[0.98]  disabled:opacity-20 flex items-center justify-center gap-2"
             >
               {isGenerating ?"Syncing..." : <><Plus size={16} strokeWidth={3} /> Commit Generation</>}
@@ -115,7 +176,7 @@ export default function BarcodeCreator() {
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 flex-1 overflow-y-auto pr-2 no-scrollbar">
                 {createdBarcodes.map(vector => (
                   <div key={vector.id} className="bg-gray-50 border border-gray-100 rounded-3xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-black  group">
-                    {/* Mock Barcode */}
+                    {/* Mock Barcode Graphics */}
                     <div className="h-12 w-full flex items-center justify-center gap-0.5 opacity-80 mix-blend-multiply group-hover:opacity-100">
                       <div className="w-1 h-full bg-black"></div>
                       <div className="w-2 h-full bg-black"></div>
@@ -127,7 +188,7 @@ export default function BarcodeCreator() {
                     </div>
                     <div className="text-center">
                       <p className="font-mono text-[11px] font-black tracking-widest text-black">{vector.barcode}</p>
-                      <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">ID: {vector.id}</p>
+                      <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">ID: {vector.id.slice(0,8)}</p>
                     </div>
                   </div>
                 ))}

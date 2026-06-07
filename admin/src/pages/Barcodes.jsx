@@ -1,28 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   QrCode, Search, Download, Printer, Settings2, 
   Layers, ScanBarcode, CheckCircle2, AlertCircle, PieChart, BarChart
 } from 'lucide-react';
-
-const MOCK_BARCODES = [
-  { id:"V-1001", barcode:"8901234567890", entityId:"W-10492", entityName:"RayBan Aviator Classic", status:"assigned", date:"2026-05-10" },
-  { id:"V-1002", barcode:"8901234567891", entityId:"W-10493", entityName:"Acuvue Oasys Monthly", status:"assigned", date:"2026-05-12" },
-  { id:"V-1003", barcode:"8901234567892", entityId:"W-10494", entityName:"Zeiss Anti-Reflective Lens", status:"assigned", date:"2026-05-15" },
-  { id:"V-1005", barcode:"8901234567894", entityId: null, entityName: null, status:"unassigned", date:"2026-05-20" },
-  { id:"V-1006", barcode:"8901234567895", entityId: null, entityName: null, status:"unassigned", date:"2026-05-20" },
-];
+import { supabase } from "../server/supabase/supabase";
 
 export default function Barcodes() {
+  const [barcodes, setBarcodes] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const fetchBarcodes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('product_barcodes')
+        .select(`
+          id,
+          barcode,
+          created_at,
+          product:products (
+            id,
+            name,
+            sku
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const mapped = data.map(b => ({
+        id: b.id,
+        barcode: b.barcode,
+        entityId: b.product?.id || null,
+        entityName: b.product?.name || null,
+        sku: b.product?.sku || null,
+        status: b.product ? "assigned" : "unassigned",
+        date: new Date(b.created_at).toLocaleDateString()
+      }));
+
+      setBarcodes(mapped);
+    } catch (err) {
+      console.error("Error fetching barcodes:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBarcodes();
+  }, [fetchBarcodes]);
+
   const stats = {
-    total: MOCK_BARCODES.length,
-    assigned: MOCK_BARCODES.filter(b => b.status ==="assigned").length,
-    unassigned: MOCK_BARCODES.filter(b => b.status ==="unassigned").length
+    total: barcodes.length,
+    assigned: barcodes.filter(b => b.status ==="assigned").length,
+    unassigned: barcodes.filter(b => b.status ==="unassigned").length
   };
 
-  const filtered = MOCK_BARCODES.filter(b => {
+  const filtered = barcodes.filter(b => {
     if (activeTab !=="all" && b.status !== activeTab) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -36,6 +72,9 @@ export default function Barcodes() {
           <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Barcode Studio</h1>
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Operational Vector Audit & Analytics</p>
         </div>
+        <button onClick={fetchBarcodes} className="p-3 border border-gray-100 rounded-2xl hover:bg-black hover:text-white transition-all">
+            <Settings2 size={18} strokeWidth={3} />
+        </button>
       </div>
 
       {/* Analytics Summary */}
@@ -43,21 +82,21 @@ export default function Barcodes() {
         <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm hover:shadow-xl   group">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Aggregate Created</p>
           <div className="flex items-end justify-between">
-            <span className="text-4xl font-black text-black tracking-tighter">{stats.total}</span>
+            <span className="text-4xl font-black text-black tracking-tighter">{loading ? "..." : stats.total}</span>
             <QrCode size={24} className="text-gray-200 group-hover:text-black" strokeWidth={3} />
           </div>
         </div>
         <div className="bg-black rounded-[32px] p-8 border border-black shadow-2xl">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Entity Bound</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 text-gray-400">Entity Bound</p>
           <div className="flex items-end justify-between text-white">
-            <span className="text-4xl font-black tracking-tighter">{stats.assigned}</span>
+            <span className="text-4xl font-black tracking-tighter">{loading ? "..." : stats.assigned}</span>
             <CheckCircle2 size={24} strokeWidth={3} />
           </div>
         </div>
         <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm hover:shadow-xl   group">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Unassigned Vectors</p>
           <div className="flex items-end justify-between">
-            <span className="text-4xl font-black text-black tracking-tighter">{stats.unassigned}</span>
+            <span className="text-4xl font-black text-black tracking-tighter">{loading ? "..." : stats.unassigned}</span>
             <ScanBarcode size={24} className="text-gray-200 group-hover:text-black" strokeWidth={3} />
           </div>
         </div>
@@ -112,9 +151,11 @@ export default function Barcodes() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map(b => (
-                <tr key={b.id} className="hover:bg-black hover:text-white   group text-black">
-                  <td className="px-8 py-6 font-mono text-[11px] font-black">{b.id}</td>
+              {loading && barcodes.length === 0 ? (
+                <tr><td colSpan={5} className="px-8 py-20 text-center text-[10px] font-black text-gray-300 uppercase tracking-widest">Accessing Ledger...</td></tr>
+              ) : filtered.map(b => (
+                <tr key={b.id} className="hover:bg-black hover:text-white   group text-black transition-colors">
+                  <td className="px-8 py-6 font-mono text-[11px] font-black">{b.id.slice(0, 8)}</td>
                   <td className="px-8 py-6 font-mono text-[11px] font-black tracking-widest border-x border-transparent">
                     {b.barcode}
                   </td>
@@ -122,7 +163,7 @@ export default function Barcodes() {
                     {b.entityName ? (
                       <>
                         <p className="text-[11px] font-black uppercase tracking-tight">{b.entityName}</p>
-                        <p className="text-[9px] font-mono text-gray-400 mt-1 uppercase tracking-widest group-hover:text-gray-400">Ref: {b.entityId}</p>
+                        <p className="text-[9px] font-mono text-gray-400 mt-1 uppercase tracking-widest group-hover:text-gray-400">SKU: {b.sku}</p>
                       </>
                     ) : (
                       <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest italic group-hover:text-gray-500">No Entity Bound</span>
@@ -140,7 +181,7 @@ export default function Barcodes() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
+              {!loading && filtered.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-8 py-20 text-center">
                     <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Zero vectors matched audit criteria</p>

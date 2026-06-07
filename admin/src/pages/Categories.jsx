@@ -23,7 +23,9 @@ export default function Categories() {
         `)
         .order('name');
       
-      if (!error && data) {
+      if (error) throw error;
+
+      if (data) {
         setCategories(data.map(c => ({
           ...c,
           items: c.products?.[0]?.count || 0
@@ -46,7 +48,7 @@ export default function Categories() {
     try {
       const { error } = await supabase.from('categories').insert([{
         name: newCat.name,
-        // description: newCat.description // Schema doesn't have description yet, let's keep it simple
+        description: newCat.description
       }]);
 
       if (error) throw error;
@@ -63,7 +65,7 @@ export default function Categories() {
 
   const handleDeleteCategory = async (id) => {
     if (!isValidUUID(id)) return;
-    if (!window.confirm("Are you sure you want to delete this category?")) return;
+    if (!window.confirm("Are you sure you want to delete this category? All linked entities will be uncategorized.")) return;
 
     try {
       const { error } = await supabase.from('categories').delete().eq('id', id);
@@ -74,7 +76,10 @@ export default function Categories() {
     }
   };
 
-  const filtered = categories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filtered = categories.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.description && c.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   return (
     <div className="space-y-8 pb-20 animate-fast-slide">
@@ -91,7 +96,7 @@ export default function Categories() {
         </button>
       </div>
 
-      <div className="bg-white rounded-[40px] p-6 border border-gray-100 shadow-sm flex items-center justify-between">
+      <div className="bg-white rounded-[40px] p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="relative group w-full max-w-md">
           <Search size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-black" strokeWidth={3} />
           <input
@@ -108,31 +113,35 @@ export default function Categories() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50/50">
+              <tr className="bg-gray-50/50 border-b border-gray-100">
                 <th className="px-8 py-6 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">ID Code</th>
                 <th className="px-8 py-6 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Classification</th>
+                <th className="px-8 py-6 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Description</th>
                 <th className="px-8 py-6 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest">Entities Linked</th>
                 <th className="px-8 py-6 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr><td colSpan={4} className="px-8 py-20 text-center text-[10px] font-black text-gray-300 uppercase tracking-widest">Syncing Classifications...</td></tr>
+              {loading && categories.length === 0 ? (
+                <tr><td colSpan={5} className="px-8 py-20 text-center text-[10px] font-black text-gray-300 uppercase tracking-widest">Syncing Classifications...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={5} className="px-8 py-20 text-center text-[10px] font-black text-gray-300 uppercase tracking-widest">No Classifications Found</td></tr>
               ) : filtered.map(cat => (
-                <tr key={cat.id} className="hover:bg-gray-50/50  group">
+                <tr key={cat.id} className="hover:bg-gray-50/50  group transition-colors">
                   <td className="px-8 py-6 font-mono text-[11px] font-black text-black">{cat.id.slice(0,8)}</td>
                   <td className="px-8 py-6 text-[11px] font-black text-black uppercase tracking-tight">
                     <div className="flex items-center gap-2">
-                      <Tags size={14} className="text-gray-400" />
+                      <Tags size={14} className="text-gray-400 group-hover:text-black transition-colors" />
                       {cat.name}
                     </div>
                   </td>
+                  <td className="px-8 py-6 text-[10px] font-bold text-gray-500 uppercase tracking-widest max-w-xs truncate">{cat.description || "No description provided"}</td>
                   <td className="px-8 py-6 text-center text-[12px] font-black text-black">{cat.items}</td>
                   <td className="px-8 py-6 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100">
+                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                       <button 
                         onClick={() => handleDeleteCategory(cat.id)}
-                        className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg"
+                        className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
                       >
                         <Trash2 size={16} strokeWidth={3} />
                       </button>
@@ -147,7 +156,7 @@ export default function Categories() {
 
       <SlideDrawer
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={() => { setShowModal(false); setNewCat({ name: '', description: '' }); }}
         title="New Classification"
         subtitle="Append inventory structure"
       >
@@ -161,13 +170,24 @@ export default function Categories() {
                 value={newCat.name}
                 onChange={e => setNewCat({ ...newCat, name: e.target.value })}
                 placeholder="E.g. Sunglasses"
-                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none"
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Structural Description</label>
+              <textarea
+                rows="3"
+                value={newCat.description}
+                onChange={e => setNewCat({ ...newCat, description: e.target.value })}
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none resize-none transition-all"
+                placeholder="Define the bounds of this entity..."
               />
             </div>
 
             <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
-              <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black">Abort</button>
-              <button type="submit" disabled={saving} className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95">
+              <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
+              <button type="submit" disabled={saving} className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 disabled:opacity-50 transition-all">
                 {saving ? "Syncing..." : "Commit Registration"}
               </button>
             </div>

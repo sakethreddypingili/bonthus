@@ -1,6 +1,6 @@
 import { 
   BarChart2, Truck, Clock, AlertCircle, CheckCircle, 
-  ArrowUpRight, ArrowDownRight, TrendingUp 
+  ArrowUpRight, ArrowDownRight, TrendingUp, RefreshCw
 } from "lucide-react";
 
 export default function ShipmentOverview() {
@@ -12,80 +12,103 @@ export default function ShipmentOverview() {
   ];
 
   const recent = [
-    { id: 1, action: 'Shipment Received', ref: 'SH-4404', time: '2h ago', type: 'success' },
-    { id: 2, action: 'Shipment Delayed', ref: 'SH-4403', time: '5h ago', type: 'error' },
-    { id: 3, action: 'New Shipment', ref: 'SH-4405', time: '8h ago', type: 'info' },
+    { id: 1, action: 'Shipment Received', ref: 'SH-4404', time: '2h ago' },
+    { id: 2, action: 'Shipment Delayed', ref: 'SH-4403', time: '5h ago' },
+    { id: 3, action: 'New Shipment', ref: 'SH-4405', time: '8h ago' },
   ];
 
   return (
     <div className="space-y-8 pb-20 animate-fast-slide">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-neutral-200">
         <div>
           <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Overview</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Operational Intelligence Vector</p>
+          <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.25em]">Operational Intelligence Vector</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-2xl shadow-sm">
-            <TrendingUp size={16} className="text-black" />
-            <span className="text-[10px] font-black text-black uppercase tracking-widest">Efficiency: 94.2%</span>
+        <div className="flex items-center gap-2 px-5 py-3 bg-black text-white rounded-2xl shadow-sm border border-neutral-900">
+          <TrendingUp size={14} strokeWidth={2.5} className="text-white" />
+          <span className="text-[10px] font-black uppercase tracking-widest">Efficiency: 94.2%</span>
         </div>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, i) => (
-          <div key={i} className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
-            <div className="flex justify-between items-start mb-6">
-              <div className="p-4 rounded-3xl bg-black text-white shadow-lg group-hover:scale-110 transition-transform">
-                <stat.icon size={20} strokeWidth={2.5} />
+          <div 
+            key={i} 
+            className="bg-white rounded-3xl p-6 border border-neutral-200 shadow-sm hover:border-black hover:shadow-md transition-all duration-300 group flex flex-col justify-between h-36"
+          >
+            <div className="flex justify-between items-center">
+              <div className="p-2.5 rounded-xl bg-black text-white transition-transform group-hover:scale-105 duration-300">
+                <stat.icon size={16} strokeWidth={2.5} />
               </div>
-              <div className="flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black bg-gray-50 text-black">
+              <span className="text-[9px] font-mono font-black px-2 py-0.5 bg-neutral-100 border border-neutral-200 rounded-full text-neutral-800">
                 {stat.trend}
-              </div>
+              </span>
             </div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">{stat.label}</p>
-            <h2 className="text-3xl font-black text-black tracking-tight">{stat.value}</h2>
+            <div>
+              <p className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-0.5">{stat.label}</p>
+              <h2 className="text-3xl font-mono font-black text-black tracking-tight">{stat.value}</h2>
+            </div>
           </div>
         ))}
       </div>
 
+      {/* Bottom Grid Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white rounded-[40px] border border-gray-100 shadow-sm p-8">
-          <h3 className="text-xl font-black text-black uppercase tracking-tighter mb-8">Activity Ledger</h3>
-          <div className="space-y-6">
-            {recent.map((activity) => (
-              <div key={activity.id} className="flex items-center gap-6 p-4 rounded-3xl hover:bg-gray-50 transition-colors group">
-                <div className="w-2 h-2 rounded-full bg-black group-hover:scale-150 transition-transform" />
-                <div className="flex-1">
-                  <p className="text-[11px] font-black text-black uppercase tracking-tight">{activity.action}</p>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Ref: {activity.ref}</p>
+        {/* Activity Ledger */}
+        <div className="lg:col-span-2 bg-white rounded-3xl border border-neutral-200 shadow-sm p-8 flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-lg font-black text-black uppercase tracking-tighter">Activity Ledger</h3>
+              <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Live Updates</span>
+            </div>
+            <div className="relative border-l border-neutral-200 ml-3 pl-8 space-y-8">
+              {recent.map((activity) => (
+                <div key={activity.id} className="relative group">
+                  {/* Timeline Dot */}
+                  <div className="absolute -left-[38px] top-1 w-3.5 h-3.5 rounded-full bg-black border-4 border-white group-hover:scale-110 transition-all duration-200 shrink-0 shadow-sm" />
+                  <div>
+                    <div className="flex justify-between items-center gap-4">
+                      <p className="text-[11px] font-black text-black uppercase tracking-tight truncate">{activity.action}</p>
+                      <span className="text-[9px] font-mono font-black text-neutral-400 uppercase tracking-widest shrink-0">{activity.time}</span>
+                    </div>
+                    <p className="text-[9px] font-mono font-black text-neutral-400 uppercase tracking-widest mt-1">Ref: {activity.ref}</p>
+                  </div>
                 </div>
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{activity.time}</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="bg-black rounded-[40px] shadow-2xl p-8 text-white relative overflow-hidden">
-            <h3 className="text-xl font-black uppercase tracking-tighter mb-8 relative z-10">Network Integrity</h3>
-            <div className="space-y-6 relative z-10">
-                {[
-                    { name: 'Vision One', score: 98 },
-                    { name: 'Apex Optical', score: 85 },
-                    { name: 'ClearView', score: 72 },
-                ].map((carrier, i) => (
-                    <div key={i} className="space-y-2">
-                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                            <span>{carrier.name}</span>
-                            <span>{carrier.score}%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                            <div className="h-full bg-white rounded-full" style={{ width: `${carrier.score}%` }} />
-                        </div>
-                    </div>
-                ))}
+        {/* Network Integrity */}
+        <div className="bg-black rounded-3xl shadow-xl p-8 text-white flex flex-col justify-between border border-neutral-900">
+          <div>
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-lg font-black uppercase tracking-tighter">Network Integrity</h3>
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
             </div>
-            <button className="w-full mt-12 py-4 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all">
-                Sync Ledger
-            </button>
+            <div className="space-y-6">
+              {[
+                { name: 'Vision One', score: 98 },
+                { name: 'Apex Optical', score: 85 },
+                { name: 'ClearView', score: 72 },
+              ].map((carrier, i) => (
+                <div key={i} className="space-y-2.5">
+                  <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-neutral-400">
+                    <span>{carrier.name}</span>
+                    <span className="text-white font-mono">{carrier.score}%</span>
+                  </div>
+                  <div className="h-[3px] w-full bg-neutral-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-white rounded-full transition-all duration-500" style={{ width: `${carrier.score}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <button className="w-full mt-10 py-4 bg-white text-black hover:bg-neutral-100 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-2">
+            <RefreshCw size={12} strokeWidth={3} className="animate-spin-slow" /> Sync Ledger
+          </button>
         </div>
       </div>
     </div>

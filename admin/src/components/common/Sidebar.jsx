@@ -14,7 +14,8 @@ import {
   QrCode,
   Plus,
   List,
-  Tags
+  Tags,
+  ClipboardList
 } from "lucide-react";
 import { useState } from "react";
 const logoImg = '/assets/images/logo.webp';
@@ -23,8 +24,8 @@ const iconImg = '/assets/images/icon.webp';
 const navItems = [
   { to: "/", label: "Dashboard", role: ["admin", "super_admin", "store_manager"], icon: LayoutDashboard },
   { to: "/orders", label: "Orders", role: ["admin", "super_admin", "store_manager"], icon: ShoppingBag },
-  { to: "/inventory-entities", label: "Master Catalog", role: ["admin", "super_admin", "store_manager"], icon: Package },
-  { to: "/warehouse", label: "Warehouse", role: ["admin", "super_admin"], icon: Warehouse },
+  { to: "/products", label: "Products", role: ["admin", "super_admin", "store_manager"], icon: Package },
+  { to: "/inventory", label: "Inventory", role: ["admin", "super_admin"], icon: Warehouse },
   { to: "/customers", label: "Customers", role: ["admin", "super_admin", "store_manager"], icon: Users },
   { to: "/reminders", label: "Board", role: ["admin", "super_admin", "store_manager", "employee"], icon: Layout },
   { to: "/attendance", label: "Attendance", role: ["admin", "super_admin", "store_manager", "employee"], icon: ClipboardCheck },
@@ -61,10 +62,10 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
             ? location.pathname === "/" 
             : (to === "/reminders" 
                 ? (location.pathname === "/reminders" || location.pathname === "/notifications")
-                : (to === "/warehouse"
-                    ? (location.pathname === "/warehouse" || location.pathname === "/warehouse/analytics" || location.pathname === "/warehouse/store" || location.pathname === "/warehouse/shipment")
-                    : (to === "/inventory-entities"
-                        ? (location.pathname === "/inventory-entities" || location.pathname === "/inventory-entities/:id" || location.pathname === "/categories" || location.pathname === "/barcode-creator" || location.pathname === "/barcodes")
+                : (to === "/inventory"
+                    ? (location.pathname === "/inventory" || location.pathname === "/inventory/analytics" || location.pathname === "/inventory/store" || location.pathname === "/inventory/shipment" || location.pathname === "/inventory/provisioning" || location.pathname === "/inventory/vendors")
+                    : (to === "/products"
+                        ? (location.pathname === "/products" || location.pathname === "/products/:id" || location.pathname === "/categories" || location.pathname === "/barcode-creator" || location.pathname === "/barcodes")
                         : location.pathname.startsWith(to)
                       )
                   )
@@ -88,11 +89,11 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 {!collapsed && <span>{label}</span>}
               </NavLink>
 
-              {/* Sub-menu for Master Catalog */}
-              {label === "Master Catalog" && isActive && (
+              {/* Sub-menu for Products */}
+              {label === "Products" && isActive && (
                 <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
                   {[
-                    { to: "/inventory-entities", label: "Inventory Entities", icon: List },
+                    { to: "/products", label: "Product List", icon: List },
                     { to: "/categories", label: "Categories", icon: Tags },
                     { to: "/barcode-creator", label: "Barcode Creator", icon: Plus },
                     { to: "/barcodes", label: "Barcode Studio", icon: QrCode }
@@ -121,14 +122,16 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 </div>
               )}
 
-              {/* Sub-menu for Warehouse */}
-              {label === "Warehouse" && isActive && (
+              {/* Sub-menu for Inventory */}
+              {label === "Inventory" && isActive && (
                 <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
                   {[
-                    { to: "/warehouse", label: "Overview", icon: Warehouse },
-                    { to: "/warehouse/shipment", label: "Shipment", icon: Truck },
-                    { to: "/warehouse/store", label: "Store Insights", icon: Store },
-                    { to: "/warehouse/analytics", label: "Warehouse Data", icon: BarChart2 },
+                    { to: "/inventory", label: "Overview", icon: Warehouse },
+                    { to: "/inventory/shipment", label: "Shipment", icon: Truck },
+                    { to: "/inventory/provisioning", label: "Provisioning", icon: ClipboardList },
+                    { to: "/inventory/vendors", label: "Vendors", icon: Users },
+                    { to: "/inventory/store", label: "Store Intelligence", icon: Store },
+                    { to: "/inventory/analytics", label: "Inventory Data", icon: BarChart2 },
                   ].map((sub) => {
                     const isSubActive = location.pathname === sub.to;
                     const SubIcon = sub.icon;
@@ -200,10 +203,10 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
               }
               ${collapsed ? "justify-center" : ""}
             `}
-            title={collapsed ? "Store" : undefined}
+            title={collapsed ? "Stores" : undefined}
           >
             <UserPlus size={18} className="flex-shrink-0" />
-            {!collapsed && <span>Store</span>}
+            {!collapsed && <span>Stores</span>}
           </NavLink>
         )}
       </nav>

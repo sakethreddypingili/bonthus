@@ -5,15 +5,17 @@ import Sidebar from "./components/common/Sidebar";
 import Topbar from "./components/common/Topbar";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
-import InventoryEntities from "./pages/InventoryEntities";
+import ProductList from "./pages/ProductList";
 import EntityDetails from "./pages/EntityDetails";
 import Categories from "./pages/Categories";
 import BarcodeCreator from "./pages/BarcodeCreator";
 import Barcodes from "./pages/Barcodes";
-import WarehouseDashboard from "./pages/WarehouseDashboard";
-import WarehouseAnalytics from "./pages/WarehouseAnalytics";
-import WarehouseStoreInsight from "./pages/WarehouseStoreInsight";
-import WarehouseShipment from "./pages/WarehouseShipment";
+import InventoryDashboard from "./pages/InventoryDashboard";
+import InventoryAnalytics from "./pages/InventoryAnalytics";
+import InventoryStoreIntelligence from "./pages/InventoryStoreIntelligence";
+import InventoryShipments from "./pages/InventoryShipments";
+import InventoryProvisioning from "./pages/InventoryProvisioning";
+import InventoryVendors from "./pages/InventoryVendors";
 import Customers from "./pages/Customers";
 import CustomerProfile from "./pages/CustomerProfile";
 import Analytics from "./pages/Analytics";
@@ -362,15 +364,17 @@ function App() {
       <Route path="/orders" element={<Orders userProfile={userProfile} />} />
       <Route path="/orders/new" element={<CreateOrder userProfile={userProfile} />} />
       <Route path="/orders/edit/:id" element={<EditOrder userProfile={userProfile} />} />
-      <Route path="/inventory-entities" element={<InventoryEntities userProfile={userProfile} />} />
-      <Route path="/inventory-entities/:id" element={<EntityDetails userProfile={userProfile} />} />
+      <Route path="/products" element={<ProductList userProfile={userProfile} />} />
+      <Route path="/products/:id" element={<EntityDetails userProfile={userProfile} />} />
       <Route path="/categories" element={<Categories userProfile={userProfile} />} />
       <Route path="/barcode-creator" element={<BarcodeCreator userProfile={userProfile} />} />
       <Route path="/barcodes" element={<Barcodes userProfile={userProfile} />} />
-      <Route path="/warehouse" element={<WarehouseDashboard userProfile={userProfile} />} />
-      <Route path="/warehouse/analytics" element={<WarehouseAnalytics userProfile={userProfile} />} />
-      <Route path="/warehouse/store" element={<WarehouseStoreInsight userProfile={userProfile} />} />
-      <Route path="/warehouse/shipment" element={<WarehouseShipment userProfile={userProfile} />} />
+      <Route path="/inventory" element={<InventoryDashboard userProfile={userProfile} />} />
+      <Route path="/inventory/analytics" element={<InventoryAnalytics userProfile={userProfile} />} />
+      <Route path="/inventory/store" element={<InventoryStoreIntelligence userProfile={userProfile} />} />
+      <Route path="/inventory/shipment" element={<InventoryShipments userProfile={userProfile} />} />
+      <Route path="/inventory/provisioning" element={<InventoryProvisioning userProfile={userProfile} />} />
+      <Route path="/inventory/vendors" element={<InventoryVendors userProfile={userProfile} />} />
       <Route path="/customers" element={<Customers userProfile={userProfile} />} />
       <Route path="/customers/:id" element={<CustomerProfile userProfile={userProfile} />} />
       <Route path="/analytics" element={<Analytics userProfile={userProfile} />} />

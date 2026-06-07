@@ -131,26 +131,57 @@ export default function Reminders({ userProfile }) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
           {tasks.map(task => (
-            <div key={task.id} className={`bg-white rounded-[32px] p-8 border ${task.status === 'completed' ? 'border-gray-100 opacity-60 grayscale' : 'border-gray-200 shadow-xl hover:border-black'} transition-all duration-300 relative overflow-hidden group`}>
-              <div className="flex justify-between items-start mb-6 border-b border-gray-50 pb-4">
-                <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${task.type === 'staff_meeting' || task.type === 'eye_test' ? 'bg-black text-white' : 'border border-black text-black'}`}>
-                  {task.type.replace('_', ' ')}
+            <div 
+              key={task.id} 
+              className={`flex flex-col justify-between bg-white rounded-3xl p-6 border transition-all duration-300 relative overflow-hidden group ${
+                task.status === 'completed' 
+                  ? 'border-gray-100 bg-gray-50/50 opacity-70' 
+                  : 'border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:border-black/20'
+              }`}
+            >
+              <div>
+                {/* Header */}
+                <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-50">
+                  <span className={`px-2.5 py-1 rounded-lg text-[9px] font-mono font-black uppercase tracking-wider ${
+                    task.status === 'completed'
+                      ? 'bg-gray-200 text-gray-500'
+                      : task.type === 'staff_meeting' || task.type === 'eye_test'
+                        ? 'bg-black text-white shadow-sm'
+                        : 'bg-gray-100 text-black border border-gray-200'
+                  }`}>
+                    {task.type.replace('_', ' ')}
+                  </span>
+                  <button 
+                    onClick={() => toggleTaskStatus(task.id, task.status)} 
+                    className="text-black hover:scale-110 active:scale-90 transition-all"
+                  >
+                    {task.status === 'completed' ? (
+                      <CheckCircle2 size={22} strokeWidth={2.5} className="text-black" />
+                    ) : (
+                      <Circle size={22} strokeWidth={2.5} className="text-gray-300 group-hover:text-black transition-colors" />
+                    )}
+                  </button>
                 </div>
-                <button onClick={() => toggleTaskStatus(task.id, task.status)} className="text-black hover:scale-110 transition-transform">
-                  {task.status === 'completed' ? <CheckCircle2 size={24} strokeWidth={3} /> : <Circle size={24} strokeWidth={3} className="text-gray-300 group-hover:text-black" />}
-                </button>
+
+                {/* Title */}
+                <h3 className={`text-lg font-black text-black tracking-tighter uppercase mb-6 leading-snug ${
+                  task.status === 'completed' ? 'line-through text-gray-400 font-bold' : ''
+                }`}>
+                  {task.title}
+                </h3>
               </div>
-              <h3 className={`text-xl font-black text-black tracking-tighter uppercase mb-4 ${task.status === 'completed' && 'line-through'}`}>{task.title}</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 text-gray-500">
-                  <Clock size={14} strokeWidth={3} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">{task.date} @ {task.time}</span>
+
+              {/* Task Details */}
+              <div className="space-y-3 pt-4 border-t border-gray-50/80">
+                <div className="flex items-center gap-2.5 text-gray-500">
+                  <Clock size={13} strokeWidth={2.5} className="shrink-0 text-gray-400" />
+                  <span className="text-[10px] font-black uppercase tracking-wider font-mono">{task.date} @ {task.time}</span>
                 </div>
-                <div className="flex items-center gap-3 text-gray-500">
-                  <Users size={14} strokeWidth={3} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest truncate">{task.assigned_to}</span>
+                <div className="flex items-center gap-2.5 text-gray-500">
+                  <Users size={13} strokeWidth={2.5} className="shrink-0 text-gray-400" />
+                  <span className="text-[10px] font-black uppercase tracking-wider truncate">{task.assigned_to}</span>
                 </div>
               </div>
             </div>

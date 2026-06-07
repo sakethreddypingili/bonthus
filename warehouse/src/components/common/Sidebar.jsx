@@ -23,11 +23,11 @@ const iconImg = '/assets/images/icon.webp';
 
 const navItems = [
   { to:"/", label:"Overview", role: ["admin","super_admin","store_manager"], icon: LayoutDashboard },
-  { to:"/analytics", label:"Analytics", role: ["admin","super_admin","store_manager"], icon: BarChart2 },
-  { to:"/store", label:"Store Insight", role: ["admin","super_admin","store_manager"], icon: Store },
-  { to:"/shipment", label:"Shipment", role: ["admin","super_admin","store_manager"], icon: Truck },
-  { to:"/inventory-entities", label:"Master Catalog", role: ["admin","super_admin","store_manager"], icon: Package },
+  { to:"/products", label:"Products", role: ["admin","super_admin","store_manager"], icon: Package },
+  { to:"/shipments", label:"Shipments", role: ["admin","super_admin","store_manager"], icon: Truck },
   { to:"/reminders", label:"Board", role: ["admin","super_admin","store_manager","employee"], icon: Layout },
+  { to:"/store-intelligence", label:"Store Intelligence", role: ["admin","super_admin","store_manager"], icon: Store },
+  { to:"/analytics", label:"Analytics", role: ["admin","super_admin","store_manager"], icon: BarChart2 },
   { to:"/attendance", label:"Attendance", role: ["admin","super_admin","store_manager","employee"], icon: ClipboardCheck },
 ];
 
@@ -61,10 +61,10 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
             ? location.pathname ==="/"
             : (to ==="/reminders" 
                 ? (location.pathname ==="/reminders" || location.pathname ==="/notifications")
-                : (to ==="/inventory-entities"
-                    ? (location.pathname ==="/inventory-entities" || location.pathname ==="/categories" || location.pathname ==="/barcodes" || location.pathname ==="/barcode-creator")
-                    : (to ==="/shipment"
-                        ? (location.pathname ==="/shipment" || location.pathname ==="/shipment-overview" || location.pathname ==="/vendors" || location.pathname ==="/provisioning")
+                : (to ==="/products"
+                    ? (location.pathname ==="/products" || location.pathname ==="/categories" || location.pathname ==="/barcodes" || location.pathname ==="/barcode-creator")
+                    : (to ==="/shipments"
+                        ? (location.pathname ==="/shipments" || location.pathname ==="/shipment-overview" || location.pathname ==="/vendors" || location.pathname ==="/provisioning")
                         : location.pathname.startsWith(to)
                       )
                   )
@@ -88,12 +88,12 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 {!collapsed && <span>{label}</span>}
               </NavLink>
 
-              {/* Sub-menu for Shipment */}
-              {label ==="Shipment" && isActive && (
+              {/* Sub-menu for Shipments */}
+              {label ==="Shipments" && isActive && (
                 <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
                   {[
                     { to:"/shipment-overview", label:"Overview", icon: BarChart2 },
-                    { to:"/shipment", label:"Registry", icon: List },
+                    { to:"/shipments", label:"Registry", icon: List },
                     { to:"/provisioning", label:"Provisioning", icon: ClipboardList },
                     { to:"/vendors", label:"Vendors", icon: Users }
                   ].map((sub) => {
@@ -121,11 +121,11 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 </div>
               )}
 
-              {/* Sub-menu for Master Catalog */}
-              {label ==="Master Catalog" && isActive && (
+              {/* Sub-menu for Products */}
+              {label ==="Products" && isActive && (
                 <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
                   {[
-                    { to:"/inventory-entities", label:"Inventory Entities", icon: List },
+                    { to:"/products", label:"Product List", icon: List },
                     { to:"/categories", label:"Categories", icon: Tags },
                     { to:"/barcode-creator", label:"Barcode Creator", icon: Plus },
                     { to:"/barcodes", label:"Barcode Studio", icon: QrCode }

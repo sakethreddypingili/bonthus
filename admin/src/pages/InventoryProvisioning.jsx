@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 
-export default function Provisioning({ userProfile }) {
+export default function InventoryProvisioning({ userProfile }) {
   const [shipments, setShipments] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);

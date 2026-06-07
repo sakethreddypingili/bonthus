@@ -7,6 +7,7 @@ import { jsPDF } from 'jspdf';
 import InvoiceLayout from '../components/layout/InvoiceLayout';
 import PdfInvoiceLayout from '../components/layout/PdfInvoiceLayout';
 import { Copy, MessageCircle, Download, Eye, Share2 } from 'lucide-react';
+import { INVOICE_BRAND } from '../constants/brand';
 
 
 
@@ -411,9 +412,8 @@ export default function InvoiceView({ userProfile }) {
   }
 
 
-  const rawStoreName = storeDetails?.name || '';
-  const storeName = rawStoreName || 'BONTHUS OPTICALS';
-  const headerTitle = 'BONTHUS OPTICALS';
+  const storeName = INVOICE_BRAND.billedFromName;
+  const headerTitle = INVOICE_BRAND.headerTitle;
   const customerName = order?.customers?.name || 'Customer';
   const customerPhone = order?.customers?.phone || 'N/A';
 

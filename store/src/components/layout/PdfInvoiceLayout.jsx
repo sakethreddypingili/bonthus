@@ -1,5 +1,6 @@
 import React from 'react';
 import { Phone, MapPin } from 'lucide-react';
+import { INVOICE_BRAND } from '../../constants/brand';
 const logoImg = '/assets/images/image.png';;
 
 const numberToWords = (num) => {
@@ -78,8 +79,7 @@ const PdfInvoiceLayout = React.forwardRef(({
           <img src={logoImg} alt="Company logo" className="w-full h-full object-cover" />
         </div>
         <div className="flex flex-col justify-center">
-          <span className="text-[11px] font-bold text-black tracking-wider uppercase mb-0.5">THE LENSCARE</span>
-          <h1 className="text-xl font-black text-slate-800 tracking-tight leading-none uppercase">{headerTitle || 'BONTHUS OPTICALS'}</h1>
+          <h1 className="text-xl font-black text-slate-800 tracking-tight leading-none uppercase">{INVOICE_BRAND.headerTitle}</h1>
           <p className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-[0.1em] uppercase whitespace-nowrap">Pvt Ltd</p>
         </div>
       </div>
@@ -119,8 +119,7 @@ const PdfInvoiceLayout = React.forwardRef(({
       <div className="grid grid-cols-2 gap-4 px-8 mb-6">
         <div className="bg-[#f8f9fc] rounded-2xl p-6 border border-slate-100 flex flex-col min-h-[120px]">
           <p className="text-[12px] text-slate-500 font-bold tracking-wider mb-2 uppercase">BILLED FROM</p>
-          <p className="font-extrabold text-black text-[18px] mb-1">THE LENSCARE</p>
-          <p className="font-bold text-slate-900 text-[15px] uppercase mb-1">{storeName}</p>
+          <p className="font-extrabold text-black text-[18px] mb-1">{INVOICE_BRAND.billedFromName}</p>
           <p className="text-slate-600 text-[13px] leading-relaxed">
             Phone: {displayPhone}
             <br />
@@ -438,7 +437,7 @@ const PdfInvoiceLayout = React.forwardRef(({
         <p className="text-[14px] font-bold text-slate-800">Thank you for your business!</p>
         <div className="px-5 py-1.5 border border-slate-200 rounded-full">
             <p className="text-xs text-slate-400 font-medium tracking-wide">
-              © {new Date().getFullYear()} {(storeName || '').toUpperCase()}
+              © {new Date().getFullYear()} {INVOICE_BRAND.headerTitle}
             </p>
         </div>
       </div>
