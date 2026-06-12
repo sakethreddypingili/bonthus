@@ -1,20 +1,9 @@
+-- TABLES
+
 -- =========================================================================
--- OPTICAL RETAIL SUITE - SUPABASE POSTGRESQL SCHEMA INITIALIZATION
+-- OPTICAL RETAIL SUITE - ATTENDANCE SYSTEM SCHEMA AND PERMISSIONS FIX
 -- =========================================================================
 
--- Enable UUID extension (typically enabled by default in Supabase)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- -------------------------------------------------------------------------
--- TRIGGER FUNCTION: Automatic updated_at timestamp updating
--- -------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION trigger_set_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
 
 -- -------------------------------------------------------------------------
 -- TABLE 1: stores
@@ -59,12 +48,6 @@ CREATE TABLE IF NOT EXISTS user_settings (
     compact_layout BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
--- Apply updated_at trigger to user_settings
-CREATE TRIGGER set_timestamp_user_settings
-BEFORE UPDATE ON user_settings
-FOR EACH ROW
-EXECUTE FUNCTION trigger_set_timestamp();
 
 -- -------------------------------------------------------------------------
 -- TABLE 4: customers
@@ -183,12 +166,6 @@ CREATE TABLE IF NOT EXISTS orders (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Apply updated_at trigger to orders
-CREATE TRIGGER set_timestamp_orders
-BEFORE UPDATE ON orders
-FOR EACH ROW
-EXECUTE FUNCTION trigger_set_timestamp();
-
 -- -------------------------------------------------------------------------
 -- TABLE 9: order_items
 -- -------------------------------------------------------------------------
@@ -271,19 +248,101 @@ CREATE TABLE IF NOT EXISTS attendance_qr_codes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Align orders table with app expectations (soft-disable flag)
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false;
+
+-- Final schema fix for attendance_qr_codes
+-- Ensures all columns used by the application exist and are correctly named
+
+DO $$ 
+BEGIN 
+    -- 1. Rename 'code' to 'qr_code_token' if it exists
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='attendance_qr_codes' AND column_name='code') THEN
+        ALTER TABLE public.attendance_qr_codes RENAME COLUMN code TO qr_code_token;
+    END IF;
+
+    -- 2. Add qr_code_token if missing
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='attendance_qr_codes' AND column_name='qr_code_token') THEN
+        ALTER TABLE public.attendance_qr_codes ADD COLUMN qr_code_token TEXT UNIQUE NOT NULL;
+    END IF;
+
+    -- 3. Add qr_type if missing
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='attendance_qr_codes' AND column_name='qr_type') THEN
+        ALTER TABLE public.attendance_qr_codes ADD COLUMN qr_type TEXT NOT NULL DEFAULT 'check_in' CHECK (qr_type IN ('check_in', 'check_out'));
+    END IF;
+
+    -- 4. Add valid_date if missing
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='attendance_qr_codes' AND column_name='valid_date') THEN
+        ALTER TABLE public.attendance_qr_codes ADD COLUMN valid_date DATE NOT NULL DEFAULT CURRENT_DATE;
+    END IF;
+
+END $$;
+
+-- OTHER / PATCHES
+
+-- 6. Grant Permissions (Essential for 'code column not found' cache error)
+GRANT ALL ON TABLE public.attendance TO authenticated;
+
+GRANT ALL ON TABLE public.attendance_qr_codes TO authenticated;
+
+GRANT ALL ON TABLE public.attendance TO service_role;
+
+GRANT ALL ON TABLE public.attendance_qr_codes TO service_role;
+
+-- 7. Force Schema Reload
+NOTIFY pgrst, 'reload schema';
+
+-- 2. Notify PostgREST to reload the schema
+NOTIFY pgrst, 'reload schema';
+
+-- 3. Grant proper permissions just in case
+GRANT SELECT, INSERT, UPDATE ON public.attendance_qr_codes TO authenticated;
+
+GRANT SELECT, INSERT, UPDATE ON public.attendance_qr_codes TO anon;
+
+GRANT SELECT, INSERT, UPDATE ON public.attendance_qr_codes TO service_role;
+
 -- =========================================================================
--- OPTIMIZATION INDEXES
+-- OPTICAL RETAIL SUITE - SUPABASE POSTGRESQL SCHEMA INITIALIZATION
 -- =========================================================================
-CREATE INDEX IF NOT EXISTS idx_users_store ON users(store_id);
-CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
-CREATE INDEX IF NOT EXISTS idx_customers_store ON customers(store_id);
-CREATE INDEX IF NOT EXISTS idx_prescriptions_customer ON prescriptions(customer_id);
-CREATE INDEX IF NOT EXISTS idx_inventory_store ON store_inventory(store_id);
-CREATE INDEX IF NOT EXISTS idx_inventory_product ON store_inventory(product_id);
-CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
-CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_id);
-CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
-CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
-CREATE INDEX IF NOT EXISTS idx_schedules_date ON schedules(scheduled_date);
-CREATE INDEX IF NOT EXISTS idx_attendance_user ON attendance(user_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id) WHERE is_read = FALSE;
+
+-- Enable UUID extension (typically enabled by default in Supabase)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+NOTIFY pgrst, 'reload schema';
+
+-- Force refresh PostgREST cache
+NOTIFY pgrst, 'reload schema';
+
+-- Verify permissions
+GRANT ALL ON TABLE public.attendance_qr_codes TO authenticated;
+
+GRANT ALL ON TABLE public.attendance_qr_codes TO anon;
+
+-- Grant PostgREST roles access to public schema (required for Supabase API / JS client)
+GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
+
+GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON TABLES TO postgres, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO postgres, anon, authenticated, service_role;
+
+-- Create the trigger on auth.users (runs after insert/updates on the auth schema)
+DROP TRIGGER IF EXISTS tr_auth_user_link ON auth.users;
+
+GRANT EXECUTE ON FUNCTION public.auth_user_store_id() TO authenticated, anon;
+
+GRANT EXECUTE ON FUNCTION public.auth_user_role() TO authenticated, anon;
+
+GRANT EXECUTE ON FUNCTION public.is_admin_or_super_admin() TO authenticated, anon;

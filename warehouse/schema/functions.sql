@@ -1,3 +1,27 @@
+-- FUNCTIONS
+
+-- -------------------------------------------------------------------------
+-- TRIGGER FUNCTION: Automatic updated_at timestamp updating
+-- -------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION trigger_set_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 5. Trigger function to automatically link auth.users to public.users by email
+CREATE OR REPLACE FUNCTION public.handle_auth_user_link()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.users
+  SET id = NEW.id
+  WHERE email = NEW.email;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Fix infinite recursion: policies must not SELECT from users under users RLS.
 -- Use SECURITY DEFINER helpers instead.
 
@@ -34,25 +58,3 @@ AS $$
       AND role IN ('admin', 'super_admin')
   );
 $$;
-
-GRANT EXECUTE ON FUNCTION public.auth_user_store_id() TO authenticated, anon;
-GRANT EXECUTE ON FUNCTION public.auth_user_role() TO authenticated, anon;
-GRANT EXECUTE ON FUNCTION public.is_admin_or_super_admin() TO authenticated, anon;
-
-DROP POLICY IF EXISTS "Users can view store staff" ON public.users;
-DROP POLICY IF EXISTS "Users can read own profile" ON public.users;
-
-CREATE POLICY "users_select"
-  ON public.users
-  FOR SELECT
-  TO authenticated
-  USING (
-    id = auth.uid()
-    OR is_admin_or_super_admin()
-    OR (
-      auth_user_store_id() IS NOT NULL
-      AND store_id = auth_user_store_id()
-    )
-  );
-
-NOTIFY pgrst, 'reload schema';
