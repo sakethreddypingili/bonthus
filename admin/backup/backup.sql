@@ -1,4 +1,4 @@
--- TYPES FETCHED FROM LIVE DATABASE
+-- TYPES
 
 -- TABLES FETCHED FROM LIVE DATABASE
 
@@ -16,7 +16,9 @@ CREATE TABLE IF NOT EXISTS public.attendance (
     longitude NUMERIC,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    CONSTRAINT attendance_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE,
+    CONSTRAINT attendance_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -30,7 +32,9 @@ CREATE TABLE IF NOT EXISTS public.attendance_qr_codes (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     qr_type TEXT NOT NULL DEFAULT 'check_in'::text,
     valid_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    CONSTRAINT attendance_qr_codes_qr_code_token_key UNIQUE (qr_code_token),
+    CONSTRAINT attendance_qr_codes_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -41,6 +45,7 @@ CREATE TABLE IF NOT EXISTS public.categories (
     name TEXT NOT NULL,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    CONSTRAINT categories_name_key UNIQUE (name),
     PRIMARY KEY (id)
 );
 
@@ -59,7 +64,9 @@ CREATE TABLE IF NOT EXISTS public.customers (
     postal_code TEXT,
     store_id UUID,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    PRIMARY KEY (id)
+    CONSTRAINT customers_phone_key UNIQUE (phone),
+    PRIMARY KEY (id),
+    CONSTRAINT customers_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -73,7 +80,8 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     is_read BOOLEAN NOT NULL DEFAULT false,
     type TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -88,7 +96,9 @@ CREATE TABLE IF NOT EXISTS public.order_items (
     discount_amount NUMERIC NOT NULL DEFAULT 0.00,
     total_price NUMERIC NOT NULL,
     custom_lens_specs JSONB,
-    PRIMARY KEY (id)
+    CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE,
+    PRIMARY KEY (id),
+    CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -110,7 +120,11 @@ CREATE TABLE IF NOT EXISTS public.orders (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     disabled BOOLEAN NOT NULL DEFAULT false,
-    PRIMARY KEY (id)
+    CONSTRAINT orders_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id) ON DELETE CASCADE,
+    CONSTRAINT orders_order_number_key UNIQUE (order_number),
+    PRIMARY KEY (id),
+    CONSTRAINT orders_prescription_id_fkey FOREIGN KEY (prescription_id) REFERENCES public.prescriptions(id) ON DELETE CASCADE,
+    CONSTRAINT orders_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -124,6 +138,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
     transaction_ref TEXT,
     status TEXT NOT NULL DEFAULT 'completed'::text,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    CONSTRAINT payments_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE,
     PRIMARY KEY (id)
 );
 
@@ -153,6 +168,8 @@ CREATE TABLE IF NOT EXISTS public.prescriptions (
     is_bifocal_progressive BOOLEAN NOT NULL DEFAULT false,
     notes TEXT,
     prescribed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    CONSTRAINT prescriptions_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id) ON DELETE CASCADE,
+    CONSTRAINT prescriptions_optometrist_id_fkey FOREIGN KEY (optometrist_id) REFERENCES public.users(id) ON DELETE CASCADE,
     PRIMARY KEY (id)
 );
 
@@ -165,7 +182,9 @@ CREATE TABLE IF NOT EXISTS public.product_barcodes (
     product_id UUID NOT NULL,
     status TEXT NOT NULL DEFAULT 'active'::text,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    PRIMARY KEY (id)
+    CONSTRAINT product_barcodes_barcode_key UNIQUE (barcode),
+    PRIMARY KEY (id),
+    CONSTRAINT product_barcodes_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -195,7 +214,11 @@ CREATE TABLE IF NOT EXISTS public.products (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     category_id UUID,
     vendor_id UUID,
-    PRIMARY KEY (id)
+    CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE CASCADE,
+    PRIMARY KEY (id),
+    CONSTRAINT products_sku_key UNIQUE (sku),
+    CONSTRAINT products_upc_key UNIQUE (upc),
+    CONSTRAINT products_vendor_id_fkey FOREIGN KEY (vendor_id) REFERENCES public.vendors(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -212,7 +235,9 @@ CREATE TABLE IF NOT EXISTS public.schedules (
     status TEXT NOT NULL DEFAULT 'pending'::text,
     store_id UUID,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    PRIMARY KEY (id)
+    CONSTRAINT schedules_assigned_to_id_fkey FOREIGN KEY (assigned_to_id) REFERENCES public.users(id) ON DELETE CASCADE,
+    PRIMARY KEY (id),
+    CONSTRAINT schedules_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -223,7 +248,9 @@ CREATE TABLE IF NOT EXISTS public.shipment_items (
     shipment_id UUID NOT NULL,
     product_id UUID NOT NULL,
     quantity INTEGER NOT NULL,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    CONSTRAINT shipment_items_product_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE,
+    CONSTRAINT shipment_items_shipment_fkey FOREIGN KEY (shipment_id) REFERENCES public.shipments(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -242,7 +269,12 @@ CREATE TABLE IF NOT EXISTS public.shipments (
     shipped_at TIMESTAMP WITH TIME ZONE,
     delivered_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    PRIMARY KEY (id)
+    CONSTRAINT shipments_destination_store_fkey FOREIGN KEY (destination_store_id) REFERENCES public.stores(id) ON DELETE CASCADE,
+    CONSTRAINT shipments_origin_store_fkey FOREIGN KEY (origin_store_id) REFERENCES public.stores(id) ON DELETE CASCADE,
+    PRIMARY KEY (id),
+    CONSTRAINT shipments_requisition_fkey FOREIGN KEY (requisition_id) REFERENCES public.store_requisitions(id) ON DELETE CASCADE,
+    CONSTRAINT shipments_tracking_number_key UNIQUE (tracking_number),
+    CONSTRAINT shipments_vendor_fkey FOREIGN KEY (vendor_id) REFERENCES public.vendors(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -255,7 +287,10 @@ CREATE TABLE IF NOT EXISTS public.store_inventory (
     stock_quantity INTEGER NOT NULL DEFAULT 0,
     unit_price NUMERIC,
     low_stock_threshold INTEGER NOT NULL DEFAULT 5,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    CONSTRAINT store_inventory_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE,
+    CONSTRAINT store_inventory_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE,
+    CONSTRAINT uq_store_product UNIQUE (store_id, product_id)
 );
 
 -- -------------------------------------------------------------------------
@@ -266,6 +301,8 @@ CREATE TABLE IF NOT EXISTS public.store_requisition_items (
     requisition_id UUID NOT NULL,
     product_id UUID NOT NULL,
     quantity INTEGER NOT NULL,
+    CONSTRAINT req_items_product_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE,
+    CONSTRAINT req_items_requisition_fkey FOREIGN KEY (requisition_id) REFERENCES public.store_requisitions(id) ON DELETE CASCADE,
     PRIMARY KEY (id)
 );
 
@@ -282,7 +319,11 @@ CREATE TABLE IF NOT EXISTS public.store_requisitions (
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    PRIMARY KEY (id)
+    CONSTRAINT requisitions_from_store_fkey FOREIGN KEY (from_store_id) REFERENCES public.stores(id) ON DELETE CASCADE,
+    CONSTRAINT requisitions_requested_by_fkey FOREIGN KEY (requested_by_id) REFERENCES public.users(id) ON DELETE CASCADE,
+    CONSTRAINT requisitions_to_store_fkey FOREIGN KEY (to_store_id) REFERENCES public.stores(id) ON DELETE CASCADE,
+    PRIMARY KEY (id),
+    CONSTRAINT store_requisitions_request_number_key UNIQUE (request_number)
 );
 
 -- -------------------------------------------------------------------------
@@ -310,7 +351,8 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
     theme TEXT NOT NULL DEFAULT 'light'::text,
     compact_layout BOOLEAN NOT NULL DEFAULT false,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    PRIMARY KEY (user_id)
+    PRIMARY KEY (user_id),
+    CONSTRAINT user_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -325,7 +367,9 @@ CREATE TABLE IF NOT EXISTS public.users (
     store_id UUID,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    PRIMARY KEY (id)
+    CONSTRAINT users_email_key UNIQUE (email),
+    PRIMARY KEY (id),
+    CONSTRAINT users_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -342,224 +386,11 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     PRIMARY KEY (id)
 );
 
--- CONSTRAINTS FETCHED FROM LIVE DATABASE
+-- CONSTRAINTS
 
-ALTER TABLE public.users DROP CONSTRAINT IF EXISTS "users_email_key";
-ALTER TABLE public.users ADD CONSTRAINT "users_email_key" UNIQUE (email);
+-- STORAGE
 
-ALTER TABLE public.users DROP CONSTRAINT IF EXISTS "users_store_id_fkey";
-ALTER TABLE public.users ADD CONSTRAINT "users_store_id_fkey" FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE SET NULL;
-
-ALTER TABLE public.user_settings DROP CONSTRAINT IF EXISTS "user_settings_theme_check";
-ALTER TABLE public.user_settings ADD CONSTRAINT "user_settings_theme_check" CHECK ((theme = ANY (ARRAY['light'::text, 'dark'::text])));
-
-ALTER TABLE public.user_settings DROP CONSTRAINT IF EXISTS "user_settings_user_id_fkey";
-ALTER TABLE public.user_settings ADD CONSTRAINT "user_settings_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-
-ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS "customers_phone_key";
-ALTER TABLE public.customers ADD CONSTRAINT "customers_phone_key" UNIQUE (phone);
-
-ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS "customers_store_id_fkey";
-ALTER TABLE public.customers ADD CONSTRAINT "customers_store_id_fkey" FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE SET NULL;
-
-ALTER TABLE public.prescriptions DROP CONSTRAINT IF EXISTS "prescriptions_customer_id_fkey";
-ALTER TABLE public.prescriptions ADD CONSTRAINT "prescriptions_customer_id_fkey" FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE;
-
-ALTER TABLE public.prescriptions DROP CONSTRAINT IF EXISTS "prescriptions_optometrist_id_fkey";
-ALTER TABLE public.prescriptions ADD CONSTRAINT "prescriptions_optometrist_id_fkey" FOREIGN KEY (optometrist_id) REFERENCES users(id) ON DELETE SET NULL;
-
-ALTER TABLE public.products DROP CONSTRAINT IF EXISTS "products_sku_key";
-ALTER TABLE public.products ADD CONSTRAINT "products_sku_key" UNIQUE (sku);
-
-ALTER TABLE public.products DROP CONSTRAINT IF EXISTS "products_upc_key";
-ALTER TABLE public.products ADD CONSTRAINT "products_upc_key" UNIQUE (upc);
-
-ALTER TABLE public.store_inventory DROP CONSTRAINT IF EXISTS "store_inventory_stock_quantity_check";
-ALTER TABLE public.store_inventory ADD CONSTRAINT "store_inventory_stock_quantity_check" CHECK ((stock_quantity >= 0));
-
-ALTER TABLE public.store_inventory DROP CONSTRAINT IF EXISTS "store_inventory_low_stock_threshold_check";
-ALTER TABLE public.store_inventory ADD CONSTRAINT "store_inventory_low_stock_threshold_check" CHECK ((low_stock_threshold >= 0));
-
-ALTER TABLE public.store_inventory DROP CONSTRAINT IF EXISTS "uq_store_product";
-ALTER TABLE public.store_inventory ADD CONSTRAINT "uq_store_product" UNIQUE (store_id, product_id);
-
-ALTER TABLE public.store_inventory DROP CONSTRAINT IF EXISTS "store_inventory_store_id_fkey";
-ALTER TABLE public.store_inventory ADD CONSTRAINT "store_inventory_store_id_fkey" FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE;
-
-ALTER TABLE public.store_inventory DROP CONSTRAINT IF EXISTS "store_inventory_product_id_fkey";
-ALTER TABLE public.store_inventory ADD CONSTRAINT "store_inventory_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
-
-ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS "orders_status_check";
-ALTER TABLE public.orders ADD CONSTRAINT "orders_status_check" CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'ready'::text, 'delivered'::text, 'cancelled'::text])));
-
-ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS "orders_subtotal_check";
-ALTER TABLE public.orders ADD CONSTRAINT "orders_subtotal_check" CHECK ((subtotal >= 0.00));
-
-ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS "orders_tax_amount_check";
-ALTER TABLE public.orders ADD CONSTRAINT "orders_tax_amount_check" CHECK ((tax_amount >= 0.00));
-
-ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS "orders_discount_amount_check";
-ALTER TABLE public.orders ADD CONSTRAINT "orders_discount_amount_check" CHECK ((discount_amount >= 0.00));
-
-ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS "orders_net_amount_check";
-ALTER TABLE public.orders ADD CONSTRAINT "orders_net_amount_check" CHECK ((net_amount >= 0.00));
-
-ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS "orders_payment_status_check";
-ALTER TABLE public.orders ADD CONSTRAINT "orders_payment_status_check" CHECK ((payment_status = ANY (ARRAY['unpaid'::text, 'partially_paid'::text, 'fully_paid'::text])));
-
-ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS "orders_order_number_key";
-ALTER TABLE public.orders ADD CONSTRAINT "orders_order_number_key" UNIQUE (order_number);
-
-ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS "orders_customer_id_fkey";
-ALTER TABLE public.orders ADD CONSTRAINT "orders_customer_id_fkey" FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS "orders_store_id_fkey";
-ALTER TABLE public.orders ADD CONSTRAINT "orders_store_id_fkey" FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS "orders_prescription_id_fkey";
-ALTER TABLE public.orders ADD CONSTRAINT "orders_prescription_id_fkey" FOREIGN KEY (prescription_id) REFERENCES prescriptions(id) ON DELETE SET NULL;
-
-ALTER TABLE public.order_items DROP CONSTRAINT IF EXISTS "order_items_quantity_check";
-ALTER TABLE public.order_items ADD CONSTRAINT "order_items_quantity_check" CHECK ((quantity > 0));
-
-ALTER TABLE public.order_items DROP CONSTRAINT IF EXISTS "order_items_unit_price_check";
-ALTER TABLE public.order_items ADD CONSTRAINT "order_items_unit_price_check" CHECK ((unit_price >= 0.00));
-
-ALTER TABLE public.schedules DROP CONSTRAINT IF EXISTS "schedules_assigned_to_id_fkey";
-ALTER TABLE public.schedules ADD CONSTRAINT "schedules_assigned_to_id_fkey" FOREIGN KEY (assigned_to_id) REFERENCES users(id) ON DELETE SET NULL;
-
-ALTER TABLE public.order_items DROP CONSTRAINT IF EXISTS "order_items_discount_amount_check";
-ALTER TABLE public.order_items ADD CONSTRAINT "order_items_discount_amount_check" CHECK ((discount_amount >= 0.00));
-
-ALTER TABLE public.order_items DROP CONSTRAINT IF EXISTS "order_items_total_price_check";
-ALTER TABLE public.order_items ADD CONSTRAINT "order_items_total_price_check" CHECK ((total_price >= 0.00));
-
-ALTER TABLE public.order_items DROP CONSTRAINT IF EXISTS "order_items_order_id_fkey";
-ALTER TABLE public.order_items ADD CONSTRAINT "order_items_order_id_fkey" FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE;
-
-ALTER TABLE public.order_items DROP CONSTRAINT IF EXISTS "order_items_product_id_fkey";
-ALTER TABLE public.order_items ADD CONSTRAINT "order_items_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS "payments_amount_check";
-ALTER TABLE public.payments ADD CONSTRAINT "payments_amount_check" CHECK ((amount > 0.00));
-
-ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS "payments_payment_method_check";
-ALTER TABLE public.payments ADD CONSTRAINT "payments_payment_method_check" CHECK ((payment_method = ANY (ARRAY['cash'::text, 'card'::text, 'digital_wallet'::text, 'bank_transfer'::text])));
-
-ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS "payments_status_check";
-ALTER TABLE public.payments ADD CONSTRAINT "payments_status_check" CHECK ((status = ANY (ARRAY['pending'::text, 'completed'::text, 'failed'::text, 'refunded'::text])));
-
-ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS "payments_order_id_fkey";
-ALTER TABLE public.payments ADD CONSTRAINT "payments_order_id_fkey" FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE;
-
-ALTER TABLE public.schedules DROP CONSTRAINT IF EXISTS "schedules_type_check";
-ALTER TABLE public.schedules ADD CONSTRAINT "schedules_type_check" CHECK ((type = ANY (ARRAY['eye_test'::text, 'follow_up'::text, 'staff_meeting'::text, 'task'::text])));
-
-ALTER TABLE public.schedules DROP CONSTRAINT IF EXISTS "schedules_status_check";
-ALTER TABLE public.schedules ADD CONSTRAINT "schedules_status_check" CHECK ((status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'completed'::text, 'cancelled'::text])));
-
-ALTER TABLE public.schedules DROP CONSTRAINT IF EXISTS "schedules_store_id_fkey";
-ALTER TABLE public.schedules ADD CONSTRAINT "schedules_store_id_fkey" FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE;
-
-ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS "notifications_type_check";
-ALTER TABLE public.notifications ADD CONSTRAINT "notifications_type_check" CHECK ((type = ANY (ARRAY['order_status'::text, 'stock_alert'::text, 'customer_followup'::text, 'system'::text])));
-
-ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS "notifications_user_id_fkey";
-ALTER TABLE public.notifications ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-
-ALTER TABLE public.users DROP CONSTRAINT IF EXISTS "users_role_check";
-ALTER TABLE public.users ADD CONSTRAINT "users_role_check" CHECK ((role = ANY (ARRAY['super_admin'::text, 'admin'::text, 'optometrist'::text, 'sales'::text, 'manager'::text])));
-
-ALTER TABLE public.categories DROP CONSTRAINT IF EXISTS "categories_name_key";
-ALTER TABLE public.categories ADD CONSTRAINT "categories_name_key" UNIQUE (name);
-
-ALTER TABLE public.products DROP CONSTRAINT IF EXISTS "products_category_id_fkey";
-ALTER TABLE public.products ADD CONSTRAINT "products_category_id_fkey" FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL;
-
-ALTER TABLE public.store_requisitions DROP CONSTRAINT IF EXISTS "store_requisitions_status_check";
-ALTER TABLE public.store_requisitions ADD CONSTRAINT "store_requisitions_status_check" CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'fulfilled'::text, 'cancelled'::text])));
-
-ALTER TABLE public.store_requisitions DROP CONSTRAINT IF EXISTS "store_requisitions_request_number_key";
-ALTER TABLE public.store_requisitions ADD CONSTRAINT "store_requisitions_request_number_key" UNIQUE (request_number);
-
-ALTER TABLE public.store_requisitions DROP CONSTRAINT IF EXISTS "requisitions_from_store_fkey";
-ALTER TABLE public.store_requisitions ADD CONSTRAINT "requisitions_from_store_fkey" FOREIGN KEY (from_store_id) REFERENCES stores(id);
-
-ALTER TABLE public.store_requisitions DROP CONSTRAINT IF EXISTS "requisitions_to_store_fkey";
-ALTER TABLE public.store_requisitions ADD CONSTRAINT "requisitions_to_store_fkey" FOREIGN KEY (to_store_id) REFERENCES stores(id);
-
-ALTER TABLE public.store_requisitions DROP CONSTRAINT IF EXISTS "requisitions_requested_by_fkey";
-ALTER TABLE public.store_requisitions ADD CONSTRAINT "requisitions_requested_by_fkey" FOREIGN KEY (requested_by_id) REFERENCES users(id);
-
-ALTER TABLE public.store_requisition_items DROP CONSTRAINT IF EXISTS "store_requisition_items_quantity_check";
-ALTER TABLE public.store_requisition_items ADD CONSTRAINT "store_requisition_items_quantity_check" CHECK ((quantity > 0));
-
-ALTER TABLE public.store_requisition_items DROP CONSTRAINT IF EXISTS "req_items_requisition_fkey";
-ALTER TABLE public.store_requisition_items ADD CONSTRAINT "req_items_requisition_fkey" FOREIGN KEY (requisition_id) REFERENCES store_requisitions(id) ON DELETE CASCADE;
-
-ALTER TABLE public.store_requisition_items DROP CONSTRAINT IF EXISTS "req_items_product_fkey";
-ALTER TABLE public.store_requisition_items ADD CONSTRAINT "req_items_product_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
-
-ALTER TABLE public.shipments DROP CONSTRAINT IF EXISTS "shipments_status_check";
-ALTER TABLE public.shipments ADD CONSTRAINT "shipments_status_check" CHECK ((status = ANY (ARRAY['preparing'::text, 'in_transit'::text, 'delivered'::text, 'exception'::text])));
-
-ALTER TABLE public.shipments DROP CONSTRAINT IF EXISTS "shipments_tracking_number_key";
-ALTER TABLE public.shipments ADD CONSTRAINT "shipments_tracking_number_key" UNIQUE (tracking_number);
-
-ALTER TABLE public.shipments DROP CONSTRAINT IF EXISTS "shipments_origin_store_fkey";
-ALTER TABLE public.shipments ADD CONSTRAINT "shipments_origin_store_fkey" FOREIGN KEY (origin_store_id) REFERENCES stores(id);
-
-ALTER TABLE public.shipments DROP CONSTRAINT IF EXISTS "shipments_destination_store_fkey";
-ALTER TABLE public.shipments ADD CONSTRAINT "shipments_destination_store_fkey" FOREIGN KEY (destination_store_id) REFERENCES stores(id);
-
-ALTER TABLE public.shipments DROP CONSTRAINT IF EXISTS "shipments_vendor_fkey";
-ALTER TABLE public.shipments ADD CONSTRAINT "shipments_vendor_fkey" FOREIGN KEY (vendor_id) REFERENCES vendors(id);
-
-ALTER TABLE public.shipments DROP CONSTRAINT IF EXISTS "shipments_requisition_fkey";
-ALTER TABLE public.shipments ADD CONSTRAINT "shipments_requisition_fkey" FOREIGN KEY (requisition_id) REFERENCES store_requisitions(id);
-
-ALTER TABLE public.shipment_items DROP CONSTRAINT IF EXISTS "shipment_items_quantity_check";
-ALTER TABLE public.shipment_items ADD CONSTRAINT "shipment_items_quantity_check" CHECK ((quantity > 0));
-
-ALTER TABLE public.shipment_items DROP CONSTRAINT IF EXISTS "shipment_items_shipment_fkey";
-ALTER TABLE public.shipment_items ADD CONSTRAINT "shipment_items_shipment_fkey" FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE;
-
-ALTER TABLE public.shipment_items DROP CONSTRAINT IF EXISTS "shipment_items_product_fkey";
-ALTER TABLE public.shipment_items ADD CONSTRAINT "shipment_items_product_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
-
-ALTER TABLE public.products DROP CONSTRAINT IF EXISTS "products_vendor_id_fkey";
-ALTER TABLE public.products ADD CONSTRAINT "products_vendor_id_fkey" FOREIGN KEY (vendor_id) REFERENCES vendors(id);
-
-ALTER TABLE public.product_barcodes DROP CONSTRAINT IF EXISTS "product_barcodes_status_check";
-ALTER TABLE public.product_barcodes ADD CONSTRAINT "product_barcodes_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
-
-ALTER TABLE public.product_barcodes DROP CONSTRAINT IF EXISTS "product_barcodes_barcode_key";
-ALTER TABLE public.product_barcodes ADD CONSTRAINT "product_barcodes_barcode_key" UNIQUE (barcode);
-
-ALTER TABLE public.product_barcodes DROP CONSTRAINT IF EXISTS "product_barcodes_product_id_fkey";
-ALTER TABLE public.product_barcodes ADD CONSTRAINT "product_barcodes_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
-
-ALTER TABLE public.attendance DROP CONSTRAINT IF EXISTS "attendance_status_check";
-ALTER TABLE public.attendance ADD CONSTRAINT "attendance_status_check" CHECK ((status = ANY (ARRAY['present'::text, 'late'::text, 'half_day'::text, 'absent'::text])));
-
-ALTER TABLE public.attendance DROP CONSTRAINT IF EXISTS "attendance_user_id_fkey";
-ALTER TABLE public.attendance ADD CONSTRAINT "attendance_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id);
-
-ALTER TABLE public.attendance DROP CONSTRAINT IF EXISTS "attendance_store_id_fkey";
-ALTER TABLE public.attendance ADD CONSTRAINT "attendance_store_id_fkey" FOREIGN KEY (store_id) REFERENCES stores(id);
-
-ALTER TABLE public.attendance_qr_codes DROP CONSTRAINT IF EXISTS "attendance_qr_codes_qr_code_token_key";
-ALTER TABLE public.attendance_qr_codes ADD CONSTRAINT "attendance_qr_codes_qr_code_token_key" UNIQUE (qr_code_token);
-
-ALTER TABLE public.attendance_qr_codes DROP CONSTRAINT IF EXISTS "attendance_qr_codes_store_id_fkey";
-ALTER TABLE public.attendance_qr_codes ADD CONSTRAINT "attendance_qr_codes_store_id_fkey" FOREIGN KEY (store_id) REFERENCES stores(id);
-
-ALTER TABLE public.attendance_qr_codes DROP CONSTRAINT IF EXISTS "attendance_qr_codes_qr_type_check";
-ALTER TABLE public.attendance_qr_codes ADD CONSTRAINT "attendance_qr_codes_qr_type_check" CHECK ((qr_type = ANY (ARRAY['check_in'::text, 'check_out'::text])));
-
--- STORAGE BUCKETS FETCHED FROM LIVE DATABASE
-
--- VIEWS FETCHED FROM LIVE DATABASE
+-- VIEWS
 
 -- FUNCTIONS FETCHED FROM LIVE DATABASE
 
@@ -1258,77 +1089,36 @@ CREATE POLICY "barcodes_select" ON public.product_barcodes
   TO authenticated
   USING (true);
 
--- INDEXES FETCHED FROM LIVE DATABASE
+-- INDEXES
 
-DROP INDEX IF EXISTS public."idx_users_store";
-CREATE INDEX idx_users_store ON public.users USING btree (store_id);
+-- =========================================================================
+-- OPTIMIZATION INDEXES
+-- =========================================================================
+CREATE INDEX IF NOT EXISTS idx_users_store ON users(store_id);
 
-DROP INDEX IF EXISTS public."idx_customers_phone";
-CREATE INDEX idx_customers_phone ON public.customers USING btree (phone);
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 
-DROP INDEX IF EXISTS public."idx_customers_store";
-CREATE INDEX idx_customers_store ON public.customers USING btree (store_id);
+CREATE INDEX IF NOT EXISTS idx_customers_store ON customers(store_id);
 
-DROP INDEX IF EXISTS public."idx_prescriptions_customer";
-CREATE INDEX idx_prescriptions_customer ON public.prescriptions USING btree (customer_id);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_customer ON prescriptions(customer_id);
 
-DROP INDEX IF EXISTS public."uq_store_product";
-CREATE UNIQUE INDEX uq_store_product ON public.store_inventory USING btree (store_id, product_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_store ON store_inventory(store_id);
 
-DROP INDEX IF EXISTS public."idx_inventory_store";
-CREATE INDEX idx_inventory_store ON public.store_inventory USING btree (store_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_product ON store_inventory(product_id);
 
-DROP INDEX IF EXISTS public."idx_inventory_product";
-CREATE INDEX idx_inventory_product ON public.store_inventory USING btree (product_id);
+CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
 
-DROP INDEX IF EXISTS public."idx_orders_customer";
-CREATE INDEX idx_orders_customer ON public.orders USING btree (customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_id);
 
-DROP INDEX IF EXISTS public."idx_orders_store";
-CREATE INDEX idx_orders_store ON public.orders USING btree (store_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 
-DROP INDEX IF EXISTS public."idx_orders_disabled";
-CREATE INDEX idx_orders_disabled ON public.orders USING btree (disabled) WHERE (disabled = false);
+CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
 
-DROP INDEX IF EXISTS public."idx_order_items_order";
-CREATE INDEX idx_order_items_order ON public.order_items USING btree (order_id);
+CREATE INDEX IF NOT EXISTS idx_schedules_date ON schedules(scheduled_date);
 
-DROP INDEX IF EXISTS public."idx_payments_order";
-CREATE INDEX idx_payments_order ON public.payments USING btree (order_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_user ON attendance(user_id);
 
-DROP INDEX IF EXISTS public."idx_schedules_date";
-CREATE INDEX idx_schedules_date ON public.schedules USING btree (scheduled_date);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id) WHERE is_read = FALSE;
 
-DROP INDEX IF EXISTS public."idx_notifications_user_unread";
-CREATE INDEX idx_notifications_user_unread ON public.notifications USING btree (user_id) WHERE (is_read = false);
-
-DROP INDEX IF EXISTS public."idx_attendance_user";
-CREATE INDEX idx_attendance_user ON public.attendance USING btree (user_id);
-
--- SEEDS FETCHED FROM LIVE DATABASE
-
--- Data for table: public.stores
-INSERT INTO public.stores (id, name, address, phone, email, created_at, gst_no) VALUES ('7d176453-c865-406e-a3d3-56c279c3ec68', 'test 1', 'Addagutta Society, Western Hills, Jal Vayu Vihar, Kukatpally, Hyderabad, Telangana 500085', '1234567890', NULL, '2026-06-01T16:49:42.263Z', '36AANCB3874FIZF') ON CONFLICT DO NOTHING;
-INSERT INTO public.stores (id, name, address, phone, email, created_at, gst_no) VALUES ('17df36ab-be0a-4049-8934-16db5b31904f', 'test 2', 'Opp. PVP Square, MG Road, Vijayawada, Andhra Pradesh 520010', '0987654321', NULL, '2026-06-01T16:51:26.892Z', '37AANCB3874F1ZD') ON CONFLICT DO NOTHING;
-INSERT INTO public.stores (id, name, address, phone, email, created_at, gst_no) VALUES ('d283d3dc-a6b7-4b62-8b7f-965db7e838cf', 'Aster Opticals', '123 Main St', '1234567890', NULL, '2026-06-01T17:17:29.867Z', '36AAAAA1111A1Z1') ON CONFLICT DO NOTHING;
-INSERT INTO public.stores (id, name, address, phone, email, created_at, gst_no) VALUES ('55a4119f-3e20-4a22-81e0-5a9c62926e92', 'test 3', '1234567890', '1234567890', NULL, '2026-06-02T03:20:40.256Z', '1234567890') ON CONFLICT DO NOTHING;
-
--- Data for table: public.users
-INSERT INTO public.users (id, email, password_hash, name, role, store_id, is_active, created_at) VALUES ('fe8f278c-69fc-4d5a-86fb-5a2f69dc5550', 'pingilisakethreddy@gmail.com', '$2a$06$lWUr0E9crQ6O9m92aY4uQuqVI8cKcQWioJfWRR2FhtGiey87aCItW', 'Saketh Reddy', 'admin', NULL, true, '2026-05-31T17:08:24.356Z') ON CONFLICT DO NOTHING;
-INSERT INTO public.users (id, email, password_hash, name, role, store_id, is_active, created_at) VALUES ('559f480a-c61b-4465-aa31-bda5dfe0ca8f', 'test@bonthus.in', '$2a$06$qdIeTTOaxQ1h4MBCTgbKcOLliVg.5SpVjKfkSSIaLsjvb50ACspb2', 'Test User', 'admin', NULL, true, '2026-06-01T13:15:29.847Z') ON CONFLICT DO NOTHING;
-
--- Data for table: public.categories
-INSERT INTO public.categories (id, name, description, created_at) VALUES ('c2ab4346-70d9-4646-b8b0-8695ffc7133f', 'frames', NULL, '2026-06-01T17:31:46.780Z') ON CONFLICT DO NOTHING;
-INSERT INTO public.categories (id, name, description, created_at) VALUES ('d705f4e3-0ac1-4777-9c38-5249d9a1993c', 'lenses', NULL, '2026-06-01T17:31:46.780Z') ON CONFLICT DO NOTHING;
-INSERT INTO public.categories (id, name, description, created_at) VALUES ('8141eccd-5aca-4ed6-b28b-d4a4be58359a', 'contact_lenses', NULL, '2026-06-01T17:31:46.780Z') ON CONFLICT DO NOTHING;
-INSERT INTO public.categories (id, name, description, created_at) VALUES ('aff04a0c-dbd7-409b-aba9-7a0dede0b5c7', 'accessories', NULL, '2026-06-01T17:31:46.780Z') ON CONFLICT DO NOTHING;
-INSERT INTO public.categories (id, name, description, created_at) VALUES ('d97ddfd9-4baf-4e9f-983f-415be86688b8', 'solutions', NULL, '2026-06-01T17:31:46.780Z') ON CONFLICT DO NOTHING;
-INSERT INTO public.categories (id, name, description, created_at) VALUES ('f6aaf933-ce65-4cf8-8aa9-acbfe872ee2a', 'test', NULL, '2026-06-01T17:35:15.954Z') ON CONFLICT DO NOTHING;
-
--- Data for table: public.products
-INSERT INTO public.products (id, sku, upc, name, brand, description, base_price, created_at, category_id, vendor_id) VALUES ('dba4c082-3e0f-4e4e-9937-605da0be15b3', 'PL-062484', NULL, 'test', NULL, NULL, '1000.00', '2026-06-01T17:52:09.539Z', 'f6aaf933-ce65-4cf8-8aa9-acbfe872ee2a', NULL) ON CONFLICT DO NOTHING;
-INSERT INTO public.products (id, sku, upc, name, brand, description, base_price, created_at, category_id, vendor_id) VALUES ('93fc3ae1-a479-4bfc-84e1-e03b961f8a13', 'PL-800005', NULL, 'test', NULL, NULL, '1000.00', '2026-06-01T17:57:54.430Z', 'f6aaf933-ce65-4cf8-8aa9-acbfe872ee2a', NULL) ON CONFLICT DO NOTHING;
-
--- Data for table: public.vendors
-INSERT INTO public.vendors (id, name, contact_name, phone, email, address, created_at) VALUES ('74406024-2036-486f-a654-244a8bc26267', 'test', 'test', '1234567890', 'test@bonthus.in', 'test', '2026-06-06T19:48:59.748Z') ON CONFLICT DO NOTHING;
+CREATE INDEX IF NOT EXISTS idx_orders_disabled ON orders(disabled) WHERE disabled = false;-- SEEDS
 
