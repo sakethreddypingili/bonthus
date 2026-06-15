@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { UserPlus, Edit2, X, Save, CheckCircle2, AlertCircle, Info, ArrowRightLeft, Search, Loader2, Plus, Building2, Percent, ChevronDown } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import { supabaseAdmin } from "../server/supabase/supabaseAdmin";
@@ -8,6 +9,25 @@ import { generateId, ID_RULES } from "../server/supabase/idGenerator";
 import { isValidUUID } from "../utils/securityUtils";
 
 export default function StoreManagement({ userProfile }) {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const searchParams = new URLSearchParams(location.search);
+
+    const [activeDrawer, setActiveDrawer] = useState(searchParams.get("drawer") || 'transfer');
+
+    useEffect(() => {
+        const drawer = searchParams.get("drawer");
+        if (drawer) {
+            setActiveDrawer(drawer);
+        } else {
+            setActiveDrawer(null);
+        }
+    }, [location.search]);
+
+    const setParams = (drawer) => {
+        navigate(`/store-management?drawer=${drawer}`);
+    };
+
     const isSuperAdmin = userProfile?.role === 'super_admin';
     const isAdmin = userProfile?.role === 'admin' || isSuperAdmin;
 
@@ -23,7 +43,6 @@ export default function StoreManagement({ userProfile }) {
     const [loading, setLoading] = useState(true);
     const [editingUser, setEditingUser] = useState(null);
     const [editingStore, setEditingStore] = useState(null);
-    const [activeDrawer, setActiveDrawer] = useState('transfer');
 
     const [creating, setCreating] = useState(false);
     const [newUser, setNewUser] = useState({
@@ -492,7 +511,6 @@ export default function StoreManagement({ userProfile }) {
 
     const drawerActions = [
         { key: 'transfer', label: 'Stock', icon: ArrowRightLeft },
-        { key: 'user', label: "User's", icon: UserPlus },
         { key: 'store', label: "Store's", icon: Building2 },
         { key: 'tax', label: "Tax Settings", icon: Percent },
         { key: 'voucher', label: "Voucher's", icon: Plus },
@@ -500,7 +518,6 @@ export default function StoreManagement({ userProfile }) {
 
     const drawerTitle =
         activeDrawer === 'transfer' ? 'Stock Management' :
-        activeDrawer === 'user' ? "User Management" :
         activeDrawer === 'store' ? "Store Management" :
         activeDrawer === 'tax' ? "Tax Settings" :
         activeDrawer === 'voucher' ? "Voucher Management" :
@@ -508,7 +525,6 @@ export default function StoreManagement({ userProfile }) {
 
     const drawerDescription =
         activeDrawer === 'transfer' ? 'View current stock, manage inventory, and transfer products.' :
-        activeDrawer === 'user' ? 'View users, update access, and manage the team.' :
         activeDrawer === 'store' ? 'View, create, and edit store locations from one place.' :
         activeDrawer === 'tax' ? 'Manage GST rates for product categories across stores.' :
         activeDrawer === 'voucher' ? 'View, create, and manage voucher codes.' :
@@ -528,7 +544,7 @@ export default function StoreManagement({ userProfile }) {
             setProductSearch('');
             setSearchResults([]);
         }
-        setActiveDrawer(drawerKey);
+        setParams(drawerKey);
     };
 
     return (
@@ -650,65 +666,6 @@ export default function StoreManagement({ userProfile }) {
                                                     </td>
                                                 </tr>
                                             )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeDrawer === 'user' && (
-                            <div className="space-y-8">
-                                <div className="flex justify-between items-center px-2">
-                                    <h3 className="text-[10px] font-black text-black uppercase tracking-[0.3em]">Access Manifest</h3>
-                                    <button
-                                        onClick={() => {
-                                            setCreatingNewUser(true);
-                                            setNewUser({ email: '', password: '', role: 'store_manager', store_id: stores[0]?.id || '' });
-                                        }}
-                                        className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all"
-                                    >
-                                        <Plus size={14} strokeWidth={3} /> Register Operator
-                                    </button>
-                                </div>
-                                <div className="overflow-x-auto border border-gray-50 rounded-[32px]">
-                                    <table className="w-full">
-                                        <thead>
-                                            <tr className="bg-gray-50/50 border-b border-gray-100">
-                                                <th className="px-8 py-5 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Operator Identity</th>
-                                                <th className="px-8 py-5 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Clearance / Status</th>
-                                                <th className="px-8 py-5 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Location Assignment</th>
-                                                <th className="px-8 py-5 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {loading ? (
-                                                <tr><td colSpan={4} className="px-8 py-20 text-center text-[10px] font-black text-gray-300 uppercase tracking-widest">Authenticating Manifest...</td></tr>
-                                            ) : users.map((u) => (
-                                                <tr key={u.id} className="hover:bg-gray-50/50 transition-colors group">
-                                                    <td className="px-8 py-6">
-                                                        <div className="text-[11px] font-black text-black uppercase tracking-tight">{u.email}</div>
-                                                        <div className="text-[9px] font-mono text-gray-400 mt-0.5 uppercase tracking-tighter">ID: {u.id.slice(0,12)}</div>
-                                                    </td>
-                                                    <td className="px-8 py-6">
-                                                        <span className="text-[10px] font-black text-black uppercase tracking-widest">{u.role.replace('_', ' ')}</span>
-                                                        <div className={`flex items-center gap-1.5 text-[9px] mt-1 font-bold uppercase tracking-wider ${!u.is_active ? 'text-gray-300 line-through' : 'text-gray-400'}`}>
-                                                            <div className={`w-1 h-1 rounded-full ${!u.is_active ? 'bg-gray-200' : 'bg-black animate-pulse'}`} />
-                                                            {u.is_active ? 'Active' : 'Inactive'}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-8 py-6 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                                                        {u.store_id ? stores.find(s => s.id === u.store_id)?.name || 'Store Not Found' : 'Global Access'}
-                                                    </td>
-                                                    <td className="px-8 py-6 text-right">
-                                                        <button
-                                                            onClick={() => setEditingUser(u)}
-                                                            className="p-2.5 text-gray-300 hover:text-black hover:bg-gray-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                                                        >
-                                                            <Edit2 size={16} strokeWidth={3} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
                                         </tbody>
                                     </table>
                                 </div>

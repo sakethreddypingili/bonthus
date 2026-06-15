@@ -27,8 +27,8 @@ const navItems = [
   { to: "/products", label: "Products", role: ["admin", "super_admin", "store_manager"], icon: Package },
   { to: "/inventory", label: "Inventory", role: ["admin", "super_admin"], icon: Warehouse },
   { to: "/customers", label: "Customers", role: ["admin", "super_admin", "store_manager"], icon: Users },
+  { to: "/employees", label: "Employees", role: ["admin", "super_admin"], icon: UserPlus },
   { to: "/reminders", label: "Board", role: ["admin", "super_admin", "store_manager", "employee"], icon: Layout },
-  { to: "/attendance", label: "Attendance", role: ["admin", "super_admin", "store_manager", "employee"], icon: ClipboardCheck },
   { to: "/analytics", label: "Analytics", role: ["admin", "super_admin", "store_manager"], icon: BarChart2 },
 ];
 
@@ -66,7 +66,10 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                     ? (location.pathname === "/inventory" || location.pathname === "/inventory/analytics" || location.pathname === "/inventory/store" || location.pathname === "/inventory/shipment" || location.pathname === "/inventory/provisioning" || location.pathname === "/inventory/vendors")
                     : (to === "/products"
                         ? (location.pathname === "/products" || location.pathname === "/products/:id" || location.pathname === "/categories" || location.pathname === "/barcode-creator" || location.pathname === "/barcodes")
-                        : location.pathname.startsWith(to)
+                        : (to === "/employees"
+                            ? (location.pathname.startsWith("/employees") || location.pathname.startsWith("/onboarding"))
+                            : location.pathname.startsWith(to)
+                          )
                       )
                   )
               );
@@ -134,6 +137,38 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                     { to: "/inventory/analytics", label: "Inventory Data", icon: BarChart2 },
                   ].map((sub) => {
                     const isSubActive = location.pathname === sub.to;
+                    const SubIcon = sub.icon;
+                    return (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={`
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all w-full
+                          ${isSubActive
+                            ? "bg-black text-white shadow-sm"
+                            : "text-gray-500 hover:text-black hover:bg-gray-100"
+                          }
+                          ${collapsed ? "justify-center" : ""}
+                        `}
+                        title={collapsed ? sub.label : undefined}
+                      >
+                        <SubIcon size={15} className="flex-shrink-0" />
+                        {!collapsed && <span>{sub.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Sub-menu for Employees */}
+              {label === "Employees" && isActive && (
+                <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
+                  {[
+                    { to: "/employees?feature=list", label: "Directory", icon: List },
+                    { to: "/employees?feature=onboarding", label: "Onboarding", icon: UserPlus },
+                    { to: "/employees?feature=attendance", label: "Attendance", icon: ClipboardCheck }
+                  ].map((sub) => {
+                    const isSubActive = location.pathname + location.search === sub.to || (sub.to === "/employees?feature=list" && location.pathname === "/employees" && !location.search);
                     const SubIcon = sub.icon;
                     return (
                       <NavLink

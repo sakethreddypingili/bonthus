@@ -29,6 +29,7 @@ import EditOrder from "./pages/EditOrder";
 import PasswordReset from "./pages/PasswordReset";
 import Reminders from "./pages/Reminders";
 import Notifications from "./pages/Notifications";
+import EmployeeManagement from "./pages/EmployeeManagement";
 import { PROFILE_CACHE_KEY, logout } from "./utils/auth";
 
 
@@ -381,6 +382,7 @@ function App() {
       <Route path="/attendance" element={<Attendance userProfile={userProfile} />} />
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
+      <Route path="/employees" element={<EmployeeManagement userProfile={userProfile} />} />
       <Route path="/store-management" element={<StoreManagement userProfile={userProfile} />} />
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
       <Route path="/invoice/:orderNumber" element={<InvoiceView userProfile={userProfile} />} />
