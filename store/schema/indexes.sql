@@ -30,3 +30,12 @@ CREATE INDEX IF NOT EXISTS idx_attendance_user ON attendance(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id) WHERE is_read = FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_orders_disabled ON orders(disabled) WHERE disabled = false;
+
+-- -------------------------------------------------------------------------
+-- New Optimization Indexes
+-- -------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_customers_family ON public.customers(family_id);
+CREATE INDEX IF NOT EXISTS idx_dependents_parent ON public.dependents(parent_customer_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_order ON public.invoices(order_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON public.invoice_items(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON public.stock_movements(product_id);

@@ -43,6 +43,26 @@ CREATE TABLE IF NOT EXISTS public.categories (
 );
 
 -- -------------------------------------------------------------------------
+-- Table: brands
+-- -------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.brands (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    name text NOT NULL UNIQUE,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT brands_pkey PRIMARY KEY (id)
+);
+
+-- -------------------------------------------------------------------------
+-- Table: family
+-- -------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.family (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    family_code text NOT NULL UNIQUE,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT family_pkey PRIMARY KEY (id)
+);
+
+-- -------------------------------------------------------------------------
 -- Table: customers
 -- -------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.customers (
@@ -56,6 +76,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
     state TEXT,
     postal_code TEXT,
     store_id UUID,
+    family_id uuid REFERENCES public.family(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
 );
@@ -188,6 +209,7 @@ CREATE TABLE IF NOT EXISTS public.products (
     upc TEXT,
     name TEXT NOT NULL,
     brand TEXT,
+    brand_id UUID REFERENCES public.brands(id) ON DELETE SET NULL,
     description TEXT,
     base_price NUMERIC NOT NULL DEFAULT 0.00,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -298,6 +320,19 @@ CREATE TABLE IF NOT EXISTS public.stores (
 );
 
 -- -------------------------------------------------------------------------
+-- Table: labs
+-- -------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.labs (
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    address TEXT,
+    phone TEXT,
+    email TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    PRIMARY KEY (id)
+);
+
+-- -------------------------------------------------------------------------
 -- Table: user_settings
 -- -------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.user_settings (
@@ -320,11 +355,33 @@ CREATE TABLE IF NOT EXISTS public.users (
     password_hash TEXT NOT NULL,
     name TEXT NOT NULL,
     role TEXT,
+    operation_type TEXT,
     store_id UUID,
+    lab_id UUID,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    personal_email TEXT,
+    phone TEXT,
+    address TEXT,
+    emergency_contact TEXT,
+    designation TEXT,
+    joined_at DATE DEFAULT CURRENT_DATE,
+    must_reset_password BOOLEAN DEFAULT true,
+    current_address TEXT,
+    permanent_address TEXT,
+    aadhaar_no TEXT,
+    bank_name TEXT,
+    account_no TEXT,
+    ifsc_code TEXT,
+    micr_code TEXT,
+    pf_uan_no TEXT,
+    esi_no TEXT,
+    ctc NUMERIC,
+    take_home NUMERIC,
+    emp_id TEXT UNIQUE,
     PRIMARY KEY (id)
 );
+
 
 -- -------------------------------------------------------------------------
 -- Table: vendors
@@ -338,5 +395,119 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     address TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
+);
+
+-- -------------------------------------------------------------------------
+-- New tables from live database
+-- -------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.dependents (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    parent_customer_id uuid NOT NULL REFERENCES public.customers(id) ON DELETE CASCADE,
+    family_id uuid REFERENCES public.family(id) ON DELETE SET NULL,
+    name text NOT NULL,
+    relationship text NOT NULL,
+    phone text,
+    email text,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT dependents_pkey PRIMARY KEY (id),
+    CONSTRAINT unique_parent_dependent UNIQUE (parent_customer_id, name, relationship)
+);
+
+CREATE TABLE IF NOT EXISTS public.product_variants (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    sku text NOT NULL UNIQUE,
+    size_attribute text,
+    color_attribute text,
+    additional_cost numeric DEFAULT 0.00,
+    stock_quantity integer DEFAULT 0 CHECK (stock_quantity >= 0),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT product_variants_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.invoices (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    invoice_number text NOT NULL UNIQUE,
+    order_id uuid REFERENCES public.orders(id) ON DELETE SET NULL,
+    customer_id uuid REFERENCES public.customers(id) ON DELETE RESTRICT,
+    store_id uuid REFERENCES public.stores(id) ON DELETE RESTRICT,
+    tax_amount numeric NOT NULL DEFAULT 0.00 CHECK (tax_amount >= 0.00),
+    discount_amount numeric NOT NULL DEFAULT 0.00 CHECK (discount_amount >= 0.00),
+    net_amount numeric NOT NULL DEFAULT 0.00 CHECK (net_amount >= 0.00),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT invoices_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.invoice_items (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    invoice_id uuid NOT NULL REFERENCES public.invoices(id) ON DELETE CASCADE,
+    product_id uuid REFERENCES public.products(id) ON DELETE RESTRICT,
+    quantity integer NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    unit_price numeric NOT NULL CHECK (unit_price >= 0.00),
+    sgst numeric DEFAULT 0.00,
+    cgst numeric DEFAULT 0.00,
+    igst numeric DEFAULT 0.00,
+    total_price numeric NOT NULL CHECK (total_price >= 0.00),
+    CONSTRAINT invoice_items_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.stock_movements (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
+    store_id uuid NOT NULL REFERENCES public.stores(id) ON DELETE RESTRICT,
+    user_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
+    quantity integer NOT NULL,
+    movement_type text CHECK (movement_type = ANY (ARRAY['purchase'::text, 'sales_deduction'::text, 'adjustment'::text, 'requisition_transfer'::text])),
+    notes text,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT stock_movements_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.lab_orders (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    order_id uuid NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+    lab_id uuid NOT NULL REFERENCES public.labs(id) ON DELETE RESTRICT,
+    status text DEFAULT 'sent_to_lab'::text CHECK (status = ANY (ARRAY['sent_to_lab'::text, 'processing'::text, 'completed'::text, 'cancelled'::text])),
+    sent_at timestamp with time zone DEFAULT now(),
+    completed_at timestamp with time zone,
+    notes text,
+    CONSTRAINT lab_orders_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.payroll_history (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    basic_salary numeric NOT NULL CHECK (basic_salary >= 0.00),
+    allowances numeric DEFAULT 0.00 CHECK (allowances >= 0.00),
+    deductions numeric DEFAULT 0.00 CHECK (deductions >= 0.00),
+    net_disbursed numeric NOT NULL CHECK (net_disbursed >= 0.00),
+    payment_date date NOT NULL DEFAULT CURRENT_DATE,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT payroll_history_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.leave_requests (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    start_date date NOT NULL,
+    end_date date NOT NULL,
+    leave_type text CHECK (leave_type = ANY (ARRAY['sick'::text, 'casual'::text, 'annual'::text, 'unpaid'::text])),
+    status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT leave_requests_pkey PRIMARY KEY (id),
+    CONSTRAINT check_dates CHECK (end_date >= start_date)
+);
+
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
+    action text NOT NULL CHECK (action = ANY (ARRAY['INSERT'::text, 'UPDATE'::text, 'DELETE'::text])),
+    target_table text NOT NULL,
+    record_id uuid NOT NULL,
+    old_data jsonb,
+    new_data jsonb,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT audit_logs_pkey PRIMARY KEY (id)
 );
 
