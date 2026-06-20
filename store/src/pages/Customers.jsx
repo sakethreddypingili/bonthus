@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Search, Download, Eye, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { Search, Download, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../server/supabase/supabase";
 
@@ -12,84 +12,214 @@ export default function Customers({ userProfile }) {
   const [jumpToPage, setJumpToPage] = useState('');
   const PER_PAGE = 25;
 
-  const [stores, setStores] = useState([]);
-  const [selectedStore, setSelectedStore] = useState("");
-  const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || userProfile?.store_name === "All";
-
-  useEffect(() => {
-    supabase.from('store').select('*').order('name').then(({ data }) => setStores(data || []));
-    if (!isSuperAdmin && userProfile?.store_id) {
-      setSelectedStore(userProfile.store_id);
-    }
-  }, [isSuperAdmin, userProfile]);
+  const [activeStoreCustomerIds, setActiveStoreCustomerIds] = useState(new Set());
 
   const fetchCustomers = useCallback(async () => {
+    if (!userProfile) {
+      // Halt fetching until userProfile is loaded
+      return;
+    }
+
+    const isAdmin = userProfile.role === 'admin' || userProfile.role === 'super_admin';
+    const userStoreId = userProfile.store_id;
+
+    if (isAdmin) {
+      console.log(`[Customers Page] Authenticated User Role: ${userProfile.role} (Super/Global Admin). Showing all-time customers.`);
+    } else {
+      const storeName = userProfile.store?.name || userProfile.store_name || "Assigned Store";
+      console.log(`[Customers Page] Authenticated User Role: ${userProfile.role} | Store: ${storeName} (ID: ${userStoreId}). Applying 48-hour activity window.`);
+    }
+
     setLoading(true);
     try {
-      let allData = [];
-      let hasMore = true;
-      let start = 0;
+      // 1. Fetch active customer ids from orders matching store in the last 48 hours
+      let fortyEightHourCustomerIds = new Set();
+      if (!isAdmin && userStoreId) {
+        const thresholdDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+        const { data: recentOrders, error: orderErr } = await supabase
+          .from('orders')
+          .select('customer_id')
+          .eq('store_id', userStoreId)
+          .gte('created_at', thresholdDate)
+          .eq('disabled', false);
+
+        if (orderErr) {
+          console.error("Failed to query 48-hour store orders:", orderErr);
+        } else if (recentOrders) {
+          recentOrders.forEach(o => {
+            if (o.customer_id) fortyEightHourCustomerIds.add(o.customer_id);
+          });
+        }
+      }
+      setActiveStoreCustomerIds(fortyEightHourCustomerIds);
+
+      // 2. Fetch all customers globally
+      let allCustomers = [];
+      let hasMoreCust = true;
+      let startCust = 0;
       const step = 1000;
 
-      while (hasMore) {
+      while (hasMoreCust) {
         let query = supabase
           .from("customers")
-          .select('*, orders(gross_amount)')
+          .select('id, name, phone, email, street, town, district, state, created_at, family_id')
           .order('created_at', { ascending: false })
-          .range(start, start + step - 1);
-          
-        if (!isSuperAdmin && userProfile?.store_id) {
-           query = query.eq('store_id', userProfile.store_id);
-        } else if (isSuperAdmin && selectedStore && selectedStore !== 'All' && selectedStore !== "") {
-           query = query.eq('store_id', selectedStore);
-        }
+          .range(startCust, startCust + step - 1);
 
-        const { data } = await query;
+        const { data, error } = await query;
+        if (error) throw new Error(`Supabase customers query failed: ${error.message}`);
 
         if (data && data.length > 0) {
-          allData = allData.concat(data);
-          start += step;
+          allCustomers = allCustomers.concat(data);
+          startCust += step;
         }
-
         if (!data || data.length < step) {
-          hasMore = false;
+          hasMoreCust = false;
         }
       }
 
-      const mapped = allData.map(u => ({
-        id: u.id,
-        name: u.name || 'Anonymous',
-        email: u.email || 'N/A',
-        phone: u.phone || 'N/A',
-        city: [u.street, u.town, u.district, u.state].filter(Boolean).join(', ') || 'N/A',
-        orders: u.orders?.length || 0,
-        spent: u.orders?.reduce((sum, o) => sum + Number(o.gross_amount || 0), 0) || 0,
-        joined: u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : 'N/A'
-      }));
+      // 3. Fetch all dependents globally
+      let allDependents = [];
+      let hasMoreDep = true;
+      let startDep = 0;
 
-      setDbCustomers(mapped);
+      while (hasMoreDep) {
+        let query = supabase
+          .from("dependents")
+          .select('id, parent_customer_id, family_id, name, relationship, phone, email, created_at')
+          .order('created_at', { ascending: false })
+          .range(startDep, startDep + step - 1);
+
+        const { data, error } = await query;
+        if (error) throw new Error(`Supabase dependents query failed: ${error.message}`);
+
+        if (data && data.length > 0) {
+          allDependents = allDependents.concat(data);
+          startDep += step;
+        }
+        if (!data || data.length < step) {
+          hasMoreDep = false;
+        }
+      }
+
+      // Combine and map defensively
+      const mappedCustomers = allCustomers.map(u => {
+        const name = String(u.name || '').trim() || 'Anonymous';
+        const email = String(u.email || '').trim() || 'N/A';
+        const phone = String(u.phone || '').trim() || 'N/A';
+        
+        let city = 'N/A';
+        try {
+          const parts = [u.street, u.town, u.district, u.state].filter(p => typeof p === 'string' && p.trim() !== '');
+          if (parts.length > 0) city = parts.join(', ');
+        } catch (e) {
+          console.error(e);
+        }
+
+        const joined = u.created_at 
+          ? new Date(u.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) 
+          : 'N/A';
+
+        return {
+          id: u.id,
+          name,
+          email,
+          phone,
+          city,
+          orders: 0,
+          spent: 0,
+          joined,
+          created_at: u.created_at,
+          parent_id: null,
+          family_id: u.family_id
+        };
+      });
+
+      const mappedDependents = allDependents.map(d => {
+        const name = String(d.name || '').trim() || 'Anonymous';
+        const email = d.email ? String(d.email).trim() : 'N/A';
+        const phone = d.phone ? String(d.phone).trim() : 'N/A';
+        
+        const parentObj = allCustomers.find(p => p.id === d.parent_customer_id);
+        const parentName = parentObj ? String(parentObj.name || '').trim() : 'Primary';
+        const displayName = `${name} (${parentName})`;
+
+        // Get address from parent
+        let city = 'N/A';
+        if (parentObj) {
+          try {
+            const parts = [parentObj.street, parentObj.town, parentObj.district, parentObj.state].filter(p => typeof p === 'string' && p.trim() !== '');
+            if (parts.length > 0) city = parts.join(', ');
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
+        const joined = d.created_at 
+          ? new Date(d.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) 
+          : 'N/A';
+
+        return {
+          id: d.id,
+          name: displayName,
+          email,
+          phone,
+          city,
+          orders: 0,
+          spent: 0,
+          joined,
+          created_at: d.created_at,
+          parent_id: d.parent_customer_id,
+          family_id: d.family_id
+        };
+      });
+
+      setDbCustomers([...mappedCustomers, ...mappedDependents]);
     } catch (err) {
       console.error("Error fetching customers:", err.message);
     } finally {
       setLoading(false);
     }
-  }, [isSuperAdmin, selectedStore, userProfile?.store_id]);
+  }, [userProfile]);
 
   useEffect(() => {
     fetchCustomers();
   }, [fetchCustomers]);
 
+  const [searchInput, setSearchInput] = useState("");
+
   const filtered = dbCustomers.filter(c => {
-    return !search || 
+    const isMatchingSearch = !search || 
       c.name.toLowerCase().includes(search.toLowerCase()) || 
       (c.email && c.email.toLowerCase().includes(search.toLowerCase())) ||
       (c.phone && c.phone.includes(search));
+
+    if (!isMatchingSearch) return false;
+
+    // If searching, show all matching customers globally
+    if (search.trim() !== "") {
+      return true;
+    }
+
+    // If not searching, check filters based on role
+    const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+    if (isAdmin) {
+      return true; // Show all-time customers for admin
+    }
+
+    // For store operators (when not searching), show only customers who placed orders at their store in the last 48 hours
+    return activeStoreCustomerIds.has(c.id);
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-  function handleSearch(e) { setSearch(e.target.value); setPage(1); }
+  function handleSearchKeyDown(e) {
+    if (e.key === "Enter") {
+      setSearch(searchInput);
+      setPage(1);
+    }
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -101,19 +231,6 @@ export default function Customers({ userProfile }) {
         </div>
 
         <div className="flex items-center gap-4">
-          {isSuperAdmin && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-sm">
-              <select 
-                value={selectedStore}
-                onChange={e => setSelectedStore(e.target.value)}
-                className="appearance-none bg-transparent text-xs font-black text-black uppercase focus:outline-none cursor-pointer pr-8 py-1"
-              >
-                <option value="All">All Locations</option>
-                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <ChevronDown size={14} className="text-black -ml-6" />
-            </div>
-          )}
           <button className="flex items-center gap-2 px-4 py-2.5 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:shadow-lg transition-all">
             <Download size={14} /> Export
           </button>
@@ -125,16 +242,19 @@ export default function Customers({ userProfile }) {
         {/* Toolbar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="text-[10px] font-black text-white bg-black px-4 py-2 rounded-xl uppercase tracking-widest">
-              Total: {filtered.length}
-            </div>
+            {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+              <div className="text-[10px] font-black text-white bg-black px-4 py-2 rounded-xl uppercase tracking-widest">
+                Total: {filtered.length}
+              </div>
+            )}
           </div>
           <div className="relative group">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-black transition-colors" />
             <input
               type="text"
-              value={search}
-              onChange={handleSearch}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               placeholder="Search customers…"
               className="pl-9 pr-4 py-2 text-[11px] font-bold uppercase tracking-widest border border-gray-100 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white w-64 transition-all placeholder:text-gray-300"
             />

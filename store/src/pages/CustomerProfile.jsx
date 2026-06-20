@@ -8,9 +8,14 @@ import {
   ShoppingBag, 
   IndianRupee, 
   Eye, 
-  ExternalLink
+  ExternalLink,
+  Users,
+  Plus,
+  Trash2,
+  Edit2
 } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
+import SlideDrawer from "../components/common/SlideDrawer";
 
 export default function CustomerProfile({ userProfile }) {
   const { id } = useParams();
@@ -18,93 +23,183 @@ export default function CustomerProfile({ userProfile }) {
   const [customer, setCustomer] = useState(null);
   const [orders, setOrders] = useState([]);
   const [eyePowers, setEyePowers] = useState([]);
+  const [dependents, setDependents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchCustomerData = async () => {
-      setLoading(true);
-      try {
-        // Fetch customer basic info
-        const { data: custData, error: custError } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('id', id)
-          .single();
-        
-        if (custError) throw custError;
-        setCustomer(custData);
+  // Dependent Modal/Form states
+  const [showDepModal, setShowDepModal] = useState(false);
+  const [editingDep, setEditingDep] = useState(null);
+  const [depForm, setDepForm] = useState({ name: "", relationship: "Child", phone: "", email: "" });
+  const [savingDep, setSavingDep] = useState(false);
 
-        // Fetch customer orders with items and products
-        let orderQuery = supabase
-          .from('orders')
-          .select(`
-            *,
-            order_items(
-              id,
-              qty,
-              price,
-              products_list(name)
-            )
-          `)
-          .eq('customer_id', id)
-          .eq('disabled', false)
-          .order('created_at', { ascending: false });
+  const fetchCustomerData = async () => {
+    setLoading(true);
+    try {
+      // Fetch customer basic info
+      const { data: custData, error: custError } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (custError) throw custError;
+      setCustomer(custData);
 
-        // Apply store filter for non-admin users
-        const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
-        if (!isAdmin && userProfile?.store_id) {
-          orderQuery = orderQuery.eq('store_id', userProfile.store_id);
-        }
+      // Fetch customer orders with items and products
+      let orderQuery = supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items(
+            id,
+            quantity,
+            unit_price,
+            products(name)
+          )
+        `)
+        .eq('customer_id', id)
+        .eq('disabled', false)
+        .order('created_at', { ascending: false });
 
-        const { data: orderData, error: orderError } = await orderQuery;
-        
-        if (orderError) throw orderError;
-
-        const storeIds = [...new Set((orderData || []).map((order) => order.store_id).filter(Boolean))];
-        let storesById = {};
-
-        if (storeIds.length > 0) {
-          const { data: storeData, error: storeError } = await supabase
-            .from('store')
-            .select('id, name')
-            .in('id', storeIds);
-
-          if (storeError) {
-            console.error('Error fetching stores for orders:', storeError.message);
-          } else {
-            storesById = Object.fromEntries((storeData || []).map((store) => [store.id, store.name]));
-          }
-        }
-
-        const enrichedOrders = (orderData || []).map((order) => ({
-          ...order,
-          store: {
-            id: order.store_id,
-            name: storesById[order.store_id] || 'N/A'
-          }
-        }));
-
-        setOrders(enrichedOrders);
-
-        // Fetch eye powers (no disabled field for eye_power table)
-        const { data: eyeData, error: eyeError } = await supabase
-          .from('eye_power')
-          .select('*')
-          .eq('customer_id', id)
-          .order('created_at', { ascending: false });
-        
-        if (eyeError) throw eyeError;
-        setEyePowers(eyeData || []);
-
-      } catch (err) {
-        console.error("Error fetching customer profile:", err.message);
-      } finally {
-        setLoading(false);
+      // Apply store filter for non-admin users
+      const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+      if (!isAdmin && userProfile?.store_id) {
+        orderQuery = orderQuery.eq('store_id', userProfile.store_id);
       }
-    };
 
+      const { data: orderData, error: orderError } = await orderQuery;
+      
+      if (orderError) throw orderError;
+
+      const storeIds = [...new Set((orderData || []).map((order) => order.store_id).filter(Boolean))];
+      let storesById = {};
+
+      if (storeIds.length > 0) {
+        const { data: storeData, error: storeError } = await supabase
+          .from('store')
+          .select('id, name')
+          .in('id', storeIds);
+
+        if (storeError) {
+          console.error('Error fetching stores for orders:', storeError.message);
+        } else {
+          storesById = Object.fromEntries((storeData || []).map((store) => [store.id, store.name]));
+        }
+      }
+
+      const enrichedOrders = (orderData || []).map((order) => ({
+        ...order,
+        store: {
+          id: order.store_id,
+          name: storesById[order.store_id] || 'N/A'
+        }
+      }));
+
+      setOrders(enrichedOrders);
+
+      // Fetch eye powers (no disabled field for eye_power table)
+      const { data: eyeData, error: eyeError } = await supabase
+        .from('eye_power')
+        .select('*')
+        .eq('customer_id', id)
+        .order('created_at', { ascending: false });
+      
+      if (eyeError) throw eyeError;
+      setEyePowers(eyeData || []);
+
+      // Fetch dependents
+      // If the current profile has a family_id, load members sharing that family_id
+      let dependentsQuery = supabase.from('dependents').select('*');
+      if (custData.family_id) {
+        dependentsQuery = dependentsQuery.eq('family_id', custData.family_id);
+      } else {
+        dependentsQuery = dependentsQuery.eq('parent_customer_id', id);
+      }
+
+      const { data: dependentsData, error: dependentsError } = await dependentsQuery.order('created_at', { ascending: false });
+
+      if (dependentsError) throw dependentsError;
+      
+      // Exclude self if showing family members sharing the same family_id
+      const filteredDeps = (dependentsData || []).filter(d => d.id !== id);
+      setDependents(filteredDeps);
+
+    } catch (err) {
+      console.error("Error fetching customer profile:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchCustomerData();
   }, [id, userProfile]);
+
+  const handleOpenAddDependent = () => {
+    setEditingDep(null);
+    setDepForm({ name: "", relationship: "Child", phone: "", email: "" });
+    setShowDepModal(true);
+  };
+
+  const handleOpenEditDependent = (dep) => {
+    setEditingDep(dep);
+    setDepForm({
+      name: dep.name,
+      relationship: dep.relationship || "Child",
+      phone: dep.phone || "",
+      email: dep.email || "",
+    });
+    setShowDepModal(true);
+  };
+
+  const handleSaveDependent = async (e) => {
+    e.preventDefault();
+    setSavingDep(true);
+    try {
+      const payload = {
+        name: depForm.name,
+        relationship: depForm.relationship,
+        phone: depForm.phone.trim() || customer.phone, // Default to parent's phone if empty
+        email: depForm.email.trim() || null,
+        parent_customer_id: customer.parent_customer_id || id,
+        family_id: customer.family_id || null,
+      };
+
+      if (editingDep) {
+        const { error } = await supabase
+          .from('dependents')
+          .update(payload)
+          .eq('id', editingDep.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('dependents')
+          .insert([payload]);
+        if (error) throw error;
+      }
+
+      setShowDepModal(false);
+      fetchCustomerData();
+    } catch (err) {
+      alert("Error saving family profile: " + err.message);
+    } finally {
+      setSavingDep(false);
+    }
+  };
+
+  const handleDeleteDependent = async (depId) => {
+    if (!window.confirm("Are you sure you want to delete this family profile?")) return;
+    try {
+      const { error } = await supabase
+        .from('dependents')
+        .delete()
+        .eq('id', depId);
+      if (error) throw error;
+      fetchCustomerData();
+    } catch (err) {
+      alert("Error deleting family profile: " + err.message);
+    }
+  };
 
   if (loading) {
     return (
@@ -128,7 +223,7 @@ export default function CustomerProfile({ userProfile }) {
     );
   }
 
-  const totalSpent = orders.reduce((sum, order) => sum + Number(order.gross_amount || 0), 0);
+  const totalSpent = orders.reduce((sum, order) => sum + Number(order.net_amount || 0), 0);
   const totalOrders = orders.length;
 
   return (
@@ -162,7 +257,7 @@ export default function CustomerProfile({ userProfile }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Stats & Info */}
+        {/* Left Column: Stats, Info, & Dependents */}
         <div className="space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-2 gap-4">
@@ -216,6 +311,49 @@ export default function CustomerProfile({ userProfile }) {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Family Profiles / Dependents */}
+          <div className="section-card p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+              <h3 className="text-sm font-bold text-[#000000] flex items-center gap-2">
+                <Users size={16} /> Family Profiles
+              </h3>
+              <button 
+                onClick={handleOpenAddDependent}
+                className="p-1 bg-gray-100 text-black hover:bg-black hover:text-white rounded-lg transition-all"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+            {dependents.length > 0 ? (
+              <div className="space-y-3">
+                {dependents.map(dep => (
+                  <div key={dep.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div>
+                      <p className="text-xs font-black text-black uppercase tracking-tight">{dep.name}</p>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{dep.relationship || "Family"}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button 
+                        onClick={() => handleOpenEditDependent(dep)} 
+                        className="p-1.5 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-all"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteDependent(dep.id)} 
+                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50 transition-all"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 italic">No family profiles linked yet.</p>
+            )}
           </div>
         </div>
 
@@ -336,8 +474,8 @@ export default function CustomerProfile({ userProfile }) {
                           <div className="flex flex-col gap-0.5">
                             {order.order_items?.map((item, idx) => (
                               <div key={item.id} className="truncate">
-                                • {item.products_list?.name || 'Unknown Product'} 
-                                <span className="text-[10px] opacity-70 ml-1">(x{item.qty})</span>
+                                • {item.products?.name || 'Unknown Product'} 
+                                <span className="text-[10px] opacity-70 ml-1">(x{item.quantity})</span>
                               </div>
                             )) || <span className="italic">No products</span>}
                           </div>
@@ -352,7 +490,7 @@ export default function CustomerProfile({ userProfile }) {
                           </span>
                         </td>
                         <td className="px-5 py-4 text-right font-bold text-[#000000] whitespace-nowrap">
-                          ₹{order.gross_amount?.toLocaleString()}
+                          ₹{order.net_amount?.toLocaleString()}
                         </td>
                         <td className="px-5 py-4 text-center">
                           <button 
@@ -373,6 +511,68 @@ export default function CustomerProfile({ userProfile }) {
           </div>
         </div>
       </div>
+
+      {/* Dependent Profile Drawer */}
+      <SlideDrawer
+        isOpen={showDepModal}
+        onClose={() => setShowDepModal(false)}
+        title={editingDep ? "Modify Family Profile" : "Add Family Profile"}
+        subtitle="Link a dependent family profile to this customer account"
+        width="max-w-md"
+      >
+        <form onSubmit={handleSaveDependent} className="p-8 space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+            <input 
+              required 
+              type="text" 
+              value={depForm.name} 
+              onChange={e => setDepForm({ ...depForm, name: e.target.value })} 
+              className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 outline-none transition-all" 
+              placeholder="Name..." 
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Relationship</label>
+            <select 
+              value={depForm.relationship} 
+              onChange={e => setDepForm({ ...depForm, relationship: e.target.value })} 
+              className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 outline-none transition-all cursor-pointer"
+            >
+              {["Spouse", "Child", "Parent", "Sibling", "Other"].map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile Number (Optional)</label>
+            <input 
+              type="tel" 
+              value={depForm.phone} 
+              onChange={e => setDepForm({ ...depForm, phone: e.target.value })} 
+              className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all" 
+              placeholder="Defaults to parent's phone" 
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Address (Optional)</label>
+            <input 
+              type="email" 
+              value={depForm.email} 
+              onChange={e => setDepForm({ ...depForm, email: e.target.value })} 
+              className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all" 
+              placeholder="Email..." 
+            />
+          </div>
+          <button 
+            type="submit" 
+            disabled={savingDep}
+            className="w-full py-5 bg-black text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all mt-8"
+          >
+            {savingDep ? "Saving..." : "Commit Family Profile"}
+          </button>
+        </form>
+      </SlideDrawer>
     </div>
   );
 }
