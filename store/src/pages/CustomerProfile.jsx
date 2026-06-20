@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, 
+  ArrowRight,
   Phone, 
   Mail, 
   MapPin, 
@@ -119,9 +120,38 @@ export default function CustomerProfile({ userProfile }) {
       const { data: dependentsData, error: dependentsError } = await dependentsQuery.order('created_at', { ascending: false });
 
       if (dependentsError) throw dependentsError;
+
+      let combinedFamilyMembers = (dependentsData || []).map(d => ({
+        ...d,
+        is_primary_customer: false
+      }));
+
+      // Fetch other primary customers sharing the same family_id
+      if (custData.family_id) {
+        const { data: siblingCustomers, error: siblingError } = await supabase
+          .from('customers')
+          .select('id, name, phone, email, family_id')
+          .eq('family_id', custData.family_id)
+          .neq('id', id);
+
+        if (siblingError) {
+          console.error("Error fetching sibling customers:", siblingError.message);
+        } else if (siblingCustomers) {
+          const mappedSiblings = siblingCustomers.map(sc => ({
+            id: sc.id,
+            name: sc.name,
+            relationship: 'Primary Member',
+            phone: sc.phone,
+            email: sc.email,
+            family_id: sc.family_id,
+            is_primary_customer: true
+          }));
+          combinedFamilyMembers = [...combinedFamilyMembers, ...mappedSiblings];
+        }
+      }
       
       // Exclude self if showing family members sharing the same family_id
-      const filteredDeps = (dependentsData || []).filter(d => d.id !== id);
+      const filteredDeps = combinedFamilyMembers.filter(d => d.id !== id);
       setDependents(filteredDeps);
 
     } catch (err) {
@@ -333,18 +363,30 @@ export default function CustomerProfile({ userProfile }) {
                       <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{dep.relationship || "Family"}</p>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <button 
-                        onClick={() => handleOpenEditDependent(dep)} 
-                        className="p-1.5 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-all"
-                      >
-                        <Edit2 size={12} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteDependent(dep.id)} 
-                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50 transition-all"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      {dep.is_primary_customer ? (
+                        <button 
+                          onClick={() => navigate(`/customers/${dep.id}`)} 
+                          className="p-1.5 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest"
+                          title="View Profile"
+                        >
+                          View <ArrowRight size={12} />
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => handleOpenEditDependent(dep)} 
+                            className="p-1.5 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-all"
+                          >
+                            <Edit2 size={12} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteDependent(dep.id)} 
+                            className="p-1.5 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50 transition-all"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
