@@ -156,26 +156,24 @@ export default function CustomerProfile({ userProfile }) {
     e.preventDefault();
     setSavingDep(true);
     try {
-      const payload = {
-        name: depForm.name,
-        relationship: depForm.relationship,
-        phone: depForm.phone.trim() || customer.phone, // Default to parent's phone if empty
-        email: depForm.email.trim() || null,
-        parent_customer_id: customer.parent_customer_id || id,
-        family_id: customer.family_id || null,
-      };
+      const familyId = (customer.family_id && customer.family_id.trim() !== '') ? customer.family_id : null;
 
-      if (editingDep) {
-        const { error } = await supabase
-          .from('dependents')
-          .update(payload)
-          .eq('id', editingDep.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('dependents')
-          .insert([payload]);
-        if (error) throw error;
+      const { data, error } = await supabase.rpc('save_dependent_with_family', {
+        p_parent_customer_id: customer.parent_customer_id || id,
+        p_name: depForm.name,
+        p_relationship: depForm.relationship,
+        p_phone: depForm.phone.trim() || null,
+        p_email: depForm.email.trim() || null,
+        p_editing_dep_id: editingDep ? editingDep.id : null,
+        p_family_id: familyId
+      });
+
+      if (error) throw error;
+
+      if (data && data.success) {
+        if (data.family_id) {
+          customer.family_id = data.family_id;
+        }
       }
 
       setShowDepModal(false);
