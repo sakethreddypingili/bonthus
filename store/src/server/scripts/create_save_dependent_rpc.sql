@@ -26,15 +26,15 @@ BEGIN
     SELECT family_id, phone INTO v_family_id, v_parent_phone FROM public.customers WHERE id = p_parent_customer_id;
   END IF;
 
-  -- Ensure that if a user submits a profile without an explicit family linkage, 
-  -- the transaction cleanly inserts a NULL value to the family_id column.
-  -- In this system, if we want to force family creation, we do it if family_id is null.
-  -- But if they explicitly want NO family linkage, we should let family_id remain NULL.
-  -- However, the instruction says: "Ensure that the database insertion to the family table happens FIRST.
-  -- Await the database response from the family insertion, extract the newly generated family.id (UUID), 
-  -- and explicitly map it as the family_id payload field for all associated dependents rows.
-  -- Wrap the entire operation in a single database transaction block."
-  -- Therefore, if v_family_id is still NULL, we insert the family record FIRST, then map it.
+  -- CRITICAL FIX: Verify if the family record actually exists in public.family table.
+  -- This prevents foreign key violations from stale or invalid family_id values in customers.
+  IF v_family_id IS NOT NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM public.family WHERE id = v_family_id) THEN
+      v_family_id := NULL;
+    END IF;
+  END IF;
+
+  -- If v_family_id is NULL (or was stale/non-existent), insert the family record FIRST
   IF v_family_id IS NULL THEN
     v_family_code := 'FAM-' || upper(substring(md5(random()::text) from 1 for 8));
     
@@ -55,11 +55,6 @@ BEGIN
 
   IF p_email IS NULL OR trim(p_email) = '' THEN
     p_email := NULL;
-  END IF;
-
-  -- Clean family_id value (protect against empty strings or invalid formats)
-  IF v_family_id::text = '' THEN
-    v_family_id := NULL;
   END IF;
 
   -- Insert or update the dependent record
