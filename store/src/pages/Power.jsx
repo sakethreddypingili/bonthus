@@ -73,7 +73,6 @@ export default function Power({ userProfile }) {
         .from("customers")
         .select("*")
         .eq("phone", phone.trim())
-        .is("parent_id", null)
         .maybeSingle();
 
       if (primaryError) throw primaryError;
@@ -83,9 +82,9 @@ export default function Power({ userProfile }) {
 
         // Load primary + dependents
         const { data: dependentsData, error: dependentsError } = await supabase
-          .from("customers")
+          .from("dependents")
           .select("*")
-          .eq("parent_id", primaryData.id);
+          .eq("parent_customer_id", primaryData.id);
 
         if (dependentsError) throw dependentsError;
 

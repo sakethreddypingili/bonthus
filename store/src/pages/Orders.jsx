@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Search, Plus, MapPin, Eye, Edit2, Lock, Download, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react";
+import { Search, Plus, MapPin, Eye, Edit2, Lock, Download, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../server/supabase/supabase";
 import CommandDialog from "../components/common/CommandDialog";
@@ -27,21 +27,31 @@ export default function Orders({ userProfile }) {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [customerMobile, setCustomerMobile] = useState('');
   const [loadingCustomer, setLoadingCustomer] = useState(false);
+  const [searchedProfiles, setSearchedProfiles] = useState([]);
+  const [searchAttempted, setSearchAttempted] = useState(false);
+
+  const closeCustomerModal = () => {
+    setShowCustomerModal(false);
+    setCustomerMobile('');
+    setSearchedProfiles([]);
+    setSearchAttempted(false);
+  };
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [payments, setPayments] = useState([{ id: Date.now(), mode: 'Cash', amount: '' }]);
   const [clearingBalance, setClearingBalance] = useState(false);
   const [showDisableModal, setShowDisableModal] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [selectedOrderForAction, setSelectedOrderForAction] = useState(null);
   const [disableAction, setDisableAction] = useState('disable');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [processingAction, setProcessingAction] = useState(false);
-  const [jumpToPage, setJumpToPage] = useState('');
   const perPage = 25;
   const navigate = useNavigate();
 
-  const isSuperAdmin = userProfile?.role === 'super_admin';
-  const isAdmin = userProfile?.role === 'admin' || isSuperAdmin;
-  const canEditOrder = isAdmin || userProfile?.role === 'store_manager';
+  const roleLower = userProfile?.role?.toLowerCase();
+  const isSuperAdmin = roleLower === 'super_admin';
+  const isAdmin = roleLower === 'admin' || isSuperAdmin;
+  const canEditOrder = isAdmin || roleLower === 'store_manager';
 
   const [stores, setStores] = useState([]);
 
@@ -77,12 +87,12 @@ export default function Orders({ userProfile }) {
           id,
           created_at,
           status,
-          gross_amount,
+          net_amount,
           due_amount,
           store_id,
           disabled,
           customers ( * ),
-          order_items ( id, qty, price, discount_amt, taxable_amount, sgst_amt, cgst_amt, total_price, products_list ( name, price ) ),
+          order_items ( id, quantity, unit_price, discount_amount, total_price, products ( name ) ),
           eye_power ( * )
         `)
         .order('created_at', { ascending: false });
@@ -99,17 +109,17 @@ export default function Orders({ userProfile }) {
       if (error) throw error;
 
       const mapped = data.map(o => {
-        const productNames = o.order_items?.map(item => item.products_list?.name).join(', ') || 'Custom Order';
+        const productNames = o.order_items?.map(item => item.products?.name).join(', ') || 'Custom Order';
         
         // Calculate the inclusive total: (Qty * Price) - Discount
         const calculatedTotal = o.order_items?.reduce((sum, item) => {
-          const lineTotal = (Number(item.qty || 0) * Number(item.price || 0)) - Number(item.discount_amt || 0);
+          const lineTotal = (Number(item.quantity || 0) * Number(item.unit_price || 0)) - Number(item.discount_amount || 0);
           return sum + lineTotal;
         }, 0);
 
         // Detect material difference for legacy orders (more than 1 rupee delta)
-        const gross = Number(o.gross_amount || 0);
-        const finalAmount = Math.abs(calculatedTotal - gross) > 1.5 ? gross : calculatedTotal;
+        const net = Number(o.net_amount || 0);
+        const finalAmount = Math.abs(calculatedTotal - net) > 1.5 ? net : calculatedTotal;
         
         return {
           ...o,
@@ -119,7 +129,7 @@ export default function Orders({ userProfile }) {
           customer_name: o.customers?.name || 'Unknown User',
           product_name: productNames,
           // Round for a clean UI display
-          amount: Math.round(finalAmount > 0 ? finalAmount : gross),
+          amount: Math.round(finalAmount > 0 ? finalAmount : net),
           date: new Date(o.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
         };
       });
@@ -150,9 +160,9 @@ export default function Orders({ userProfile }) {
         due_amount: Number(editingOrder.due_amount) || 0,
       };
 
-      // Only admins can edit gross_amount
+      // Only admins can edit net_amount
       if (isAdmin) {
-        updateData.gross_amount = Number(editingOrder.amount) || 0;
+        updateData.net_amount = Number(editingOrder.amount) || 0;
       }
 
       let q = supabase
@@ -181,29 +191,39 @@ export default function Orders({ userProfile }) {
     if (!customerMobile) return;
 
     setLoadingCustomer(true);
+    setSearchAttempted(true);
     try {
-      const { data, error } = await supabase
+      const { data: primaryData, error: primaryError } = await supabase
         .from('customers')
         .select('*')
-        .eq('phone', customerMobile)
-        .limit(1)
+        .eq('phone', customerMobile.trim())
         .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
+      if (primaryError) throw primaryError;
 
-      if (data) {
-        navigate('/orders/new', { state: { customer: data } });
+      if (primaryData) {
+        const { data: dependentsData, error: dependentsError } = await supabase
+          .from('dependents')
+          .select('*')
+          .eq('parent_customer_id', primaryData.id);
+
+        if (dependentsError) throw dependentsError;
+
+        const allProfiles = [
+          { ...primaryData, label: "Primary Profile" },
+          ...(dependentsData || []).map(dep => ({
+            ...dep,
+            label: `Dependent (${dep.relationship || "Family"})`
+          }))
+        ];
+        setSearchedProfiles(allProfiles);
       } else {
-        navigate('/orders/new', { state: { customer: { phone: customerMobile } } });
+        setSearchedProfiles([]);
       }
     } catch (err) {
       alert("Error looking up customer: " + err.message);
     } finally {
       setLoadingCustomer(false);
-      setShowCustomerModal(false);
-      setCustomerMobile('');
     }
   };
 
@@ -777,17 +797,11 @@ export default function Orders({ userProfile }) {
 
       <CommandDialog
         isOpen={showCustomerModal}
-        onClose={() => setShowCustomerModal(false)}
+        onClose={closeCustomerModal}
         title="Initiate Order"
         subtitle="Identify Customer Entity"
       >
         <div className="p-8">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-black rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl">
-              <Plus size={32} className="text-white" strokeWidth={3} />
-            </div>
-          </div>
-
           <form onSubmit={handleLookupCustomer} className="space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contact Link</label>
@@ -808,17 +822,61 @@ export default function Orders({ userProfile }) {
                 disabled={loadingCustomer} 
                 className="w-full px-6 py-4 bg-black text-white rounded-[24px] text-xs font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
               >
-                {loadingCustomer ? 'Verifying...' : 'Proceed to Intake'}
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setShowCustomerModal(false)} 
-                className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors"
-              >
-                Cancel Operation
+                {loadingCustomer ? 'Verifying...' : 'Search'}
               </button>
             </div>
           </form>
+
+          {searchAttempted && !loadingCustomer && (
+            <>
+              {searchedProfiles.length > 0 ? (
+                <div className="space-y-3 mt-6 border-t border-gray-100 pt-6 max-h-60 overflow-y-auto no-scrollbar">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Select Profile</label>
+                  {searchedProfiles.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        navigate('/orders/new', { state: { customer: p } });
+                        closeCustomerModal();
+                      }}
+                      className="w-full text-left px-5 py-4 border border-gray-100 hover:border-black bg-gray-50 hover:bg-black hover:text-white rounded-2xl transition-all flex items-center justify-between group"
+                    >
+                      <div>
+                        <span className="block text-xs font-black uppercase tracking-tight text-black group-hover:text-white">{p.name}</span>
+                        <span className="block text-[9px] font-bold text-gray-400 group-hover:text-gray-300 uppercase tracking-wider mt-0.5">{p.label}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-gray-400 group-hover:text-white">{p.phone}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-6 border-t border-gray-100 pt-6 text-center space-y-4">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No matching customer profile found</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigate('/orders/new', { state: { customer: { phone: customerMobile } } });
+                      closeCustomerModal();
+                    }}
+                    className="w-full px-5 py-4 border border-dashed border-gray-200 hover:border-black hover:bg-gray-50 text-[10px] font-black uppercase tracking-widest text-black rounded-2xl transition-all"
+                  >
+                    Register New Profile (+91 {customerMobile})
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="mt-4 text-center">
+            <button 
+              type="button" 
+              onClick={closeCustomerModal} 
+              className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors"
+            >
+              Cancel Operation
+            </button>
+          </div>
         </div>
       </CommandDialog>
 
