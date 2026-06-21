@@ -29,6 +29,27 @@ export default function CreateOrder({ userProfile }) {
         age: initialCustomer.age || ""
     });
 
+    const [showRegModal, setShowRegModal] = useState(false);
+    const [regForm, setRegForm] = useState({
+        name: "",
+        phone: "",
+        age: "",
+        email: "",
+        street: "",
+        town: "",
+        district: "",
+        state: ""
+    });
+
+    useEffect(() => {
+        if (location.state?.triggerRegisterModal && location.state?.customer?.phone) {
+            setRegForm(prev => ({ ...prev, phone: location.state.customer.phone }));
+            setShowRegModal(true);
+            // Clear navigation state parameter trigger so it doesn't reopen
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state]);
+
 
 
     useEffect(() => {
@@ -202,6 +223,53 @@ export default function CreateOrder({ userProfile }) {
     const productInputRefs = useRef({});
     const [dropdownLayout, setDropdownLayout] = useState(null);
     const [highlightedRow, setHighlightedRow] = useState(null);
+
+    const handleRegisterCustomer = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const newCustId = generateId(ID_RULES.CUSTOMERS.prefix, ID_RULES.CUSTOMERS.digits);
+            const { data: newCust, error: custError } = await supabase
+                .from('customers')
+                .insert([{
+                    id: newCustId,
+                    name: regForm.name,
+                    phone: regForm.phone,
+                    street: regForm.street,
+                    town: regForm.town,
+                    district: regForm.district,
+                    state: regForm.state,
+                    email: regForm.email || null,
+                    age: regForm.age ? Number(regForm.age) : null,
+                    created_at: new Date().toISOString()
+                }])
+                .select('*')
+                .single();
+
+            if (custError) throw custError;
+
+            // Update local state to select this new customer profile
+            const profileWithLabel = { ...newCust, label: "Primary Profile" };
+            setProfiles([profileWithLabel]);
+            setSelectedProfile(profileWithLabel);
+            setCustomer({
+                id: newCust.id,
+                name: newCust.name,
+                phone: newCust.phone,
+                street: newCust.street || "",
+                town: newCust.town || "",
+                district: newCust.district || "",
+                state: newCust.state || "",
+                email: newCust.email || "",
+                age: newCust.age || ""
+            });
+            setShowRegModal(false);
+        } catch (err) {
+            alert("Error registering customer: " + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [payments, setPayments] = useState([{ id: Date.now(), mode: 'Cash', amount: '' }]);
@@ -904,11 +972,32 @@ export default function CreateOrder({ userProfile }) {
                         </div>
 
                         {customer.phone && customer.phone.length >= 10 && profiles.length === 0 && (
-                            <div className="bg-gray-50 border border-gray-100 p-5 rounded-2xl flex flex-col gap-1.5 border-t border-gray-50 pt-6">
-                                <span className="text-[10px] font-black uppercase text-black">No customer found</span>
-                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
-                                    No customer profile exists for this phone number. Please enter details below to create a new customer profile.
-                                </p>
+                            <div className="bg-gray-50 border border-gray-100 p-5 rounded-2xl flex flex-col gap-3 border-t border-gray-50 pt-6">
+                                <div>
+                                    <span className="text-[10px] font-black uppercase text-black">No customer found</span>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                                        No customer profile exists for this phone number. Please create the customer profile first.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setRegForm({
+                                            name: "",
+                                            phone: customer.phone,
+                                            age: "",
+                                            email: "",
+                                            street: "",
+                                            town: "",
+                                            district: "",
+                                            state: ""
+                                        });
+                                        setShowRegModal(true);
+                                    }}
+                                    className="w-full sm:w-auto px-5 py-2.5 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all text-center"
+                                >
+                                    Create Customer Profile
+                                </button>
                             </div>
                         )}
 
@@ -1432,6 +1521,107 @@ export default function CreateOrder({ userProfile }) {
                         </button>
                     </div>
                 </div>
+            </CommandDialog>
+
+            <CommandDialog
+                isOpen={showRegModal}
+                onClose={() => setShowRegModal(false)}
+                title="Register Customer Profile"
+                subtitle="Create a new primary customer record first"
+            >
+                <form onSubmit={handleRegisterCustomer} className="p-8 space-y-4 max-h-[80vh] overflow-y-auto no-scrollbar">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Full Name *</label>
+                            <input
+                                required
+                                type="text"
+                                value={regForm.name}
+                                onChange={e => setRegForm({ ...regForm, name: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                                placeholder="Name"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Age</label>
+                            <input
+                                type="number"
+                                value={regForm.age}
+                                onChange={e => setRegForm({ ...regForm, age: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                                placeholder="Age"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Mobile Number *</label>
+                            <input
+                                required
+                                type="tel"
+                                value={regForm.phone}
+                                onChange={e => setRegForm({ ...regForm, phone: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                                placeholder="Mobile"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Email Address</label>
+                            <input
+                                type="email"
+                                value={regForm.email}
+                                onChange={e => setRegForm({ ...regForm, email: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                                placeholder="Email"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Street / Landmark</label>
+                            <input
+                                type="text"
+                                value={regForm.street}
+                                onChange={e => setRegForm({ ...regForm, street: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                                placeholder="Street Address"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Town / City</label>
+                            <input
+                                type="text"
+                                value={regForm.town}
+                                onChange={e => setRegForm({ ...regForm, town: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                                placeholder="Town"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">District</label>
+                            <input
+                                type="text"
+                                value={regForm.district}
+                                onChange={e => setRegForm({ ...regForm, district: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                                placeholder="District"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">State</label>
+                            <input
+                                type="text"
+                                value={regForm.state}
+                                onChange={e => setRegForm({ ...regForm, state: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                                placeholder="State"
+                            />
+                        </div>
+                    </div>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-4 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all mt-4"
+                    >
+                        {loading ? "Registering..." : "Create Profile"}
+                    </button>
+                </form>
             </CommandDialog>
 
         </div>

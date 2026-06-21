@@ -40,13 +40,10 @@ async function run() {
 
     try {
         await client.connect();
-        const res = await client.query(`
-            SELECT c.relname, c.relkind, n.nspname
-            FROM pg_class c
-            JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE c.relname = 'eye_power';
-        `);
-        console.log("pg_class results for eye_power:", res.rows);
+        console.log("Adding customer_visits_customer_id_fkey constraint...");
+        console.log("Reloading schema cache...");
+        await client.query("NOTIFY pgrst, 'reload schema';");
+        console.log("Schema cache reloaded.");
     } catch (e) {
         console.error(e);
     } finally {

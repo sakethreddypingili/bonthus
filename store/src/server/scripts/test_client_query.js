@@ -36,14 +36,17 @@ async function run() {
     const family_id = '7a57d64a-93f2-4716-bddb-bf22f9b9f546';
 
     const { data, error } = await supabase
-        .from('dependents')
-        .select('*')
-        .eq('family_id', family_id);
+        .from('customer_visits')
+        .select(`
+            *,
+            customers ( name, phone )
+        `)
+        .limit(1);
 
     if (error) {
-        console.error("Error querying dependents:", error.message);
+        console.error("Error querying customer_visits join:", error.message);
     } else {
-        console.log("Dependents retrieved via client SDK:", data);
+        console.log("customer_visits join retrieved successfully:", data);
     }
 }
 

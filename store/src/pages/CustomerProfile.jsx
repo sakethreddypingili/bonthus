@@ -28,6 +28,7 @@ export default function CustomerProfile({ userProfile }) {
   const [dependents, setDependents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [familyMembers, setFamilyMembers] = useState([]);
+  const [visits, setVisits] = useState([]);
 
   // Dependent Modal/Form states
   const [showDepModal, setShowDepModal] = useState(false);
@@ -181,15 +182,26 @@ export default function CustomerProfile({ userProfile }) {
 
       setOrders(enrichedOrders);
 
-      // Fetch eye powers (no disabled field for eye_power table)
+      // Fetch eye powers (prescriptions table)
       const { data: eyeData, error: eyeError } = await supabase
-        .from('eye_power')
+        .from('prescriptions')
         .select('*')
         .eq('customer_id', id)
-        .order('created_at', { ascending: false });
+        .order('prescribed_at', { ascending: false });
       
       if (eyeError) throw eyeError;
       setEyePowers(eyeData || []);
+
+      // Fetch flow history (customer visits)
+      const { data: visitData, error: visitError } = await supabase
+        .from('customer_visits')
+        .select('*')
+        .eq('customer_id', id)
+        .order('created_at', { ascending: false });
+
+      if (!visitError && visitData) {
+        setVisits(visitData);
+      }
 
       // Fetch dependents
       // If the current profile has a family_id, load members sharing that family_id
@@ -550,9 +562,9 @@ export default function CustomerProfile({ userProfile }) {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {eyePowers.map((pow, idx) => {
-                      const hasNearVision = (p) => p.nv_right_sph != null || p.nv_left_sph != null || 
-                                              p.nv_right_cyl != null || p.nv_left_cyl != null || 
-                                              p.nv_right_axis != null || p.nv_left_axis != null;
+                      const hasNearVision = (p) => p.nv_re_sph != null || p.nv_le_sph != null || 
+                                              p.nv_re_cyl != null || p.nv_le_cyl != null || 
+                                              p.nv_re_axis != null || p.nv_le_axis != null;
                       const showNV = hasNearVision(pow);
                       const groupRowSpan = showNV ? 4 : 2;
                       
@@ -568,21 +580,21 @@ export default function CustomerProfile({ userProfile }) {
                           {/* Distance Vision Row */}
                           <tr className="hover:bg-gray-50/50">
                             <td rowSpan={groupRowSpan} className="px-5 py-4 text-xs font-medium text-gray-600 border-r border-gray-100">
-                              {formatEyePowerDate(pow.created_at)}
+                              {formatEyePowerDate(pow.prescribed_at || pow.created_at)}
                             </td>
                             <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">RE (DV)</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_right_sph ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_right_cyl ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_right_axis ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_re_sph ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_re_cyl ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_re_axis ?? '-'}</td>
                             <td rowSpan={groupRowSpan} className="px-5 py-4 text-xs text-gray-500 max-w-[200px] italic border-l border-gray-100">
                               {pow.notes || '-'}
                             </td>
                           </tr>
                           <tr className="hover:bg-gray-50/50 border-b border-gray-50">
                             <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">LE (DV)</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_left_sph ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_left_cyl ?? '-'}</td>
-                            <td className="px-5 py-2 text-center font-bold">{pow.dv_left_axis ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_le_sph ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_le_cyl ?? '-'}</td>
+                            <td className="px-5 py-2 text-center font-bold">{pow.dv_le_axis ?? '-'}</td>
                           </tr>
                           
                           {/* Near Vision Row (Conditional) */}
@@ -590,15 +602,15 @@ export default function CustomerProfile({ userProfile }) {
                             <>
                               <tr className="hover:bg-gray-50/50">
                                 <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">RE (NV)</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_right_sph ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_right_cyl ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_right_axis ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_re_sph ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_re_cyl ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_re_axis ?? '-'}</td>
                               </tr>
                               <tr className="hover:bg-gray-50/50 border-b border-gray-100">
                                 <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">LE (NV)</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_left_sph ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_left_cyl ?? '-'}</td>
-                                <td className="px-5 py-2 text-center font-bold">{pow.nv_left_axis ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_le_sph ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_le_cyl ?? '-'}</td>
+                                <td className="px-5 py-2 text-center font-bold">{pow.nv_le_axis ?? '-'}</td>
                               </tr>
                             </>
                           )}
@@ -682,6 +694,55 @@ export default function CustomerProfile({ userProfile }) {
                 </table>
               ) : (
                 <div className="p-10 text-center text-gray-400 italic">No orders found for this customer.</div>
+              )}
+            </div>
+          </div>
+
+          {/* Flow / Visit History */}
+          <div className="section-card">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#000000] flex items-center gap-2">
+                <Users size={16} className="text-[#333333]" /> Flow / Visit History
+              </h3>
+            </div>
+            <div className="p-0 overflow-x-auto">
+              {visits.length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Date</th>
+                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Purpose</th>
+                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {visits.map((v) => {
+                      const purposeLabels = {
+                        buy: "Buy Products",
+                        eye_checkup: "Eye Checkup",
+                        followup: "Order Followup",
+                        other: "Other Reasons"
+                      };
+                      return (
+                        <tr key={v.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-5 py-4 text-xs text-gray-500 whitespace-nowrap">
+                            {new Date(v.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </td>
+                          <td className="px-5 py-4 text-xs font-semibold text-gray-700">
+                            <span className="px-2 py-1 bg-black text-white rounded-lg text-[9px] font-black uppercase">
+                              {purposeLabels[v.purpose] || v.purpose}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-xs text-gray-500 italic max-w-[300px]">
+                            {v.notes || "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="p-10 text-center text-gray-400 italic">No flow history recorded for this customer.</div>
               )}
             </div>
           </div>

@@ -150,10 +150,10 @@ export default function Flow({ userProfile }) {
   };
 
   useEffect(() => {
-    if (!customer) {
+    if (userProfile) {
       fetchRecentVisits();
     }
-  }, [customer]);
+  }, [userProfile]);
 
   const handleProfileSelect = (p) => {
     setSelectedProfile(p);
