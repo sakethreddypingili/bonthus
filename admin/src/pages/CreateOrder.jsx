@@ -47,11 +47,12 @@ export default function CreateOrder({ userProfile }) {
         const fetchCustomerDetails = async () => {
             if (customer.phone && customer.phone.length >= 10) {
                 try {
-                    const { data, error } = await supabase
+                    const { data: customerList, error } = await supabase
                         .from('customers')
                         .select('name, street, town, district, state')
                         .eq('phone', customer.phone)
-                        .single();
+                        .limit(1);
+                    const data = customerList && customerList.length > 0 ? customerList[0] : null;
                     if (data && !error) {
                         setCustomer(prev => ({
                             ...prev,
@@ -855,12 +856,13 @@ export default function CreateOrder({ userProfile }) {
         setLoading(true);
         try {
             let customerId = null;
-            const { data: existingCustomer } = await supabase
+            const { data: existingCustomers } = await supabase
                 .from('customers')
                 .select('id')
                 .eq('phone', customer.phone)
-                .limit(1)
-                .maybeSingle();
+                .limit(1);
+
+            const existingCustomer = existingCustomers && existingCustomers.length > 0 ? existingCustomers[0] : null;
 
             if (existingCustomer) {
                 customerId = existingCustomer.id;

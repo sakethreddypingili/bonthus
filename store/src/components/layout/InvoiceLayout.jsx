@@ -1,7 +1,7 @@
 import React from 'react';
 import { Phone, MapPin } from 'lucide-react';
 import { INVOICE_BRAND } from '../../constants/brand';
-const logoImg = '/assets/images/image.png';;
+const logoImg = '/assets/images/bonthus-icon.webp';
 
 const numberToWords = (num) => {
   const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
@@ -81,7 +81,6 @@ const InvoiceLayout = React.forwardRef(({
             <img src={logoImg} alt="Company logo" className="w-full h-full object-contain" />
           </div>
           <div className="flex flex-col justify-center">
-            <span className="text-[10px] font-extrabold text-black tracking-widest uppercase mb-0.5">THE LENSCARE</span>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">{INVOICE_BRAND.headerTitle}</h1>
             <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-0.5">{INVOICE_BRAND.headerSubtitle}</p>
           </div>
@@ -89,68 +88,61 @@ const InvoiceLayout = React.forwardRef(({
 
         {/* Middle: Invoice Meta (Left) & Company Contact (Right) */}
         <div className="flex flex-row items-stretch gap-6">
-          {/* Left: Company Details */}
+          {/* Left: Combined Billed From Details */}
           <div className="w-1/2 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col justify-center gap-2">
-            <div className="flex items-center gap-2 text-slate-600">
-              <Phone size={14} className="text-slate-400" />
-              <span className="text-xs font-medium">Mobile: <span className="text-slate-900">{displayPhone}</span></span>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-5 h-5 rounded-full bg-slate-200/50 flex items-center justify-center text-slate-500">
+                <MapPin size={10} />
+              </div>
+              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Billed From</p>
+            </div>
+            <p className="font-extrabold text-black text-sm uppercase">{INVOICE_BRAND.billedFromName}</p>
+            <div className="flex items-center gap-2 text-slate-600 mt-1">
+              <Phone size={12} className="text-slate-400" />
+              <span className="text-xs font-medium">Phone: <span className="text-slate-900">{displayPhone}</span></span>
             </div>
             <div className="flex items-start gap-2 text-slate-600">
-              <MapPin size={14} className="text-slate-400 mt-0.5 shrink-0" />
+              <MapPin size={12} className="text-slate-400 mt-0.5 shrink-0" />
               <div className="text-xs leading-relaxed">
                 <p>{displayAddress}</p>
               </div>
             </div>
             {displayGstin && (
-              <div className="flex items-center gap-2 text-slate-600 border-t border-slate-100 pt-2 mt-2">
+              <div className="flex items-center gap-2 text-slate-600 border-t border-slate-100 pt-2 mt-1">
                 <span className="text-xs font-medium">GST No: <span className="text-slate-900 font-semibold">{displayGstin}</span></span>
               </div>
             )}
           </div>
 
-          {/* Right: Invoice Block */}
-          <div className="w-1/2 flex flex-col bg-slate-50 border border-slate-100 rounded-2xl px-6 py-5 shadow-sm">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase mb-4">Invoice</h2>
-            <div className="w-full flex justify-between items-center gap-8 mb-3 border-b border-slate-200/60 pb-3">
-              <span className="text-sm font-medium text-slate-500">Invoice No.</span>
-              <span className="text-sm font-bold text-slate-900">{order?.id || '-'}</span>
+          {/* Right: Invoice & Billed To Block */}
+          <div className="w-1/2 flex flex-col bg-slate-50 border border-slate-100 rounded-2xl px-6 py-5 shadow-sm justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase mb-4">Invoice</h2>
+              <div className="w-full flex justify-between items-center gap-8 mb-3 border-b border-slate-200/60 pb-3">
+                <span className="text-sm font-medium text-slate-500">Invoice No.</span>
+                <span className="text-sm font-bold text-slate-900">{order?.id || '-'}</span>
+              </div>
+              <div className="w-full flex justify-between items-center gap-8 mb-3 border-b border-slate-200/60 pb-3">
+                <span className="text-sm font-medium text-slate-500">Issue Date</span>
+                <span className="text-sm font-bold text-slate-900">{new Date(order?.created_at || new Date()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+              </div>
             </div>
-            <div className="w-full flex justify-between items-center gap-8">
-              <span className="text-sm font-medium text-slate-500">Issue Date</span>
-              <span className="text-sm font-bold text-slate-900">{new Date(order?.created_at || new Date()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+            <div className="mt-2">
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-black">
+                  <span className="font-bold text-[9px] font-black">To</span>
+                </div>
+                <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Billed To</p>
+              </div>
+              <p className="font-extrabold text-slate-900 text-base leading-none uppercase">{customerName}</p>
+              <p className="text-slate-600 text-xs font-semibold leading-none mt-1.5">{customerPhone}</p>
+              {order?.customers?.email && <p className="text-slate-500 text-[10px] mt-1 lowercase leading-none">{order?.customers?.email}</p>}
             </div>
           </div>
         </div>
       </div>
 
       <hr className="border-slate-300 mb-4" />
-
-      {/* Company & Customer Details */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-slate-200/50 flex items-center justify-center text-slate-500">
-              <MapPin size={12} />
-            </div>
-            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Billed From</p>
-          </div>
-          <p className="font-extrabold text-black text-lg mb-0.5">{INVOICE_BRAND.billedFromName}</p>
-          <p className="text-slate-600 text-xs font-medium">Phone: {displayPhone}</p>
-          <p className="text-slate-600 text-xs leading-tight">{displayAddress}</p>
-        </div>
-
-        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-black">
-              <span className="font-bold text-xs font-black">To</span>
-            </div>
-            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Billed To</p>
-          </div>
-          <p className="font-bold text-slate-900 text-base mb-0.5">{customerName}</p>
-          <p className="text-slate-600 text-sm font-medium leading-none">{customerPhone}</p>
-          {order?.customers?.email && <p className="text-slate-500 text-xs mt-0.5 lowercase">{order?.customers?.email}</p>}
-        </div>
-      </div>
 
       {/* Items Table - No scroll, fits page width */}
       <div className="border border-slate-400 rounded-2xl mb-4 overflow-hidden">
@@ -175,8 +167,8 @@ const InvoiceLayout = React.forwardRef(({
               const p = Number(item.price || 0);
               const d = Number(item.discount_amt || 0);
 
-              const sgstR = Number(item.products_list?.products_category?.sgst || 0);
-              const cgstR = Number(item.products_list?.products_category?.cgst || 0);
+              const sgstR = Number(item.products?.product_categories?.sgst || 0);
+              const cgstR = Number(item.products?.product_categories?.cgst || 0);
               const totalTaxR = sgstR + cgstR;
 
               let taxable, sgstA, cgstA, total;
@@ -195,7 +187,7 @@ const InvoiceLayout = React.forwardRef(({
               return (
                 <tr key={item.id} className="bg-white hover:bg-slate-50 transition-colors">
                   <td className="py-2 px-4 font-bold text-slate-900 text-xs border-r border-slate-400">
-                    {item.products_list?.name || 'Custom Product'}
+                    {item.products?.name || 'Custom Product'}
                   </td>
                   <td className="py-2 px-1 text-center font-medium text-slate-900 border-r border-slate-400">{q}</td>
                   <td className="py-2 px-1 text-right font-medium text-slate-900 border-r border-slate-400">₹{p.toLocaleString()}</td>
@@ -442,7 +434,7 @@ const InvoiceLayout = React.forwardRef(({
         <div className="flex flex-col justify-end items-end">
           <div className="flex flex-col items-center gap-6 mt-4">
             <div className="text-center">
-              <p className="text-[10px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For "The Lenscare" {storeName}</p>
+              <p className="text-[10px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For {storeName}</p>
               <div className="w-40 h-[1px] bg-slate-300 mb-1"></div>
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Authorized Signatory</p>
             </div>

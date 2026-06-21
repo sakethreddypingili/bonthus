@@ -92,7 +92,7 @@ export default function InvoiceView({ userProfile }) {
   // WhatsApp Business API credentials - LOAD FROM ENVIRONMENT ONLY
   const WA_PHONE_NUMBER_ID = process.env.REACT_APP_WA_PHONE_NUMBER_ID;
   const WA_ACCESS_TOKEN = process.env.REACT_APP_WA_ACCESS_TOKEN;
-  
+
   // Validate credentials are configured
   if (!WA_PHONE_NUMBER_ID || !WA_ACCESS_TOKEN) {
     console.error('WhatsApp credentials not configured in environment variables');
@@ -168,22 +168,21 @@ export default function InvoiceView({ userProfile }) {
           eye_power(*),
           order_items(
             *,
-            products_list(
+            products(
               id,
               name, 
-              price,
               category_id,
-              products_category(id, name, sgst, cgst)
+              categories(id, name, sgst, cgst)
             )
           )
         `)
         .eq('id', orderId)
         .single();
-      
+
       if (error) throw error;
-      
+
       console.log('Fetched order with categories:', JSON.stringify(data?.order_items?.[0], null, 2));
-      
+
       setOrder(data);
 
       // 2. Fetch Store Details 
@@ -193,9 +192,9 @@ export default function InvoiceView({ userProfile }) {
           .select('*')
           .eq('id', data.store_id)
           .single();
-        
+
         console.log('Store Data:', storeData);
-        
+
         if (storeData) {
           setStoreDetails(storeData);
         }
@@ -213,7 +212,7 @@ export default function InvoiceView({ userProfile }) {
 
   const totals = useMemo(() => {
     if (!order?.order_items?.length) {
-      const g = Number(order?.gross_amount || 0);
+      const g = Number(order?.net_amount || 0);
       const d = Number(order?.due_amount || 0);
       return {
         isLegacy: false,
@@ -230,7 +229,7 @@ export default function InvoiceView({ userProfile }) {
 
     // 2. Detect if this is a legacy order where tax was added ON TOP of the prices
     // We allow a small tolerance for rounding differences
-    const isLegacy = Number(order?.gross_amount || 0) > (inclusiveItemSum + 5);
+    const isLegacy = Number(order?.net_amount || 0) > (inclusiveItemSum + 5);
 
     let tCgst = 0, tSgst = 0, tTaxable = 0, tSub = 0, tDisc = 0;
 
@@ -238,10 +237,10 @@ export default function InvoiceView({ userProfile }) {
       const q = Number(item.qty || 0);
       const p = Number(item.price || 0);
       const d = Number(item.discount_amt || 0);
-      
+
       const sub = q * p;
-      const sgstRate = Number(item.products_list?.products_category?.sgst || 0);
-      const cgstRate = Number(item.products_list?.products_category?.cgst || 0);
+      const sgstRate = Number(item.products?.categories?.sgst || 0);
+      const cgstRate = Number(item.products?.categories?.cgst || 0);
       const totalTaxRate = sgstRate + cgstRate;
 
       let taxable, sgstAmt, cgstAmt, lineTotal;
@@ -266,7 +265,7 @@ export default function InvoiceView({ userProfile }) {
       tCgst += cgstAmt;
       tSgst += sgstAmt;
     });
-    
+
     // Master Totals
     const finalGrossTotal = Math.round(isLegacy ? (tTaxable + tSgst + tCgst) : (tSub - tDisc));
     const roundedDue = Math.round(Number(order?.due_amount || 0));
@@ -279,7 +278,7 @@ export default function InvoiceView({ userProfile }) {
       taxableAmount: tTaxable.toFixed(2),
       cgst: tCgst.toFixed(2),
       sgst: tSgst.toFixed(2),
-      total: finalGrossTotal.toString(), 
+      total: finalGrossTotal.toString(),
       paid: roundedPaid.toString(),
       due: roundedDue.toString()
     };
@@ -351,7 +350,7 @@ export default function InvoiceView({ userProfile }) {
         compress: true,
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('images/bonthus-icon.webp');
 
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -420,7 +419,7 @@ export default function InvoiceView({ userProfile }) {
   const displayAddress = storeDetails?.address || 'No Address Provided';
   const displayGstin = storeDetails?.gst_no || storeDetails?.gstin || 'Not Available';
   const displayPhone = storeDetails?.phone_no || storeDetails?.phone || 'No Contact Provided';
-  
+
   // If order status is "Delivered", treat payment as successful.
   const isDelivered = String(order?.status || '').toLowerCase() === 'delivered';
   const displayPaymentStatus = isDelivered ? 'Success' : 'Pending';
@@ -449,11 +448,10 @@ export default function InvoiceView({ userProfile }) {
             <button
               onClick={handleDownload}
               disabled={isGenerating}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition min-h-[44px] ${
-                isGenerating 
-                  ? 'bg-gray-400 cursor-not-allowed text-white' 
-                  : 'bg-black hover:shadow-lg text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition min-h-[44px] ${isGenerating
+                ? 'bg-gray-400 cursor-not-allowed text-white'
+                : 'bg-black hover:shadow-lg text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20'
+                }`}
               aria-label={isGenerating ? "Generating PDF..." : "Download invoice as PDF"}
             >
               {isGenerating ? (
@@ -543,19 +541,19 @@ export default function InvoiceView({ userProfile }) {
           </div>
         )}
 
-      {/* Full-Screen Processing Overlay - Prevents "Frozen" perception during heavy CPU tasks */}
-      {isGenerating && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center animate-in fade-in duration-300">
-          <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 max-w-xs text-center border border-slate-100">
-            <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin" />
-            <div>
-              <h3 className="text-lg font-bold text-slate-900">Generating Invoice</h3>
-              <p className="text-sm text-slate-500 mt-1">Please wait while we prepare your high-quality PDF. This may take a few seconds.</p>
+        {/* Full-Screen Processing Overlay - Prevents "Frozen" perception during heavy CPU tasks */}
+        {isGenerating && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center animate-in fade-in duration-300">
+            <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 max-w-xs text-center border border-slate-100">
+              <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin" />
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Generating Invoice</h3>
+                <p className="text-sm text-slate-500 mt-1">Please wait while we prepare your high-quality PDF. This may take a few seconds.</p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  </div>
   );
 }

@@ -77,6 +77,9 @@ CREATE TABLE IF NOT EXISTS public.customers (
     postal_code TEXT,
     store_id UUID,
     family_id uuid REFERENCES public.family(id) ON DELETE SET NULL,
+    parent_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    relationship TEXT,
+    age INTEGER,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
 );
@@ -401,18 +404,7 @@ CREATE TABLE IF NOT EXISTS public.vendors (
 -- New tables from live database
 -- -------------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS public.dependents (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    parent_customer_id uuid NOT NULL REFERENCES public.customers(id) ON DELETE CASCADE,
-    family_id uuid REFERENCES public.family(id) ON DELETE SET NULL,
-    name text NOT NULL,
-    relationship text NOT NULL,
-    phone text,
-    email text,
-    created_at timestamp with time zone NOT NULL DEFAULT now(),
-    CONSTRAINT dependents_pkey PRIMARY KEY (id),
-    CONSTRAINT unique_parent_dependent UNIQUE (parent_customer_id, name, relationship)
-);
+
 
 CREATE TABLE IF NOT EXISTS public.product_variants (
     id uuid NOT NULL DEFAULT gen_random_uuid(),

@@ -13,12 +13,12 @@ const setFavicon = (href) => {
     link.rel = "icon";
     head.appendChild(link);
   }
-  link.type = "image/x-icon";
+  link.type = "image/webp";
   link.href = href;
 };
 
 // Use public path for favicon
-setFavicon("/assets/images/favicon.ico");
+setFavicon("/assets/images/bonthus-icon.webp");
 document.title = "Bonthus - Store";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));

@@ -20,6 +20,8 @@ import PasswordReset from "./pages/PasswordReset";
 import Reminders from "./pages/Reminders";
 import Notifications from "./pages/Notifications";
 import BarcodePrinter from "./pages/BarcodePrinter";
+import Flow from "./pages/Flow";
+import Power from "./pages/Power";
 import { PROFILE_CACHE_KEY, logout } from "./utils/auth";
 
 function App() {
@@ -353,6 +355,8 @@ function App() {
     <Routes>
       <Route path="/" element={<Attendance userProfile={userProfile} />} />
       <Route path="/attendance" element={<Attendance userProfile={userProfile} />} />
+      <Route path="/flow" element={<Flow userProfile={userProfile} />} />
+      <Route path="/power" element={<Power userProfile={userProfile} />} />
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/invoice/:id" element={<InvoiceView userProfile={userProfile} />} />
@@ -370,6 +374,8 @@ function App() {
       <Route path="/products" element={<Products userProfile={userProfile} />} />
       <Route path="/customers" element={<Customers userProfile={userProfile} />} />
       <Route path="/customers/:id" element={<CustomerProfile userProfile={userProfile} />} />
+      <Route path="/flow" element={<Flow userProfile={userProfile} />} />
+      <Route path="/power" element={<Power userProfile={userProfile} />} />
       <Route path="/analytics" element={<Analytics userProfile={userProfile} />} />
       <Route path="/attendance" element={<Attendance userProfile={userProfile} />} />
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />

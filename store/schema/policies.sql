@@ -32,7 +32,6 @@ ALTER TABLE public.product_barcodes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.labs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.brands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.family ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.dependents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_variants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_items ENABLE ROW LEVEL SECURITY;
@@ -265,13 +264,7 @@ CREATE POLICY "family_select_policy" ON public.family FOR SELECT TO authenticate
 DROP POLICY IF EXISTS "family_admin_policy" ON public.family;
 CREATE POLICY "family_admin_policy" ON public.family FOR ALL TO authenticated USING (is_admin_or_super_admin());
 
--- public.dependents
-DROP POLICY IF EXISTS "dependents_select_policy" ON public.dependents;
-CREATE POLICY "dependents_select_policy" ON public.dependents FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "dependents_write_policy" ON public.dependents;
-CREATE POLICY "dependents_write_policy" ON public.dependents FOR ALL TO authenticated USING (true);
-DROP POLICY IF EXISTS "Public invoice read dependents" ON public.dependents;
-CREATE POLICY "Public invoice read dependents" ON public.dependents FOR SELECT TO anon USING (true);
+
 
 -- public.product_variants
 DROP POLICY IF EXISTS "product_variants_select_policy" ON public.product_variants;

@@ -93,7 +93,7 @@ export default function Orders({ userProfile }) {
           disabled,
           customers ( * ),
           order_items ( id, quantity, unit_price, discount_amount, total_price, products ( name ) ),
-          eye_power ( * )
+          prescriptions ( * )
         `)
         .order('created_at', { ascending: false });
 
@@ -193,30 +193,44 @@ export default function Orders({ userProfile }) {
     setLoadingCustomer(true);
     setSearchAttempted(true);
     try {
-      const { data: primaryData, error: primaryError } = await supabase
+      const { data: matchedCustomers, error: primaryError } = await supabase
         .from('customers')
         .select('*')
-        .eq('phone', customerMobile.trim())
-        .maybeSingle();
+        .eq('phone', customerMobile.trim());
 
       if (primaryError) throw primaryError;
 
-      if (primaryData) {
-        const { data: dependentsData, error: dependentsError } = await supabase
-          .from('dependents')
-          .select('*')
-          .eq('parent_customer_id', primaryData.id);
+      if (matchedCustomers && matchedCustomers.length > 0) {
+        const primaryData = matchedCustomers.find(c => !c.parent_id);
+        let dependentsData = [];
 
-        if (dependentsError) throw dependentsError;
+        if (primaryData) {
+          const { data: deps, error: dependentsError } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('parent_id', primaryData.id);
+          if (dependentsError) throw dependentsError;
+          dependentsData = deps || [];
+        }
 
-        const allProfiles = [
-          { ...primaryData, label: "Primary Profile" },
-          ...(dependentsData || []).map(dep => ({
-            ...dep,
-            label: `Dependent (${dep.relationship || "Family"})`
-          }))
-        ];
-        setSearchedProfiles(allProfiles);
+        const profileMap = new Map();
+        matchedCustomers.forEach(c => {
+          profileMap.set(c.id, {
+            ...c,
+            label: c.parent_id ? `Dependent (${c.relationship || "Family"})` : "Primary Profile"
+          });
+        });
+
+        dependentsData.forEach(c => {
+          if (!profileMap.has(c.id)) {
+            profileMap.set(c.id, {
+              ...c,
+              label: `Dependent (${c.relationship || "Family"})`
+            });
+          }
+        });
+
+        setSearchedProfiles(Array.from(profileMap.values()));
       } else {
         setSearchedProfiles([]);
       }
@@ -330,7 +344,7 @@ export default function Orders({ userProfile }) {
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
         {/* Toolbar */}
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 px-6 py-6 border-b border-gray-50">
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 xl:pb-0 no-scrollbar">
+          <div className="flex flex-wrap items-center gap-2">
             {STATUSES.map(s => (
               <button
                 key={s}

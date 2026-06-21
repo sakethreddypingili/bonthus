@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import { supabaseAdmin } from "../server/supabase/supabaseAdmin";
-import { ROLES_FOR_SUPER_ADMIN, ROLES_FOR_ADMIN } from "../server/database/mocks/constants";
+import { OPERATION_TYPES, ROLES_BY_OPERATION, UNIT_BASED_OPERATIONS, ROLES_FOR_SUPER_ADMIN, ROLES_FOR_ADMIN } from "../server/database/mocks/constants";
 import SlideDrawer from '../components/common/SlideDrawer';
 import { Onboarding } from "./Onboarding";
 import Attendance from "./Attendance";
@@ -33,6 +33,7 @@ export default function EmployeeManagement({ userProfile }) {
 
   const [employees, setEmployees] = useState([]);
   const [stores, setStores] = useState([]);
+  const [labs, setLabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -40,7 +41,6 @@ export default function EmployeeManagement({ userProfile }) {
 
   const isSuperAdmin = userProfile?.role === 'super_admin';
   const isAdmin = userProfile?.role === 'admin' || isSuperAdmin;
-  const availableRoles = isSuperAdmin ? ROLES_FOR_SUPER_ADMIN : (isAdmin ? ROLES_FOR_ADMIN : []);
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -49,12 +49,16 @@ export default function EmployeeManagement({ userProfile }) {
 
   useEffect(() => {
     fetchEmployees();
-    fetchStores();
+    fetchUnits();
   }, []);
 
-  async function fetchStores() {
-    const { data, error } = await supabaseAdmin.from('stores').select('*').order('name');
-    if (!error) setStores(data || []);
+  async function fetchUnits() {
+    const [{ data: sData }, { data: lData }] = await Promise.all([
+      supabaseAdmin.from('stores').select('*').order('name'),
+      supabaseAdmin.from('labs').select('*').order('name')
+    ]);
+    if (sData) setStores(sData);
+    if (lData) setLabs(lData);
   }
 
   async function fetchEmployees() {
@@ -81,11 +85,14 @@ export default function EmployeeManagement({ userProfile }) {
         .update({
           name: editingEmployee.name,
           role: editingEmployee.role,
-          store_id: editingEmployee.store_id || null,
+          operation_type: editingEmployee.operation_type,
+          store_id: editingEmployee.operation_type === 'store' ? (editingEmployee.store_id || null) : null,
+          lab_id: editingEmployee.operation_type === 'lab' ? (editingEmployee.lab_id || null) : null,
           is_active: editingEmployee.is_active,
           phone: editingEmployee.phone,
           personal_email: editingEmployee.personal_email,
-          address: editingEmployee.address,
+          current_address: editingEmployee.current_address,
+          permanent_address: editingEmployee.permanent_address,
           emergency_contact: editingEmployee.emergency_contact,
           designation: editingEmployee.designation
         })
@@ -167,7 +174,14 @@ export default function EmployeeManagement({ userProfile }) {
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-sm font-black text-black uppercase tracking-tight truncate">{emp.name}</h3>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 truncate">{emp.designation || emp.role?.replace('_', ' ')}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">{emp.designation || emp.role?.replace('_', ' ')}</p>
+                      {emp.operation_type && (
+                        <span className="text-[8px] font-black px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-md uppercase tracking-tighter">
+                          {emp.operation_type}
+                        </span>
+                      )}
+                    </div>
                     <div className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${emp.is_active ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}>
                       <div className={`w-1 h-1 rounded-full ${emp.is_active ? "bg-green-600 animate-pulse" : "bg-red-600"}`} />
                       {emp.is_active ? "Active" : "Inactive"}
@@ -216,29 +230,100 @@ export default function EmployeeManagement({ userProfile }) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Role</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Operation Domain</label>
                 <select 
-                  value={editingEmployee.role}
-                  onChange={e => setEditingEmployee({...editingEmployee, role: e.target.value})}
+                  value={(() => {
+                    const op = editingEmployee.operation_type;
+                    if (op === 'store') return 'retail_ops';
+                    if (op === 'lab') return 'warehouse';
+                    return op || '';
+                  })()}
+                  onChange={e => {
+                    const domain = e.target.value;
+                    const firstPrimary = ROLES_BY_OPERATION[domain]?.[0]?.value || '';
+                    const isUnit = UNIT_BASED_OPERATIONS.includes(firstPrimary);
+                    setEditingEmployee({
+                      ...editingEmployee, 
+                      operation_type: isUnit ? firstPrimary : domain,
+                      role: isUnit ? (ROLES_BY_OPERATION[firstPrimary]?.[0]?.value || '') : firstPrimary,
+                      store_id: null,
+                      lab_id: null
+                    });
+                  }}
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 outline-none transition-all"
                 >
-                  {availableRoles.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  <option value="">Select Domain</option>
+                  {OPERATION_TYPES.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
                 </select>
               </div>
+
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Unit</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Official Designation</label>
                 <select 
-                  value={editingEmployee.store_id || ''}
-                  onChange={e => setEditingEmployee({...editingEmployee, store_id: e.target.value})}
+                  value={UNIT_BASED_OPERATIONS.includes(editingEmployee.operation_type) ? editingEmployee.operation_type : editingEmployee.role}
+                  onChange={e => {
+                    const primary = e.target.value;
+                    const isUnit = UNIT_BASED_OPERATIONS.includes(primary);
+                    const domain = (() => {
+                      const op = editingEmployee.operation_type;
+                      if (op === 'store') return 'retail_ops';
+                      if (op === 'lab') return 'warehouse';
+                      return op;
+                    })();
+                    setEditingEmployee({
+                      ...editingEmployee, 
+                      operation_type: isUnit ? primary : domain,
+                      role: isUnit ? (ROLES_BY_OPERATION[primary]?.[0]?.value || '') : primary,
+                      store_id: null,
+                      lab_id: null
+                    });
+                  }}
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 outline-none transition-all"
                 >
-                  <option value="">Global</option>
-                  {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {(() => {
+                    const op = editingEmployee.operation_type;
+                    const domain = (op === 'store') ? 'retail_ops' : (op === 'lab' ? 'warehouse' : op);
+                    return (ROLES_BY_OPERATION[domain] || []).map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ));
+                  })()}
                 </select>
               </div>
             </div>
+
+            {UNIT_BASED_OPERATIONS.includes(editingEmployee.operation_type) && (
+              <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-1 duration-300">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Unit Specific Role</label>
+                  <select 
+                    value={editingEmployee.role}
+                    onChange={e => setEditingEmployee({...editingEmployee, role: e.target.value})}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                  >
+                    {(ROLES_BY_OPERATION[editingEmployee.operation_type] || []).map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Assigned {editingEmployee.operation_type === 'store' ? 'Store' : 'Lab'}</label>
+                  <select 
+                    value={editingEmployee.operation_type === 'store' ? (editingEmployee.store_id || '') : (editingEmployee.lab_id || '')}
+                    onChange={e => setEditingEmployee({
+                      ...editingEmployee, 
+                      [editingEmployee.operation_type === 'store' ? 'store_id' : 'lab_id']: e.target.value 
+                    })}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                  >
+                    <option value="">Global Command</option>
+                    {(editingEmployee.operation_type === 'store' ? stores : labs).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Designation</label>
@@ -272,6 +357,26 @@ export default function EmployeeManagement({ userProfile }) {
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Current Address</label>
+              <textarea 
+                rows={2}
+                value={editingEmployee.current_address || ''}
+                onChange={e => setEditingEmployee({...editingEmployee, current_address: e.target.value})}
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-[11px] font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all resize-none"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Permanent Address</label>
+              <textarea 
+                rows={2}
+                value={editingEmployee.permanent_address || ''}
+                onChange={e => setEditingEmployee({...editingEmployee, permanent_address: e.target.value})}
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-[11px] font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all resize-none"
+              />
             </div>
 
             <div className="pt-8 border-t border-gray-50 flex gap-4">

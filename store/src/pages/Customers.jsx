@@ -13,6 +13,16 @@ export default function Customers({ userProfile }) {
   const PER_PAGE = 25;
 
   const [activeStoreCustomerIds, setActiveStoreCustomerIds] = useState(new Set());
+  const [selectedStore, setSelectedStore] = useState("All");
+
+  useEffect(() => {
+    if (userProfile) {
+      const isAdmin = userProfile.role === 'admin' || userProfile.role === 'super_admin';
+      if (!isAdmin) {
+        setSelectedStore(userProfile.store_id || "All");
+      }
+    }
+  }, [userProfile]);
 
   const fetchCustomers = useCallback(async () => {
     if (!userProfile) {
@@ -21,7 +31,7 @@ export default function Customers({ userProfile }) {
     }
 
     const isAdmin = userProfile.role === 'admin' || userProfile.role === 'super_admin';
-    const userStoreId = userProfile.store_id;
+    const userStoreId = selectedStore !== "All" ? selectedStore : userProfile.store_id;
 
     if (isAdmin) {
       console.log(`[Customers Page] Authenticated User Role: ${userProfile.role} (Super/Global Admin). Showing all-time customers.`);
@@ -32,10 +42,12 @@ export default function Customers({ userProfile }) {
 
     setLoading(true);
     try {
-      // 1. Fetch active customer ids from orders matching store in the last 48 hours
+      // 1. Fetch active customer ids from orders, visits, and prescriptions matching store in the last 48 hours
       let fortyEightHourCustomerIds = new Set();
-      if (!isAdmin && userStoreId) {
+      if ((!isAdmin || selectedStore !== "All") && userStoreId) {
         const thresholdDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+        
+        // A. Orders
         const { data: recentOrders, error: orderErr } = await supabase
           .from('orders')
           .select('customer_id')
@@ -50,10 +62,50 @@ export default function Customers({ userProfile }) {
             if (o.customer_id) fortyEightHourCustomerIds.add(o.customer_id);
           });
         }
+
+        // B. Visits (Flow)
+        const { data: recentVisits, error: visitErr } = await supabase
+          .from('customer_visits')
+          .select('customer_id')
+          .eq('store_id', userStoreId)
+          .gte('created_at', thresholdDate);
+
+        if (visitErr) {
+          console.error("Failed to query 48-hour store visits:", visitErr);
+        } else if (recentVisits) {
+          recentVisits.forEach(v => {
+            if (v.customer_id) fortyEightHourCustomerIds.add(v.customer_id);
+          });
+        }
+
+        // C. Prescriptions (Power) - linked to store users/optometrists
+        const { data: storeUsers, error: usersErr } = await supabase
+          .from('users')
+          .select('id')
+          .eq('store_id', userStoreId);
+
+        if (usersErr) {
+          console.error("Failed to query store users:", usersErr);
+        } else if (storeUsers && storeUsers.length > 0) {
+          const storeUserIds = storeUsers.map(u => u.id);
+          const { data: recentPrescriptions, error: rxErr } = await supabase
+            .from('prescriptions')
+            .select('customer_id')
+            .in('optometrist_id', storeUserIds)
+            .gte('prescribed_at', thresholdDate);
+
+          if (rxErr) {
+            console.error("Failed to query recent prescriptions:", rxErr);
+          } else if (recentPrescriptions) {
+            recentPrescriptions.forEach(p => {
+              if (p.customer_id) fortyEightHourCustomerIds.add(p.customer_id);
+            });
+          }
+        }
       }
       setActiveStoreCustomerIds(fortyEightHourCustomerIds);
 
-      // 2. Fetch all customers globally
+      // 2. Fetch all customers globally (including dependents)
       let allCustomers = [];
       let hasMoreCust = true;
       let startCust = 0;
@@ -62,9 +114,13 @@ export default function Customers({ userProfile }) {
       while (hasMoreCust) {
         let query = supabase
           .from("customers")
-          .select('id, name, phone, email, street, town, district, state, created_at, family_id')
+          .select('id, name, phone, email, street, town, district, state, created_at, family_id, parent_id, relationship')
           .order('created_at', { ascending: false })
           .range(startCust, startCust + step - 1);
+
+        if (selectedStore !== "All") {
+          query = query.eq('store_id', selectedStore);
+        }
 
         const { data, error } = await query;
         if (error) throw new Error(`Supabase customers query failed: ${error.message}`);
@@ -75,30 +131,6 @@ export default function Customers({ userProfile }) {
         }
         if (!data || data.length < step) {
           hasMoreCust = false;
-        }
-      }
-
-      // 3. Fetch all dependents globally
-      let allDependents = [];
-      let hasMoreDep = true;
-      let startDep = 0;
-
-      while (hasMoreDep) {
-        let query = supabase
-          .from("dependents")
-          .select('id, parent_customer_id, family_id, name, relationship, phone, email, created_at')
-          .order('created_at', { ascending: false })
-          .range(startDep, startDep + step - 1);
-
-        const { data, error } = await query;
-        if (error) throw new Error(`Supabase dependents query failed: ${error.message}`);
-
-        if (data && data.length > 0) {
-          allDependents = allDependents.concat(data);
-          startDep += step;
-        }
-        if (!data || data.length < step) {
-          hasMoreDep = false;
         }
       }
 
@@ -120,47 +152,15 @@ export default function Customers({ userProfile }) {
           ? new Date(u.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) 
           : 'N/A';
 
-        return {
-          id: u.id,
-          name,
-          email,
-          phone,
-          city,
-          orders: 0,
-          spent: 0,
-          joined,
-          created_at: u.created_at,
-          parent_id: null,
-          family_id: u.family_id
-        };
-      });
-
-      const mappedDependents = allDependents.map(d => {
-        const name = String(d.name || '').trim() || 'Anonymous';
-        const email = d.email ? String(d.email).trim() : 'N/A';
-        const phone = d.phone ? String(d.phone).trim() : 'N/A';
-        
-        const parentObj = allCustomers.find(p => p.id === d.parent_customer_id);
-        const parentName = parentObj ? String(parentObj.name || '').trim() : 'Primary';
-        const displayName = `${name} (${parentName})`;
-
-        // Get address from parent
-        let city = 'N/A';
-        if (parentObj) {
-          try {
-            const parts = [parentObj.street, parentObj.town, parentObj.district, parentObj.state].filter(p => typeof p === 'string' && p.trim() !== '');
-            if (parts.length > 0) city = parts.join(', ');
-          } catch (e) {
-            console.error(e);
-          }
+        let displayName = name;
+        if (u.parent_id) {
+          const parentObj = allCustomers.find(p => p.id === u.parent_id);
+          const parentName = parentObj ? String(parentObj.name || '').trim() : 'Primary';
+          displayName = `${name} (${parentName})`;
         }
 
-        const joined = d.created_at 
-          ? new Date(d.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) 
-          : 'N/A';
-
         return {
-          id: d.id,
+          id: u.id,
           name: displayName,
           email,
           phone,
@@ -168,19 +168,19 @@ export default function Customers({ userProfile }) {
           orders: 0,
           spent: 0,
           joined,
-          created_at: d.created_at,
-          parent_id: d.parent_customer_id,
-          family_id: d.family_id
+          created_at: u.created_at,
+          parent_id: u.parent_id,
+          family_id: u.family_id
         };
       });
 
-      setDbCustomers([...mappedCustomers, ...mappedDependents]);
+      setDbCustomers(mappedCustomers);
     } catch (err) {
       console.error("Error fetching customers:", err.message);
     } finally {
       setLoading(false);
     }
-  }, [userProfile]);
+  }, [userProfile, selectedStore]);
 
   useEffect(() => {
     fetchCustomers();
@@ -300,7 +300,7 @@ export default function Customers({ userProfile }) {
                   <td className="px-6 py-4 text-center text-[10px] font-black text-gray-400 uppercase">{c.joined}</td>
                   <td className="px-6 py-4 text-center">
                     <button 
-                      onClick={() => navigate(`/customers/${c.id}`)}
+                      onClick={() => navigate(`/customers/${c.id}`, { state: { parentId: c.parent_id } })}
                       className="p-2 rounded-lg hover:bg-black hover:text-white transition-all text-gray-400"
                     >
                       <Eye size={16} />

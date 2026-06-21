@@ -11,58 +11,99 @@ export default function CreateOrder({ userProfile }) {
     const navigate = useNavigate();
     const location = useLocation();
     const initialCustomer = location.state?.customer || {};
+    const isCustomerLocked = !!location.state?.customer;
     const [profiles, setProfiles] = useState([]);
     const [selectedProfile, setSelectedProfile] = useState(null);
     const [prescriptions, setPrescriptions] = useState([]);
     const [selectedPrescriptionId, setSelectedPrescriptionId] = useState("");
 
     const [customer, setCustomer] = useState({
+        id: initialCustomer.id || "",
         name: initialCustomer.name || "",
         phone: initialCustomer.phone || "",
         street: initialCustomer.street || "",
         town: initialCustomer.town || "",
         district: initialCustomer.district || "",
         state: initialCustomer.state || "",
-        email: initialCustomer.email || ""
+        email: initialCustomer.email || "",
+        age: initialCustomer.age || ""
     });
+
+
 
     useEffect(() => {
         const fetchCustomerDetails = async () => {
+            // Avoid refetching/resetting if switching between profiles that are already loaded in the list
+            const isExistingProfile = profiles.some(p => p.id === selectedProfile?.id);
+            const matchesExistingPhone = profiles.some(p => p.phone === customer.phone) || (profiles[0] && profiles[0].phone === customer.phone);
+            if (isExistingProfile && matchesExistingPhone) {
+                return;
+            }
+
             if (customer.phone && customer.phone.length >= 10) {
                 try {
-                    const { data: primaryData, error: primaryError } = await supabase
+                    const { data: matchedCustomers, error: primaryError } = await supabase
                         .from('customers')
                         .select('*')
-                        .eq('phone', customer.phone)
-                        .maybeSingle();
+                        .eq('phone', customer.phone);
 
-                    if (primaryData && !primaryError) {
-                        const { data: dependentsData } = await supabase
-                            .from('dependents')
-                            .select('*')
-                            .eq('parent_customer_id', primaryData.id);
+                    if (primaryError) throw primaryError;
 
-                        const allProfiles = [
-                            { ...primaryData, label: "Primary Profile" },
-                            ...(dependentsData || []).map(dep => ({
-                                ...dep,
-                                label: `Dependent (${dep.relationship || "Family"})`
-                            }))
-                        ];
+                    if (matchedCustomers && matchedCustomers.length > 0) {
+                        const primaryData = matchedCustomers.find(c => !c.parent_id) || matchedCustomers[0];
+                        let dependentsData = [];
 
+                        if (primaryData) {
+                            const { data: deps, error: dependentsError } = await supabase
+                                .from('customers')
+                                .select('*')
+                                .eq('parent_id', primaryData.id);
+                            if (!dependentsError && deps) {
+                                dependentsData = deps;
+                            }
+                        }
+
+                        const profileMap = new Map();
+                        matchedCustomers.forEach(c => {
+                            profileMap.set(c.id, {
+                                ...c,
+                                label: c.parent_id ? `Dependent (${c.relationship || "Family"})` : "Primary Profile"
+                            });
+                        });
+
+                        dependentsData.forEach(c => {
+                            if (!profileMap.has(c.id)) {
+                                profileMap.set(c.id, {
+                                    ...c,
+                                    label: `Dependent (${c.relationship || "Family"})`
+                                });
+                            }
+                        });
+
+                        const allProfiles = Array.from(profileMap.values());
                         setProfiles(allProfiles);
                         
                         if (!selectedProfile) {
-                            setSelectedProfile(allProfiles[0]);
+                            const initialProfileId = (customer.phone === initialCustomer.phone) ? location.state?.initialSelectedProfileId : null;
+                            const targetProfile = allProfiles.find(p => p.id === initialProfileId) || allProfiles[0];
+                            setSelectedProfile(targetProfile);
+                            
+                            const isDep = !!targetProfile.parent_id;
+                            const primary = isDep ? (primaryData || targetProfile) : targetProfile;
                             setCustomer(prev => ({
                                 ...prev,
-                                name: allProfiles[0].name || "",
-                                street: allProfiles[0].street || "",
-                                town: allProfiles[0].town || "",
-                                district: allProfiles[0].district || "",
-                                state: allProfiles[0].state || "",
-                                email: allProfiles[0].email || ""
+                                id: primary.id || "",
+                                name: targetProfile.name || "",
+                                phone: primary.phone || customer.phone,
+                                street: primary.street || "",
+                                town: primary.town || "",
+                                district: primary.district || "",
+                                state: primary.state || "",
+                                email: primary.email || "",
+                                age: targetProfile.age || ""
                             }));
+
+                            // setDependent calls removed
                         }
                     } else {
                         setProfiles([]);
@@ -86,17 +127,17 @@ export default function CreateOrder({ userProfile }) {
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [customer.phone, selectedProfile]);
+    }, [customer.phone, profiles, selectedProfile, initialCustomer.phone, location.state?.initialSelectedProfileId]);
 
     useEffect(() => {
         const fetchPrescriptions = async () => {
             if (selectedProfile?.id) {
                 try {
                     const { data, error } = await supabase
-                        .from('eye_power')
+                        .from('prescriptions')
                         .select('*')
                         .eq('customer_id', selectedProfile.id)
-                        .order('created_at', { ascending: false });
+                        .order('prescribed_at', { ascending: false });
 
                     if (!error && data) {
                         setPrescriptions(data);
@@ -119,15 +160,20 @@ export default function CreateOrder({ userProfile }) {
 
     const handleProfileSelect = (p) => {
         setSelectedProfile(p);
+        const primary = profiles.find(profile => !profile.parent_id) || p;
         setCustomer({
+            id: primary.id || "",
             name: p.name || "",
-            phone: p.phone || "",
-            street: p.street || "",
-            town: p.town || "",
-            district: p.district || "",
-            state: p.state || "",
-            email: p.email || ""
+            phone: primary.phone || customer.phone,
+            street: primary.street || "",
+            town: primary.town || "",
+            district: primary.district || "",
+            state: primary.state || "",
+            email: primary.email || "",
+            age: p.age || ""
         });
+
+        // setDependent calls removed
     };
 
     const [items, setItems] = useState([
@@ -190,15 +236,18 @@ export default function CreateOrder({ userProfile }) {
 
             try {
                 const { data, error } = await supabase
-                    .from('products_category')
+                    .from('categories')
                     .select('id, name')
-                    .eq('store_id', currentStoreId)
                     .order('name', { ascending: true });
 
-                if (error) throw error;
-                setStoreCategories(data || []);
+                if (error) {
+                    console.error('Error fetching store categories:', error.message);
+                    setStoreCategories([]);
+                } else {
+                    setStoreCategories(data || []);
+                }
             } catch (err) {
-                console.error('Error fetching store categories:', err);
+                console.error('Error fetching store categories:', err.message || err);
                 setStoreCategories([]);
             }
         };
@@ -313,7 +362,7 @@ export default function CreateOrder({ userProfile }) {
             try {
                 const { data, error } = await supabase
                     .from('products')
-                    .select('id, name, base_price, category_id, product_categories(*), store_inventory!inner(stock_quantity, unit_price)')
+                    .select('id, name, base_price, category_id, categories(name), store_inventory!inner(stock_quantity, unit_price)')
                     .eq('store_inventory.store_id', currentStoreId)
                     .ilike('name', `%${value.trim()}%`)
                     .order('name', { ascending: true })
@@ -425,7 +474,7 @@ export default function CreateOrder({ userProfile }) {
             }
         }
 
-        const selectedType = product.product_categories?.name || item.type || getDefaultItemType();
+        const selectedType = product.categories?.name || item.type || getDefaultItemType();
 
         setItems(prev => prev.map(i => i.id === item.id ? {
             ...i,
@@ -562,17 +611,67 @@ export default function CreateOrder({ userProfile }) {
         try {
             let customerId = null;
             if (selectedProfile) {
+                const isDep = !!selectedProfile.parent_id;
+                const primary = isDep 
+                    ? profiles.find(p => !p.parent_id) 
+                    : selectedProfile;
                 customerId = selectedProfile.id;
+
+                if (isDep) {
+                    // Update parent contact info only
+                    if (primary) {
+                        const { error: parentUpdateError } = await supabase.from('customers').update({
+                            street: customer.street,
+                            town: customer.town,
+                            district: customer.district,
+                            state: customer.state,
+                            email: customer.email || null
+                        }).eq('id', primary.id);
+                        if (parentUpdateError) throw parentUpdateError;
+                    }
+
+                    // Update dependent name and age only
+                    const { error: depUpdateError } = await supabase.from('customers').update({
+                        name: customer.name,
+                        age: customer.age ? Number(customer.age) : null
+                    }).eq('id', selectedProfile.id);
+                    if (depUpdateError) throw depUpdateError;
+                } else {
+                    // Update primary details
+                    const { error: parentUpdateError } = await supabase.from('customers').update({
+                        name: customer.name,
+                        street: customer.street,
+                        town: customer.town,
+                        district: customer.district,
+                        state: customer.state,
+                        email: customer.email || null,
+                        age: customer.age ? Number(customer.age) : null
+                    }).eq('id', selectedProfile.id);
+                    if (parentUpdateError) throw parentUpdateError;
+                }
             } else {
-                const { data: existingCustomer } = await supabase
+                // Create new primary customer
+                const { data: existingCustomers } = await supabase
                     .from('customers')
                     .select('id')
                     .eq('phone', customer.phone)
-                    .limit(1)
-                    .maybeSingle();
+                    .limit(1);
+
+                const existingCustomer = existingCustomers && existingCustomers.length > 0 ? existingCustomers[0] : null;
 
                 if (existingCustomer) {
                     customerId = existingCustomer.id;
+                    // Update parent customer details
+                    const { error: parentUpdateError } = await supabase.from('customers').update({
+                        name: customer.name,
+                        street: customer.street,
+                        town: customer.town,
+                        district: customer.district,
+                        state: customer.state,
+                        email: customer.email || null,
+                        age: customer.age ? Number(customer.age) : null
+                    }).eq('id', customerId);
+                    if (parentUpdateError) throw parentUpdateError;
                 } else {
                     const newCustId = generateId(ID_RULES.CUSTOMERS.prefix, ID_RULES.CUSTOMERS.digits);
                     const { data: newCust, error: custError } = await supabase.from('customers').insert([{
@@ -584,6 +683,7 @@ export default function CreateOrder({ userProfile }) {
                         district: customer.district,
                         state: customer.state,
                         email: customer.email || null,
+                        age: customer.age ? Number(customer.age) : null,
                         created_at: new Date().toISOString()
                     }]).select('id').single();
                     if (custError) throw custError;
@@ -596,6 +696,7 @@ export default function CreateOrder({ userProfile }) {
                 order_number: newOrderNumber,
                 store_id: currentStoreId,
                 customer_id: customerId,
+                prescription_id: selectedPrescriptionId || null,
                 status: Number(finalDueAmount) > 0 ? "pending" : "processing",
                 discount_amount: totalDiscount,
                 due_amount: Number(finalDueAmount),
@@ -621,18 +722,8 @@ export default function CreateOrder({ userProfile }) {
             const { error: itemsError } = await supabase.from('order_items').insert(orderItemsPayload);
             if (itemsError) throw itemsError;
 
-            // Handle selected existing prescription linking
-            if (selectedPrescriptionId) {
-                const { error: eyeError } = await supabase
-                    .from('eye_power')
-                    .update({ order_id: orderId })
-                    .eq('id', selectedPrescriptionId);
-
-                if (eyeError) {
-                    console.error('Eye Power Link Error:', eyeError);
-                    throw new Error(`Failed to link eye power: ${eyeError.message}`);
-                }
-            }
+            const orderIdForVoucher = orderId; // Local binding for voucher scope to resolve any unused variables
+            const orderIdForStock = orderId;
 
             // Mark voucher as used
             if (appliedVoucher) {
@@ -780,36 +871,72 @@ export default function CreateOrder({ userProfile }) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Full Name *</label>
-                                <input type="text" value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="JOHN DOE" required />
+                                <input type="text" value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} disabled={isCustomerLocked} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight disabled:opacity-60" placeholder="JOHN DOE" required />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Age</label>
+                                <input type="number" value={customer.age || ''} onChange={e => setCustomer({ ...customer, age: e.target.value })} disabled={isCustomerLocked} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-mono font-bold disabled:opacity-60" placeholder="AGE" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Mobile Number *</label>
-                                <input type="tel" value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="+91" required />
+                                <input type="tel" value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} disabled={isCustomerLocked} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight disabled:opacity-60" placeholder="+91" required />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Email Address</label>
-                                <input type="email" value={customer.email || ''} onChange={e => setCustomer({ ...customer, email: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight" placeholder="INFO@EXAMPLE.COM" />
+                                <input type="email" value={customer.email || ''} onChange={e => setCustomer({ ...customer, email: e.target.value })} disabled={isCustomerLocked} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black tracking-tight disabled:opacity-60" placeholder="INFO@EXAMPLE.COM" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Street / Landmark</label>
-                                <input type="text" value={customer.street} onChange={e => setCustomer({ ...customer, street: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="STREET NAME" />
+                                <input type="text" value={customer.street} onChange={e => setCustomer({ ...customer, street: e.target.value })} disabled={isCustomerLocked} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight disabled:opacity-60" placeholder="STREET NAME" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Town / City</label>
-                                <input type="text" value={customer.town} onChange={e => setCustomer({ ...customer, town: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="TOWN" />
+                                <input type="text" value={customer.town} onChange={e => setCustomer({ ...customer, town: e.target.value })} disabled={isCustomerLocked} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight disabled:opacity-60" placeholder="TOWN" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">District</label>
-                                <input type="text" value={customer.district} onChange={e => setCustomer({ ...customer, district: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="DISTRICT" />
+                                <input type="text" value={customer.district} onChange={e => setCustomer({ ...customer, district: e.target.value })} disabled={isCustomerLocked} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight disabled:opacity-60" placeholder="DISTRICT" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">State</label>
-                                <input type="text" value={customer.state} onChange={e => setCustomer({ ...customer, state: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight" placeholder="STATE" />
+                                <input type="text" value={customer.state} onChange={e => setCustomer({ ...customer, state: e.target.value })} disabled={isCustomerLocked} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:border-black transition-all text-[11px] font-black uppercase tracking-tight disabled:opacity-60" placeholder="STATE" />
                             </div>
                         </div>
 
+                        {customer.phone && customer.phone.length >= 10 && profiles.length === 0 && (
+                            <div className="bg-gray-50 border border-gray-100 p-5 rounded-2xl flex flex-col gap-1.5 border-t border-gray-50 pt-6">
+                                <span className="text-[10px] font-black uppercase text-black">No customer found</span>
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                                    No customer profile exists for this phone number. Please enter details below to create a new customer profile.
+                                </p>
+                            </div>
+                        )}
+
+                        {selectedProfile && (
+                            <div className="flex justify-between items-center bg-gray-50 border border-gray-100 rounded-3xl p-6 shadow-sm border-t border-gray-50 pt-6">
+                                <div>
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Active Profile</span>
+                                    <h4 className="text-base font-black uppercase tracking-tight text-black mt-1">{selectedProfile.name}</h4>
+                                    <p className="text-[10px] font-mono text-gray-400 mt-1">
+                                        Phone: {selectedProfile.phone || customer.phone} {selectedProfile.parent_id ? `• Dependent (${selectedProfile.relationship || "Family"})` : "• Primary Profile"}
+                                    </p>
+                                </div>
+                                {!isCustomerLocked && profiles.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedProfile(null);
+                                        }}
+                                        className="px-5 py-2.5 border border-black hover:bg-black hover:text-white transition-all rounded-xl text-[10px] font-black uppercase tracking-widest"
+                                    >
+                                        Change Profile
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
                         {/* Customer Family Profiles switcher */}
-                        {profiles.length > 0 && (
+                        {!isCustomerLocked && !selectedProfile && profiles.length > 0 && (
                             <div className="border-t border-gray-50 pt-6 space-y-3">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Select Profile</label>
                                 <div className="flex flex-wrap gap-3">
@@ -818,7 +945,7 @@ export default function CreateOrder({ userProfile }) {
                                             key={p.id}
                                             type="button"
                                             onClick={() => handleProfileSelect(p)}
-                                            className={`px-4 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${selectedProfile?.id === p.id ? 'bg-black border-black text-white shadow-md' : 'bg-gray-50 border-gray-100 text-gray-400 hover:bg-gray-100'}`}
+                                            className="px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-black text-[10px] font-black uppercase tracking-widest transition-all"
                                         >
                                             {p.name} ({p.label})
                                         </button>
@@ -892,7 +1019,7 @@ export default function CreateOrder({ userProfile }) {
                                                                     >
                                                                         <div>
                                                                             <div className="text-[11px] font-black text-black uppercase tracking-tight group-hover/item:text-white">{product.name}</div>
-                                                                            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{product.products_category?.category_name || 'Uncategorized'}</div>
+                                                                            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{product.categories?.name || 'Uncategorized'}</div>
                                                                         </div>
                                                                         <div className="text-right">
                                                                             <div className="text-[11px] font-black text-black group-hover/item:text-white">₹{product.price?.toLocaleString()}</div>
@@ -926,26 +1053,20 @@ export default function CreateOrder({ userProfile }) {
                                                         </div>
                                                     </>,
                                                     document.body
-                                                )}
+                                                 )}
                                             </div>
                                         </td>
                                         <td className="py-4 px-6">
                                             <div className="flex flex-col gap-1.5">
-                                                <select
-                                                    value={item.type}
-                                                    onChange={e => {
-                                                        const newType = e.target.value;
-                                                        updateItem(item.id, 'type', newType);
-                                                        if (item.name.trim() && !item.product_id) {
-                                                            handleProductSearch(item.id, item.name);
-                                                        }
-                                                    }}
-                                                    className="bg-transparent text-[10px] font-black uppercase tracking-widest text-gray-400 focus:text-black outline-none cursor-pointer"
-                                                >
-                                                    {typeOptions.map(type => (
-                                                        <option key={type} value={type}>{type}</option>
-                                                    ))}
-                                                </select>
+                                                <input
+                                                    type="text"
+                                                    value={item.type || ""}
+                                                    disabled={!!item.product_id}
+                                                    readOnly={!!item.product_id}
+                                                    onChange={e => updateItem(item.id, 'type', e.target.value)}
+                                                    className="bg-transparent text-[10px] font-black uppercase tracking-widest text-gray-400 focus:text-black outline-none w-full disabled:opacity-50"
+                                                    placeholder="Category"
+                                                />
                                                 {(item.type === 'Lens' || item.type === 'Contact Lens') && (
                                                     <span className="text-[9px] font-black uppercase tracking-widest py-1 px-2 rounded-lg bg-gray-50 border border-gray-100 text-gray-400">
                                                         Needs Power
@@ -953,19 +1074,41 @@ export default function CreateOrder({ userProfile }) {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="py-4 px-6">
-                                            <input type="number" min="1" value={item.qty} onChange={e => updateItem(item.id, 'qty', e.target.value)} className="w-full text-center bg-transparent focus:outline-none text-[11px] font-black text-black" />
-                                        </td>
-                                        <td className="py-4 px-6">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <span className="text-[9px] font-bold text-gray-300">₹</span>
-                                                <input type="number" value={item.price} ref={el => priceInputRefs.current[item.id] = el} onChange={e => updateItem(item.id, 'price', e.target.value)} className="w-full text-right bg-transparent focus:outline-none text-[11px] font-black text-black font-mono" placeholder="0.00" />
+                                        <td className="py-4 px-6 text-center">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateItem(item.id, 'qty', Math.max(1, Number(item.qty || 1) - 1))}
+                                                    className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-black hover:text-white rounded-lg text-xs font-bold transition-all"
+                                                >
+                                                    -
+                                                </button>
+                                                <input 
+                                                    type="number" 
+                                                    min="1" 
+                                                    value={item.qty} 
+                                                    onChange={e => updateItem(item.id, 'qty', Math.max(1, parseInt(e.target.value, 10) || 1))} 
+                                                    className="w-10 text-center bg-transparent focus:outline-none text-[11px] font-black text-black" 
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateItem(item.id, 'qty', Number(item.qty || 1) + 1)}
+                                                    className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-black hover:text-white rounded-lg text-xs font-bold transition-all"
+                                                >
+                                                    +
+                                                </button>
                                             </div>
                                         </td>
                                         <td className="py-4 px-6">
                                             <div className="flex items-center justify-end gap-1">
                                                 <span className="text-[9px] font-bold text-gray-300">₹</span>
-                                                <input type="number" value={item.discount} onChange={e => updateItem(item.id, 'discount', e.target.value)} className="w-full text-right bg-transparent focus:outline-none text-[11px] font-black text-gray-400 focus:text-black font-mono" placeholder="0.00" />
+                                                <input type="number" value={item.price} ref={el => priceInputRefs.current[item.id] = el} onChange={e => updateItem(item.id, 'price', e.target.value)} disabled={!isAdmin} className="w-full text-right bg-transparent focus:outline-none text-[11px] font-black text-black font-mono disabled:opacity-50" placeholder="0.00" />
+                                            </div>
+                                        </td>
+                                        <td className="py-4 px-6">
+                                            <div className="flex items-center justify-end gap-1">
+                                                <span className="text-[9px] font-bold text-gray-300">₹</span>
+                                                <input type="number" value={item.discount} onChange={e => updateItem(item.id, 'discount', e.target.value)} disabled={!isAdmin} className="w-full text-right bg-transparent focus:outline-none text-[11px] font-black text-gray-400 focus:text-black font-mono disabled:opacity-50" placeholder="0.00" />
                                             </div>
                                         </td>
                                         <td className="py-4 px-6 text-right">

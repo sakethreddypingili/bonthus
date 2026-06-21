@@ -224,8 +224,8 @@ export default function Products({ userProfile }) {
     <div className="space-y-8 animate-fast-slide pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
         <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Inventory Registry</h1>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Master Product Catalog & Unit Stock</p>
+          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">{isSuperAdmin ? "Inventory Registry" : "Product Catalogue"}</h1>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">{isSuperAdmin ? "Master Product Catalog & Unit Stock" : "Product Catalogue and related actions"}</p>
         </div>
 
         <div className="flex items-center gap-4">
@@ -241,20 +241,24 @@ export default function Products({ userProfile }) {
             </select>
             {isSuperAdmin && <ChevronDown size={14} className="text-black -ml-6" />}
           </div>
-          <button 
-            onClick={() => { setEditingItem(null); setShowAddModal(true); }}
-            className="flex items-center gap-2 px-6 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
-          >
-            <Plus size={14} strokeWidth={3} /> New Product
-          </button>
+          {isSuperAdmin && (
+            <button 
+              onClick={() => { setEditingItem(null); setShowAddModal(true); }}
+              className="flex items-center gap-2 px-6 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
+            >
+              <Plus size={14} strokeWidth={3} /> New Product
+            </button>
+          )}
         </div>
       </div>
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <button className="text-[10px] font-black text-black uppercase tracking-widest px-4 py-2 border border-gray-100 rounded-xl hover:bg-gray-50 flex items-center gap-2">
-            <Check size={12} /> Bulk Action
-          </button>
+          {isSuperAdmin && (
+            <button className="text-[10px] font-black text-black uppercase tracking-widest px-4 py-2 border border-gray-100 rounded-xl hover:bg-gray-50 flex items-center gap-2">
+              <Check size={12} /> Bulk Action
+            </button>
+          )}
         </div>
         
         <div className="flex items-center gap-3">
@@ -287,11 +291,11 @@ export default function Products({ userProfile }) {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Product</th>
-                    <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Brand</th>
+                    <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">{isSuperAdmin ? "Brand" : "Category"}</th>
                     <th className="px-6 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Value</th>
-                    <th className="px-6 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Stock</th>
+                    {isSuperAdmin && <th className="px-6 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Stock</th>}
                     <th className="px-6 py-4 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                    <th className="px-6 py-4 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest">Action</th>
+                    {isSuperAdmin && <th className="px-6 py-4 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -304,26 +308,30 @@ export default function Products({ userProfile }) {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{p.brand || 'N/A'}</span>
+                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{isSuperAdmin ? (p.brand || 'N/A') : (p.category || 'N/A')}</span>
                       </td>
                       <td className="px-6 py-4 text-right text-[11px] font-black text-black tracking-tight">₹{p.price.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-right">
-                        <span className={`text-[11px] font-black ${p.stock === 0 ? "text-gray-400 line-through" : "text-black"}`}>{p.stock}</span>
-                        <span className="text-[9px] text-gray-400 ml-1">/ {p.minStock}</span>
-                      </td>
+                      {isSuperAdmin && (
+                        <td className="px-6 py-4 text-right">
+                          <span className={`text-[11px] font-black ${p.stock === 0 ? "text-gray-400 line-through" : "text-black"}`}>{p.stock}</span>
+                          <span className="text-[9px] text-gray-400 ml-1">/ {p.minStock}</span>
+                        </td>
+                      )}
                       <td className="px-6 py-4 text-center">
                         {statusBadge(p)}
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditClick(p)} className="p-2 rounded-lg hover:bg-black hover:text-white text-gray-400">
-                                <Plus size={16} />
-                            </button>
-                            <button onClick={() => navigate(`/inventory-entities/${p.id}`)} className="p-2 rounded-lg hover:bg-black hover:text-white text-gray-400">
-                                <MoreVertical size={16} />
-                            </button>
-                        </div>
-                      </td>
+                      {isSuperAdmin && (
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEditClick(p)} className="p-2 rounded-lg hover:bg-black hover:text-white text-gray-400" title="Edit">
+                                  <Plus size={16} />
+                              </button>
+                              <button onClick={() => navigate(`/inventory-entities/${p.id}`)} className="p-2 rounded-lg hover:bg-black hover:text-white text-gray-400" title="View details">
+                                  <MoreVertical size={16} />
+                              </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -339,9 +347,11 @@ export default function Products({ userProfile }) {
                     <p className="text-[11px] font-black text-black uppercase tracking-tight group-hover:text-black">{p.name}</p>
                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">{p.sku}</p>
                   </div>
-                  <button onClick={() => handleEditClick(p)} className="p-1 rounded-lg hover:bg-black hover:text-white text-gray-300">
-                      <Plus size={14} />
-                  </button>
+                  {isSuperAdmin && (
+                    <button onClick={() => handleEditClick(p)} className="p-1 rounded-lg hover:bg-black hover:text-white text-gray-300" title="Edit">
+                        <Plus size={14} />
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-3" onClick={() => navigate(`/inventory-entities/${p.id}`)}>
                   <div className="flex items-center justify-between">
@@ -350,7 +360,7 @@ export default function Products({ userProfile }) {
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-gray-50">
                     {statusBadge(p)}
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Stock: {p.stock}</span>
+                    {isSuperAdmin && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Stock: {p.stock}</span>}
                   </div>
                 </div>
               </div>

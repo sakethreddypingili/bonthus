@@ -94,7 +94,7 @@ export default function Analytics({ userProfile }) {
   }, [userProfile, selectedStoreId, fetchAnalyticsData]);
 
   async function fetchStoreSales() {
-    const { data: orders } = await supabase.from("orders").select("gross_amount, store_id").eq("disabled", false);
+    const { data: orders } = await supabase.from("orders").select("net_amount, store_id").eq("disabled", false);
     const { data: storesData } = await supabase.from("store").select("id, name");
 
     if (orders && storesData) {
@@ -103,7 +103,7 @@ export default function Analytics({ userProfile }) {
 
       orders.forEach(o => {
         if (o.store_id && storeMap[o.store_id]) {
-          storeMap[o.store_id].revenue += Number(o.gross_amount || 0);
+          storeMap[o.store_id].revenue += Number(o.net_amount || 0);
         }
       });
 
@@ -121,7 +121,7 @@ export default function Analytics({ userProfile }) {
 
     let query = supabase
       .from("orders")
-      .select("gross_amount, created_at, store_id")
+      .select("net_amount, created_at, store_id")
       .eq("disabled", false)
       .gte("created_at", twelveMonthsAgo.toISOString())
       .order("created_at", { ascending: true });
@@ -146,7 +146,7 @@ export default function Analytics({ userProfile }) {
         const date = new Date(o.created_at);
         const monthLabel = months[date.getMonth()];
         if (revenueMap[monthLabel]) {
-          const rev = Number(o.gross_amount || 0);
+          const rev = Number(o.net_amount || 0);
           revenueMap[monthLabel].revenue += rev;
           revenueMap[monthLabel].orders += 1;
           totalRev += rev;
@@ -159,7 +159,7 @@ export default function Analytics({ userProfile }) {
 
       const avgOrderValue = orders.length > 0 ? Math.round(totalRev / orders.length) : 0;
 
-      let prodQuery = supabase.from("products_list").select("id", { count: "exact", head: true });
+      let prodQuery = supabase.from("store_inventory").select("product_id", { count: "exact", head: true });
       if (sId) prodQuery = prodQuery.eq("store_id", sId);
       const { count: productCount } = await prodQuery;
 
@@ -198,9 +198,9 @@ export default function Analytics({ userProfile }) {
 
   async function fetchTopProducts(sId) {
     let query = supabase
-      .from("products_list")
-      .select("name, price, sales, products_category(name)")
-      .order("sales", { ascending: false })
+      .from("store_inventory")
+      .select("stock_quantity, unit_price, products(name, sales, product_categories(name))")
+      .order("products(sales)", { ascending: false })
       .limit(10);
 
     if (sId) query = query.eq("store_id", sId);
@@ -208,17 +208,17 @@ export default function Analytics({ userProfile }) {
     const { data } = await query;
     if (data) {
       setTopProducts(data.map(p => ({
-        name: p.name,
-        category: p.products_category?.name || "General",
-        sales: p.sales || 0,
-        revenue: (p.sales || 0) * (p.price || 0),
+        name: p.products?.name || "Unknown",
+        category: p.products?.product_categories?.name || "General",
+        sales: p.products?.sales || 0,
+        revenue: (p.products?.sales || 0) * (p.unit_price || 0),
         trend: "up"
       })));
     }
 
     let catQuery = supabase
-      .from("products_list")
-      .select("sales, products_category(name)");
+      .from("store_inventory")
+      .select("products(sales, product_categories(name))");
 
     if (sId) catQuery = catQuery.eq("store_id", sId);
 
@@ -226,8 +226,8 @@ export default function Analytics({ userProfile }) {
     if (catData) {
       const catMap = {};
       catData.forEach(p => {
-        const cat = p.products_category?.name || "General";
-        catMap[cat] = (catMap[cat] || 0) + (p.sales || 0);
+        const cat = p.products?.product_categories?.name || "General";
+        catMap[cat] = (catMap[cat] || 0) + (p.products?.sales || 0);
       });
 
       const totalSales = catData.reduce((sum, p) => sum + (p.sales || 0), 0);

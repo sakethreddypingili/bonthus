@@ -202,7 +202,7 @@ export default function Dashboard({ userProfile }) {
   async function fetchTopCustomers(sId) {
     let query = supabase
       .from("customers")
-      .select("id, name, orders(gross_amount)")
+      .select("id, name, orders(net_amount)")
       .order('name');
 
     if (sId) query = query.eq("store_id", sId);
@@ -213,9 +213,9 @@ export default function Dashboard({ userProfile }) {
       const customersWithSpent = data.map(c => ({
         id: c.id,
         name: c.name || 'Anonymous',
-        spent: c.orders?.reduce((sum, o) => sum + Number(o.gross_amount || 0), 0) || 0,
+        spent: c.orders?.reduce((sum, o) => sum + Number(o.net_amount || 0), 0) || 0,
         orderCount: c.orders?.length || 0,
-        avgOrderValue: c.orders && c.orders.length > 0 ? Math.round((c.orders.reduce((sum, o) => sum + Number(o.gross_amount || 0), 0) / c.orders.length)) : 0
+        avgOrderValue: c.orders && c.orders.length > 0 ? Math.round((c.orders.reduce((sum, o) => sum + Number(o.net_amount || 0), 0) / c.orders.length)) : 0
       }));
       
       const sorted = customersWithSpent
@@ -237,7 +237,7 @@ export default function Dashboard({ userProfile }) {
 
     let query = supabase
       .from("orders")
-      .select("id, status, gross_amount, created_at, customers(name)")
+      .select("id, status, net_amount, created_at, customers(name)")
       .eq("disabled", false)
       .gte("created_at", todayStart)
       .lte("created_at", todayEndISO)
@@ -252,7 +252,7 @@ export default function Dashboard({ userProfile }) {
       const formatted = data.map(o => ({
         id: o.id,
         customer: o.customers?.name || 'Unknown',
-        amount: o.gross_amount,
+        amount: o.net_amount,
         status: o.status,
         time: new Date(o.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
       }));
@@ -344,28 +344,28 @@ export default function Dashboard({ userProfile }) {
     // Build queries based on role
     let baseTodayQuery = supabase
       .from("orders")
-      .select("gross_amount, status, customer_id, created_at", { count: "exact" })
+      .select("net_amount, status, customer_id, created_at", { count: "exact" })
       .eq("disabled", false)
       .gte("created_at", todayStart)
       .lte("created_at", todayEndISO);
 
     let baseYesterdayQuery = supabase
       .from("orders")
-      .select("gross_amount", { count: "exact" })
+      .select("net_amount", { count: "exact" })
       .eq("disabled", false)
       .gte("created_at", yesterdayStart)
       .lte("created_at", yesterdayEndISO);
 
     let base30DaysQuery = supabase
       .from("orders")
-      .select("gross_amount", { count: "exact" })
+      .select("net_amount", { count: "exact" })
       .eq("disabled", false)
       .gte("created_at", thirtyDaysAgoStart)
       .lte("created_at", thirtyDaysAgoEndISO);
 
     let baseMonthQuery = supabase
       .from("orders")
-      .select("gross_amount", { count: "exact" })
+      .select("net_amount", { count: "exact" })
       .eq("disabled", false)
       .gte("created_at", monthStartISO)
       .lte("created_at", todayEndISO);
@@ -391,10 +391,10 @@ export default function Dashboard({ userProfile }) {
     ]);
 
     // Calculate revenues
-    const todayRevenue = (todayOrders || []).reduce((sum, o) => sum + (o.gross_amount || 0), 0);
-    const yesterdayRevenue = (yesterdayOrders || []).reduce((sum, o) => sum + (o.gross_amount || 0), 0);
-    const thirtyDaysRevenue = (thirtyDaysOrders || []).reduce((sum, o) => sum + (o.gross_amount || 0), 0);
-    const monthRevenue = (monthOrders || []).reduce((sum, o) => sum + (o.gross_amount || 0), 0);
+    const todayRevenue = (todayOrders || []).reduce((sum, o) => sum + (o.net_amount || 0), 0);
+    const yesterdayRevenue = (yesterdayOrders || []).reduce((sum, o) => sum + (o.net_amount || 0), 0);
+    const thirtyDaysRevenue = (thirtyDaysOrders || []).reduce((sum, o) => sum + (o.net_amount || 0), 0);
+    const monthRevenue = (monthOrders || []).reduce((sum, o) => sum + (o.net_amount || 0), 0);
 
     // Calculate trends (percentage change)
     const trendRevenueToday = yesterdayRevenue > 0 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100) : 0;
@@ -444,7 +444,7 @@ export default function Dashboard({ userProfile }) {
 
     let query = supabase
       .from("orders")
-      .select("gross_amount, created_at")
+      .select("net_amount, created_at")
       .eq("disabled", false)
       .gte("created_at", twelveMonthsAgo.toISOString())
       .order("created_at", { ascending: true });
@@ -468,7 +468,7 @@ export default function Dashboard({ userProfile }) {
         const date = new Date(o.created_at);
         const monthLabel = months[date.getMonth()];
         if (revenueMap[monthLabel]) {
-          revenueMap[monthLabel].revenue += Number(o.gross_amount || 0);
+          revenueMap[monthLabel].revenue += Number(o.net_amount || 0);
           revenueMap[monthLabel].orders += 1;
         }
       });
@@ -521,7 +521,7 @@ export default function Dashboard({ userProfile }) {
 
     let query = supabase
       .from("orders")
-      .select("id, status, gross_amount, created_at, customers(name)")
+      .select("id, status, net_amount, created_at, customers(name)")
       .eq("disabled", false)
       .gte("created_at", yesterday.toISOString())
       .lt("created_at", todayStart.toISOString())
@@ -535,7 +535,7 @@ export default function Dashboard({ userProfile }) {
       setRecentOrders(data.map(o => ({
         id: o.id,
         customer: o.customers?.name || "Unknown",
-        amount: o.gross_amount,
+        amount: o.net_amount,
         status: o.status,
         date: new Date(o.created_at).toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' })
       })));
@@ -543,7 +543,7 @@ export default function Dashboard({ userProfile }) {
   }
 
   async function fetchStoreSales() {
-    const { data: orders } = await supabase.from("orders").select("gross_amount, store_id").eq("disabled", false);
+    const { data: orders } = await supabase.from("orders").select("net_amount, store_id").eq("disabled", false);
     const { data: storesData } = await supabase.from("store").select("id, name");
 
     if (orders && storesData) {
@@ -552,7 +552,7 @@ export default function Dashboard({ userProfile }) {
       
       orders.forEach(o => {
         if (o.store_id && storeMap[o.store_id]) {
-          storeMap[o.store_id].value += Number(o.gross_amount || 0);
+          storeMap[o.store_id].value += Number(o.net_amount || 0);
         }
       });
 
@@ -571,19 +571,19 @@ export default function Dashboard({ userProfile }) {
 
   async function fetchTopProducts(sId) {
     let query = supabase
-      .from("products_list")
-      .select("name, price, sales, products_category(name)")
-      .order("sales", { ascending: false });
+      .from("store_inventory")
+      .select("stock_quantity, unit_price, products(name, sales, product_categories(name))")
+      .order("products(sales)", { ascending: false });
 
     if (sId) query = query.eq("store_id", sId);
 
     const { data } = await query;
     if (data) {
       setTopProducts(data.slice(0, 5).map(p => ({
-        name: p.name,
-        category: p.products_category?.name || "General",
-        sales: p.sales || 0,
-        revenue: (p.sales || 0) * (p.price || 0),
+        name: p.products?.name || "Unknown",
+        category: p.products?.product_categories?.name || "General",
+        sales: p.products?.sales || 0,
+        revenue: (p.products?.sales || 0) * (p.unit_price || 0),
         trend: "up"
       })));
 
@@ -592,11 +592,11 @@ export default function Dashboard({ userProfile }) {
       const shapeMap = {};
       
       data.forEach(p => {
-        const name = p.name || "";
+        const name = p.products?.name || "";
         const foundShape = shapes.find(s => name.toLowerCase().includes(s.toLowerCase())) || "Other";
         if (!shapeMap[foundShape]) shapeMap[foundShape] = { name: foundShape, sales: 0, revenue: 0 };
-        shapeMap[foundShape].sales += (p.sales || 0);
-        shapeMap[foundShape].revenue += (p.sales || 0) * (p.price || 0);
+        shapeMap[foundShape].sales += (p.products?.sales || 0);
+        shapeMap[foundShape].revenue += (p.products?.sales || 0) * (p.unit_price || 0);
       });
 
       const formattedShapes = Object.values(shapeMap)
@@ -607,8 +607,8 @@ export default function Dashboard({ userProfile }) {
     }
 
     let catQuery = supabase
-      .from("products_list")
-      .select("sales, products_category(name)");
+      .from("store_inventory")
+      .select("products(sales, product_categories(name))");
     
     if (sId) catQuery = catQuery.eq("store_id", sId);
 
@@ -616,11 +616,11 @@ export default function Dashboard({ userProfile }) {
     if (catData) {
       const catMap = {};
       catData.forEach(p => {
-        const cat = p.products_category?.name || "General";
-        catMap[cat] = (catMap[cat] || 0) + (p.sales || 0);
+        const cat = p.products?.product_categories?.name || "General";
+        catMap[cat] = (catMap[cat] || 0) + (p.products?.sales || 0);
       });
       
-      const totalSales = catData.reduce((sum, p) => sum + (p.sales || 0), 0);
+      const totalSales = catData.reduce((sum, p) => sum + (p.products?.sales || 0), 0);
       const formattedCats = Object.entries(catMap)
         .map(([name, val], i) => ({
           name,

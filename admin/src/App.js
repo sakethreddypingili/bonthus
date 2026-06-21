@@ -22,14 +22,14 @@ import Analytics from "./pages/Analytics";
 import Attendance from "./pages/Attendance";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
-import StoreManagement from "./pages/StoreManagement";
 import CreateOrder from "./pages/CreateOrder";
-import InvoiceView from "./pages/InvoiceView";
 import EditOrder from "./pages/EditOrder";
 import PasswordReset from "./pages/PasswordReset";
 import Reminders from "./pages/Reminders";
+import InvoiceView from "./pages/InvoiceView";
 import Notifications from "./pages/Notifications";
 import EmployeeManagement from "./pages/EmployeeManagement";
+import Infrastructure from "./pages/Infrastructure";
 import { PROFILE_CACHE_KEY, logout } from "./utils/auth";
 
 
@@ -383,7 +383,7 @@ function App() {
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/employees" element={<EmployeeManagement userProfile={userProfile} />} />
-      <Route path="/store-management" element={<StoreManagement userProfile={userProfile} />} />
+      <Route path="/infrastructure" element={<Infrastructure userProfile={userProfile} />} />
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
       <Route path="/invoice/:orderNumber" element={<InvoiceView userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/" replace />} />

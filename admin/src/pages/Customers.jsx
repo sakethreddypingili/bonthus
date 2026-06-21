@@ -14,8 +14,10 @@ export default function Customers({ userProfile }) {
   const PER_PAGE = 25;
 
   const [stores, setStores] = useState([]);
-  const [selectedStore, setSelectedStore] = useState("");
   const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || userProfile?.store_name === "All";
+  const [selectedStore, setSelectedStore] = useState(() => {
+    return (!isSuperAdmin && userProfile?.store_id) ? userProfile.store_id : "All";
+  });
 
   useEffect(() => {
     supabase.from('stores').select('*').order('name').then(({ data }) => setStores(data || []));

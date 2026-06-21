@@ -186,16 +186,17 @@ export default function Orders({ userProfile }) {
 
     setLoadingCustomer(true);
     try {
-      const { data, error } = await supabase
+      const { data: customerList, error } = await supabase
         .from('customers')
         .select('*')
         .eq('phone', customerMobile)
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error;
       }
+
+      const data = customerList && customerList.length > 0 ? customerList[0] : null;
 
       if (data) {
         navigate('/orders/new', { state: { customer: data } });

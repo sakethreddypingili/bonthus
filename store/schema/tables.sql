@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
 CREATE TABLE IF NOT EXISTS customers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
-    phone TEXT UNIQUE NOT NULL,
+    phone TEXT NOT NULL,
     email TEXT,
     street TEXT,
     town TEXT,
@@ -84,6 +84,9 @@ CREATE TABLE IF NOT EXISTS customers (
     postal_code TEXT,
     store_id UUID REFERENCES stores(id) ON DELETE SET NULL,
     family_id UUID REFERENCES family(id) ON DELETE SET NULL,
+    parent_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+    relationship TEXT,
+    age INTEGER,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -305,18 +308,7 @@ END $$;
 -- New Tables from live database
 -- -------------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS public.dependents (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    parent_customer_id uuid NOT NULL REFERENCES public.customers(id) ON DELETE CASCADE,
-    family_id uuid REFERENCES public.family(id) ON DELETE SET NULL,
-    name text NOT NULL,
-    relationship text NOT NULL,
-    phone text,
-    email text,
-    created_at timestamp with time zone NOT NULL DEFAULT now(),
-    CONSTRAINT dependents_pkey PRIMARY KEY (id),
-    CONSTRAINT unique_parent_dependent UNIQUE (parent_customer_id, name, relationship)
-);
+
 
 CREATE TABLE IF NOT EXISTS public.product_variants (
     id uuid NOT NULL DEFAULT gen_random_uuid(),

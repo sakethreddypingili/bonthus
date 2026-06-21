@@ -52,22 +52,24 @@ export default function Flow({ userProfile }) {
     setShowRegForm(false);
 
     try {
-      // Find the primary customer matching the phone number
-      const { data: primaryData, error: primaryError } = await supabase
+      const { data: matchedCustomers, error: primaryError } = await supabase
         .from("customers")
         .select("*")
-        .eq("phone", phone.trim())
-        .maybeSingle();
+        .eq("phone", phone.trim());
 
       if (primaryError) throw primaryError;
+
+      const primaryData = matchedCustomers && matchedCustomers.length > 0
+        ? (matchedCustomers.find(c => !c.parent_id) || matchedCustomers[0])
+        : null;
 
       if (primaryData) {
         setCustomer(primaryData);
         // Load the primary profile + its dependents
         const { data: dependentsData, error: dependentsError } = await supabase
-          .from("dependents")
+          .from("customers")
           .select("*")
-          .eq("parent_customer_id", primaryData.id);
+          .eq("parent_id", primaryData.id);
 
         if (dependentsError) throw dependentsError;
 
@@ -80,8 +82,13 @@ export default function Flow({ userProfile }) {
         ];
 
         setProfiles(allProfiles);
-        setSelectedProfile(allProfiles[0]);
-        fetchVisitHistory(allProfiles[0].id);
+        if (allProfiles.length === 1) {
+          setSelectedProfile(allProfiles[0]);
+          fetchVisitHistory(allProfiles[0].id);
+        } else {
+          setSelectedProfile(null);
+          setHistory([]);
+        }
       } else {
         // Prepare registration form with the entered phone number
         setRegForm({
@@ -341,198 +348,222 @@ export default function Flow({ userProfile }) {
         {/* Profiles and Visit Log Form */}
         {customer && (
           <div className="border-t border-gray-50 pt-8 space-y-6">
-            <div>
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                Select Profile checking in
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                {profiles.map((p) => {
-                  const isSelected = selectedProfile?.id === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => handleProfileSelect(p)}
-                      className={`flex flex-col text-left p-5 rounded-2xl border transition-all ${
-                        isSelected
-                          ? "border-black bg-black text-white shadow-xl scale-[1.02]"
-                          : "border-gray-100 bg-gray-50/50 text-black hover:bg-gray-50"
-                      }`}
-                    >
-                      <span className="text-[10px] font-black uppercase tracking-widest opacity-60">
-                        {p.label}
-                      </span>
-                      <span className="text-sm font-black mt-1 uppercase tracking-tight">{p.name}</span>
-                      <span className="text-[10px] font-mono mt-1 opacity-70">{p.phone}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <form onSubmit={handleLogVisit} className="space-y-6">
-              <div className="space-y-2">
+            {!selectedProfile && profiles.length > 0 && (
+              <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                  Purpose of Visit
+                  Select Profile checking in
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { id: "buy", label: "Buy Products" },
-                    { id: "eye_checkup", label: "Eye Checkup" },
-                    { id: "followup", label: "Order Followup" },
-                    { id: "other", label: "Other Reasons" },
-                  ].map((pOpt) => {
-                    const isSelected = purpose === pOpt.id;
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                  {profiles.map((p) => {
                     return (
                       <button
-                        key={pOpt.id}
+                        key={p.id}
                         type="button"
-                        onClick={() => setPurpose(pOpt.id)}
-                        className={`py-4 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${
-                          isSelected
-                            ? "bg-black border-black text-white shadow-lg"
-                            : "bg-white border-gray-100 text-gray-500 hover:border-gray-200 hover:text-black"
-                        }`}
+                        onClick={() => handleProfileSelect(p)}
+                        className="flex flex-col text-left p-5 rounded-2xl border border-gray-100 bg-gray-50/50 text-black hover:bg-gray-50 transition-all hover:scale-[1.01]"
                       >
-                        {pOpt.label}
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">
+                          {p.label}
+                        </span>
+                        <span className="text-sm font-black mt-1 uppercase tracking-tight">{p.name}</span>
+                        <span className="text-[10px] font-mono mt-1 opacity-70">{p.phone}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
+            )}
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                  Optional Notes
-                </label>
-                <textarea
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Enter details like referral details, order numbers, issues, etc."
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all resize-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading || !purpose}
-                className="w-full py-4 bg-black text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 disabled:pointer-events-none"
-              >
-                {loading ? "Logging..." : "Log Check-in"}
-              </button>
-            </form>
-
-            {/* Visit History Section */}
-            <div className="space-y-4 border-t border-gray-50 pt-8">
-              <h3 className="text-sm font-black uppercase tracking-wider text-black">
-                Visit History for {selectedProfile?.name}
-              </h3>
-              <div className="overflow-x-auto border border-gray-50 rounded-[24px]">
-                {loadingHistory ? (
-                  <div className="p-10 text-center flex items-center justify-center gap-3">
-                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading history...</span>
+            {selectedProfile && (
+              <>
+                {/* Active Selected Profile Summary */}
+                <div className="flex justify-between items-center bg-gray-50 border border-gray-100 rounded-3xl p-6 shadow-sm">
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Active Profile</span>
+                    <h4 className="text-base font-black uppercase tracking-tight text-black mt-1">{selectedProfile.name}</h4>
+                    <p className="text-[10px] font-mono text-gray-400 mt-1">
+                      Phone: {selectedProfile.phone || customer.phone} {selectedProfile.parent_id ? `• Dependent (${selectedProfile.relationship || "Family"})` : "• Primary Profile"}
+                    </p>
                   </div>
-                ) : history.length > 0 ? (
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Purpose</th>
-                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 text-[11px] font-black">
-                      {history.map((v) => {
-                        const purposeLabels = {
-                          buy: "Buy Products",
-                          eye_checkup: "Eye Checkup",
-                          followup: "Order Followup",
-                          other: "Other Reasons"
-                        };
+                  {profiles.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProfile(null);
+                        setHistory([]);
+                      }}
+                      className="px-5 py-2.5 border border-black hover:bg-black hover:text-white transition-all rounded-xl text-[10px] font-black uppercase tracking-widest"
+                    >
+                      Change Profile
+                    </button>
+                  )}
+                </div>
+
+                <form onSubmit={handleLogVisit} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                      Purpose of Visit
+                    </label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { id: "buy", label: "Buy Products" },
+                        { id: "eye_checkup", label: "Eye Checkup" },
+                        { id: "followup", label: "Order Followup" },
+                        { id: "other", label: "Other Reasons" },
+                      ].map((pOpt) => {
+                        const isSelected = purpose === pOpt.id;
                         return (
-                          <tr key={v.id} className="hover:bg-gray-50/50">
-                            <td className="px-6 py-4 text-xs font-bold text-gray-600">
-                              {new Date(v.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                            </td>
-                            <td className="px-6 py-4 text-black uppercase tracking-tight">
-                              <span className="px-2.5 py-1 bg-black text-white rounded-lg text-[9px] font-black uppercase">
-                                {purposeLabels[v.purpose] || v.purpose}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-gray-500 font-sans italic max-w-[300px]">
-                              {v.notes || "—"}
-                            </td>
-                          </tr>
+                          <button
+                            key={pOpt.id}
+                            type="button"
+                            onClick={() => setPurpose(pOpt.id)}
+                            className={`py-4 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+                              isSelected
+                                ? "bg-black border-black text-white shadow-lg"
+                                : "bg-white border-gray-100 text-gray-500 hover:border-gray-200 hover:text-black"
+                            }`}
+                          >
+                            {pOpt.label}
+                          </button>
                         );
                       })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="p-10 text-center text-gray-400 italic">No visit history found for this profile.</div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+                    </div>
+                  </div>
 
-        {!customer && (
-          <div className="space-y-4 border-t border-gray-50 pt-8">
-            <h3 className="text-sm font-black uppercase tracking-wider text-black">
-              Recent Check-ins
-            </h3>
-            <div className="overflow-x-auto border border-gray-50 rounded-[24px]">
-              {loadingRecent ? (
-                <div className="p-10 text-center flex items-center justify-center gap-3">
-                  <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading check-ins...</span>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                      Optional Notes
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Enter details like referral details, order numbers, issues, etc."
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all resize-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading || !purpose}
+                    className="w-full py-4 bg-black text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 disabled:pointer-events-none"
+                  >
+                    {loading ? "Logging..." : "Log Check-in"}
+                  </button>
+                </form>
+
+                {/* Visit History Section */}
+                <div className="space-y-4 border-t border-gray-50 pt-8">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-black">
+                    Visit History for {selectedProfile.name}
+                  </h3>
+                  <div className="overflow-x-auto border border-gray-50 rounded-[24px]">
+                    {loadingHistory ? (
+                      <div className="p-10 text-center flex items-center justify-center gap-3">
+                        <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading history...</span>
+                      </div>
+                    ) : history.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                            <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Purpose</th>
+                            <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 text-[11px] font-black">
+                          {history.map((v) => {
+                            const purposeLabels = {
+                              buy: "Buy Products",
+                              eye_checkup: "Eye Checkup",
+                              followup: "Order Followup",
+                              other: "Other Reasons"
+                            };
+                            return (
+                              <tr key={v.id} className="hover:bg-gray-50/50">
+                                <td className="px-6 py-4 text-xs font-bold text-gray-600">
+                                  {new Date(v.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                </td>
+                                <td className="px-6 py-4 text-black uppercase tracking-tight">
+                                  <span className="px-2.5 py-1 bg-black text-white rounded-lg text-[9px] font-black uppercase">
+                                    {purposeLabels[v.purpose] || v.purpose}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-gray-500 font-sans italic max-w-[300px]">
+                                  {v.notes || "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="p-10 text-center text-gray-400 italic">No visit history found for this profile.</div>
+                    )}
+                  </div>
                 </div>
-              ) : recentVisits.length > 0 ? (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Purpose</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 text-[11px] font-black">
-                    {recentVisits.map((v) => {
-                      const purposeLabels = {
-                        buy: "Buy Products",
-                        eye_checkup: "Eye Checkup",
-                        followup: "Order Followup",
-                        other: "Other Reasons"
-                      };
-                      return (
-                        <tr key={v.id} className="hover:bg-gray-50/50">
-                          <td className="px-6 py-4">
-                            <span className="block text-xs font-black uppercase text-black">{v.customers?.name || "Unknown"}</span>
-                            <span className="block text-[9px] font-mono text-gray-400 mt-0.5">{v.customers?.phone}</span>
-                          </td>
-                          <td className="px-6 py-4 text-xs font-bold text-gray-600">
-                            {new Date(v.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          </td>
-                          <td className="px-6 py-4 text-black uppercase tracking-tight">
-                            <span className="px-2.5 py-1 bg-black text-white rounded-lg text-[9px] font-black uppercase">
-                              {purposeLabels[v.purpose] || v.purpose}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-gray-500 font-sans italic max-w-[300px]">
-                            {v.notes || "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="p-10 text-center text-gray-400 italic">No recent check-ins recorded.</div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         )}
+      </div>
+
+      {/* Unconditional Recent Check-ins list always displayed at bottom of page */}
+      <div className="bg-white rounded-[32px] border border-gray-100 p-8 shadow-sm space-y-4">
+        <h3 className="text-sm font-black uppercase tracking-wider text-black">
+          Recent Check-ins
+        </h3>
+        <div className="overflow-x-auto border border-gray-50 rounded-[24px]">
+          {loadingRecent ? (
+            <div className="p-10 text-center flex items-center justify-center gap-3">
+              <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading check-ins...</span>
+            </div>
+          ) : recentVisits.length > 0 ? (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer</th>
+                  <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                  <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Purpose</th>
+                  <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-[11px] font-black">
+                {recentVisits.map((v) => {
+                  const purposeLabels = {
+                    buy: "Buy Products",
+                    eye_checkup: "Eye Checkup",
+                    followup: "Order Followup",
+                    other: "Other Reasons"
+                  };
+                  return (
+                    <tr key={v.id} className="hover:bg-gray-50/50">
+                      <td className="px-6 py-4">
+                        <span className="block text-xs font-black uppercase text-black">{v.customers?.name || "Unknown"}</span>
+                        <span className="block text-[9px] font-mono text-gray-400 mt-0.5">{v.customers?.phone}</span>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-bold text-gray-600">
+                        {new Date(v.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                      <td className="px-6 py-4 text-black uppercase tracking-tight">
+                        <span className="px-2.5 py-1 bg-black text-white rounded-lg text-[9px] font-black uppercase">
+                          {purposeLabels[v.purpose] || v.purpose}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 font-sans italic max-w-[300px]">
+                        {v.notes || "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <div className="p-10 text-center text-gray-400 italic">No recent check-ins recorded.</div>
+          )}
+        </div>
       </div>
 
       {/* Notification Toast */}

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { UserPlus, Edit2, X, Save, CheckCircle2, AlertCircle, Info, ArrowRightLeft, Search, Loader2, Plus, Building2, Percent, ChevronDown } from "lucide-react";
 import SlideDrawer from '../components/common/SlideDrawer';
 import { supabase } from "../server/supabase/supabase";
-import { supabaseAdmin } from "../server/supabase/supabaseAdmin";
 import { ROLES_FOR_SUPER_ADMIN, ROLES_FOR_ADMIN } from "../server/database/mocks/constants";
 
 import { generateId, ID_RULES } from "../server/supabase/idGenerator";
@@ -142,11 +141,19 @@ export default function StoreManagement({ userProfile }) {
     async function fetchProductStocks() {
         try {
             const { data, error } = await supabase
-                .from('products_list')
-                .select('id, name, stock, store_id, store(name)')
-                .order('name', { ascending: true });
+                .from('store_inventory')
+                .select('id, stock_quantity, store_id, products(id, name), store(name)')
+                .order('products(name)', { ascending: true });
             if (!error && data) {
-                setProductStocks(data);
+                const mapped = data.map(i => ({
+                    id: i.products?.id || i.id,
+                    name: i.products?.name || 'Unknown Product',
+                    stock: i.stock_quantity || 0,
+                    store_id: i.store_id,
+                    store: i.store,
+                    inventory_id: i.id
+                }));
+                setProductStocks(mapped);
             }
         } catch (err) {
             console.error("Error fetching stocks:", err);
@@ -201,7 +208,7 @@ export default function StoreManagement({ userProfile }) {
     async function handleUpdateUser(e) {
         e.preventDefault();
         try {
-            const { error } = await supabaseAdmin
+            const { error } = await supabase
                 .from('auth_users')
                 .update({
                     role: editingUser.role,
@@ -223,50 +230,7 @@ export default function StoreManagement({ userProfile }) {
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
-        setCreating(true);
-        try {
-            const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-                email: newUser.email,
-                password: newUser.password,
-                email_confirm: true
-            });
-
-            if (authError) throw authError;
-
-            setTimeout(async () => {
-                const { error: updateError } = await supabaseAdmin
-                    .from('auth_users')
-                    .update({
-                        role: newUser.role,
-                        store_id: newUser.store_id || null,
-                        must_reset_password: true
-                    })
-                    .eq('id', authData.user.id);
-
-                if (updateError) {
-                    console.error("Could not set final role:", updateError.message);
-                    showNotification("Account created, but updating role failed. Please edit manually.", "warning");
-                } else {
-                    showNotification(`User ${newUser.email} successfully created!`, "success");
-                    setCreatingNewUser(false);
-                    fetchUsers();
-                }
-
-                setCreating(false);
-                setNewUser({ 
-                    email: '', 
-                    password: 'Welcome@123', 
-                    useDefaultPassword: true, 
-                    role: 'store_manager', 
-                    store_id: stores[0]?.id || '' 
-                });
-            }, 1500);
-
-        } catch (err) {
-            console.error(err);
-            showNotification(err.message || "Failed to create user.", "error");
-            setCreating(false);
-        }
+        showNotification("Operator registration is restricted to secure admin backend endpoints to protect system credentials.", "error");
     };
 
     const handleCancelEdit = () => {
@@ -330,12 +294,19 @@ export default function StoreManagement({ userProfile }) {
         setSearchingProducts(true);
         try {
             const { data, error } = await supabase
-                .from('products_list')
-                .select('id, name, stock')
-                .ilike('name', `%${query}%`)
+                .from('store_inventory')
+                .select('id, stock_quantity, store_id, products!inner(id, name)')
+                .eq('store_id', transferData.sourceStore)
+                .ilike('products.name', `%${query}%`)
                 .limit(10);
             if (error) throw error;
-            setSearchResults(data || []);
+            const mapped = (data || []).map(i => ({
+                id: i.products?.id,
+                name: i.products?.name,
+                stock: i.stock_quantity,
+                inventory_id: i.id
+            }));
+            setSearchResults(mapped);
         } catch (err) {
             console.error(err);
         } finally {
@@ -344,28 +315,14 @@ export default function StoreManagement({ userProfile }) {
     };
 
     const handleDestStoreChange = async (storeId) => {
-        setTransferData({ ...transferData, destStore: storeId, destCategoryId: '' });
-        try {
-            const { data } = await supabase
-                .from('products_category')
-                .select('id, name')
-                .eq('store_id', storeId)
-                .order('name');
-            setDestCategories(data || []);
-        } catch (err) {
-            console.error("Error fetching destination categories:", err);
-            setDestCategories([]);
-        }
+        setTransferData({ ...transferData, destStore: storeId, destCategoryId: 'dummy-category' });
+        setDestCategories([{ id: 'dummy-category', name: 'Default Category' }]);
     };
 
     const handleTransferStock = async (e) => {
         e.preventDefault();
         if (!transferData.productId) {
             showNotification("Please select a valid product.", "error");
-            return;
-        }
-        if (!transferData.destCategoryId) {
-            showNotification("Please select a destination category.", "error");
             return;
         }
         if (transferData.sourceStore === transferData.destStore) {
@@ -375,48 +332,43 @@ export default function StoreManagement({ userProfile }) {
         setTransferring(true);
         try {
             // 1. Fetch Source Product Details
-            const { data: srcProd, error: srcErr } = await supabase.from('products_list')
-                .select('*, products_category(*)')
-                .eq('id', transferData.productId)
+            const { data: srcProd, error: srcErr } = await supabase.from('store_inventory')
+                .select('*, products(*)')
+                .eq('store_id', transferData.sourceStore)
+                .eq('product_id', transferData.productId)
                 .single();
 
             if (srcErr || !srcProd) throw new Error("Could not fetch source product details");
-            if (srcProd.stock < transferData.qty) throw new Error(`Insufficient stock in source store. Available: ${srcProd.stock}`);
+            if (srcProd.stock_quantity < transferData.qty) throw new Error(`Insufficient stock in source store. Available: ${srcProd.stock_quantity}`);
 
             // 2. Check if Product exists in Destination Store
-            const { data: destProd } = await supabase.from('products_list')
-                .select('id, stock')
-                .ilike('name', srcProd.name)
+            const { data: destProd } = await supabase.from('store_inventory')
+                .select('id, stock_quantity')
+                .eq('product_id', transferData.productId)
                 .eq('store_id', transferData.destStore)
                 .maybeSingle();
 
             if (destProd) {
                 // Update existing product stock
-                const { error: updateDestErr } = await supabase.from('products_list')
-                    .update({ stock: destProd.stock + transferData.qty })
+                const { error: updateDestErr } = await supabase.from('store_inventory')
+                    .update({ stock_quantity: destProd.stock_quantity + transferData.qty })
                     .eq('id', destProd.id);
                 if (updateDestErr) throw new Error("Failed to update destination product stock");
             } else {
-                // Create new product in selected category
-                const newId = generateId(ID_RULES.PRODUCTS.prefix, ID_RULES.PRODUCTS.digits);
-                const { error: insertDestErr } = await supabase.from('products_list')
+                // Create new store_inventory entry in destination store
+                const { error: insertDestErr } = await supabase.from('store_inventory')
                     .insert([{
-                        id: newId,
-                        name: srcProd.name,
-                        category_id: transferData.destCategoryId,
-                        price: srcProd.price || 0,
-                        stock: transferData.qty,
                         store_id: transferData.destStore,
-                        sales: 0,
-                        hsn_code: srcProd.hsn_code || "",
-                        item_detail: srcProd.item_detail || ""
+                        product_id: transferData.productId,
+                        stock_quantity: transferData.qty,
+                        unit_price: srcProd.unit_price || 0
                     }]);
                 if (insertDestErr) throw new Error("Failed to create product in destination store: " + insertDestErr.message);
             }
 
             // 3. Deduct Stock from Source
-            const { error: updateSrcErr } = await supabase.from('products_list')
-                .update({ stock: srcProd.stock - transferData.qty })
+            const { error: updateSrcErr } = await supabase.from('store_inventory')
+                .update({ stock_quantity: srcProd.stock_quantity - transferData.qty })
                 .eq('id', srcProd.id);
             if (updateSrcErr) throw new Error("Failed to deduct stock from source product");
 

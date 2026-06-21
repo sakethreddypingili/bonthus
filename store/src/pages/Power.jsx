@@ -25,6 +25,19 @@ export default function Power({ userProfile }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [showRegForm, setShowRegForm] = useState(false);
+  const [regForm, setRegForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    street: "",
+    town: "",
+    district: "",
+    state: "",
+    postal_code: "",
+    age: ""
+  });
   const [notification, setNotification] = useState(null);
 
   // Recent power history list for default view
@@ -68,23 +81,24 @@ export default function Power({ userProfile }) {
     setHistory([]);
 
     try {
-      // Find the primary customer matching the phone number
-      const { data: primaryData, error: primaryError } = await supabase
+      const { data: matchedCustomers, error: primaryError } = await supabase
         .from("customers")
         .select("*")
-        .eq("phone", phone.trim())
-        .maybeSingle();
+        .eq("phone", phone.trim());
 
       if (primaryError) throw primaryError;
+
+      const primaryData = matchedCustomers && matchedCustomers.length > 0
+        ? (matchedCustomers.find(c => !c.parent_id) || matchedCustomers[0])
+        : null;
 
       if (primaryData) {
         setCustomer(primaryData);
 
-        // Load primary + dependents
         const { data: dependentsData, error: dependentsError } = await supabase
-          .from("dependents")
+          .from("customers")
           .select("*")
-          .eq("parent_customer_id", primaryData.id);
+          .eq("parent_id", primaryData.id);
 
         if (dependentsError) throw dependentsError;
 
@@ -97,11 +111,26 @@ export default function Power({ userProfile }) {
         ];
 
         setProfiles(allProfiles);
-        setSelectedProfile(allProfiles[0]);
-        // Fetch history for first profile
-        fetchHistory(allProfiles[0].id);
+        if (allProfiles.length === 1) {
+          setSelectedProfile(allProfiles[0]);
+          fetchHistory(allProfiles[0].id);
+        } else {
+          setSelectedProfile(null);
+          setHistory([]);
+        }
       } else {
-        showNotification("No customer found with this number.", "error");
+        setRegForm({
+          name: "",
+          phone: phone.trim(),
+          email: "",
+          street: "",
+          town: "",
+          district: "",
+          state: "",
+          postal_code: "",
+          age: ""
+        });
+        setShowRegForm(true);
       }
     } catch (err) {
       showNotification(err.message, "error");
@@ -114,7 +143,7 @@ export default function Power({ userProfile }) {
     setLoadingHistory(true);
     try {
       const { data, error } = await supabase
-        .from("eye_power")
+        .from("prescriptions")
         .select("*")
         .eq("customer_id", profileId)
         .order("prescribed_at", { ascending: false });
@@ -144,7 +173,7 @@ export default function Power({ userProfile }) {
     setLoadingRecent(true);
     try {
       let query = supabase
-        .from("eye_power")
+        .from("prescriptions")
         .select(`
           *,
           customers ( name, phone )
@@ -188,6 +217,37 @@ export default function Power({ userProfile }) {
       fetchRecentPowers();
     }
   }, [customer, userProfile]);
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const payload = {
+        ...regForm,
+        age: regForm.age ? Number(regForm.age) : null
+      };
+
+      const { data, error } = await supabase
+        .from("customers")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      showNotification("Customer profile created!");
+      setCustomer(data);
+      const initialProfile = { ...data, label: "Primary Profile" };
+      setProfiles([initialProfile]);
+      setSelectedProfile(initialProfile);
+      setHistory([]);
+      setShowRegForm(false);
+    } catch (err) {
+      showNotification(err.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleProfileSelect = (p) => {
     setSelectedProfile(p);
@@ -336,32 +396,35 @@ export default function Power({ userProfile }) {
       const payload = {
         customer_id: selectedProfile.id,
         // Distance Vision (DV)
-        dv_right_sph: normalizeOptical(preset.re?.sph),
-        dv_right_cyl: tempPrescription.isCylindrical ? normalizeOptical(preset.re?.cyl) : null,
-        dv_right_axis: tempPrescription.isCylindrical ? normalizeAxis(preset.re?.axis) : null,
-        dv_left_sph: normalizeOptical(preset.le?.sph),
-        dv_left_cyl: tempPrescription.isCylindrical ? normalizeOptical(preset.le?.cyl) : null,
-        dv_left_axis: tempPrescription.isCylindrical ? normalizeAxis(preset.le?.axis) : null,
+        dv_re_sph: normalizeOptical(preset.re?.sph),
+        dv_re_cyl: tempPrescription.isCylindrical ? normalizeOptical(preset.re?.cyl) : null,
+        dv_re_axis: tempPrescription.isCylindrical ? normalizeAxis(preset.re?.axis) : null,
+        dv_le_sph: normalizeOptical(preset.le?.sph),
+        dv_le_cyl: tempPrescription.isCylindrical ? normalizeOptical(preset.le?.cyl) : null,
+        dv_le_axis: tempPrescription.isCylindrical ? normalizeAxis(preset.le?.axis) : null,
         // Near Vision (NV)
-        nv_right_sph: tempPrescription.hasAdditionalPower ? normalizeOptical(preset.adl_re?.sph) : null,
-        nv_right_cyl: tempPrescription.hasAdditionalPower && tempPrescription.isCylindrical
+        nv_re_sph: tempPrescription.hasAdditionalPower ? normalizeOptical(preset.adl_re?.sph) : null,
+        nv_re_cyl: tempPrescription.hasAdditionalPower && tempPrescription.isCylindrical
           ? (normalizeOptical(preset.adl_re?.cyl) ?? normalizeOptical(preset.re?.cyl))
           : null,
-        nv_right_axis: tempPrescription.hasAdditionalPower && tempPrescription.isCylindrical
+        nv_re_axis: tempPrescription.hasAdditionalPower && tempPrescription.isCylindrical
           ? (normalizeAxis(preset.adl_re?.axis) ?? normalizeAxis(preset.re?.axis))
           : null,
-        nv_left_sph: tempPrescription.hasAdditionalPower ? normalizeOptical(preset.adl_le?.sph) : null,
-        nv_left_cyl: tempPrescription.hasAdditionalPower && tempPrescription.isCylindrical
+        nv_le_sph: tempPrescription.hasAdditionalPower ? normalizeOptical(preset.adl_le?.sph) : null,
+        nv_le_cyl: tempPrescription.hasAdditionalPower && tempPrescription.isCylindrical
           ? (normalizeOptical(preset.adl_le?.cyl) ?? normalizeOptical(preset.le?.cyl))
           : null,
-        nv_left_axis: tempPrescription.hasAdditionalPower && tempPrescription.isCylindrical
+        nv_le_axis: tempPrescription.hasAdditionalPower && tempPrescription.isCylindrical
           ? (normalizeAxis(preset.adl_le?.axis) ?? normalizeAxis(preset.le?.axis))
           : null,
         notes: isNonEmpty(tempPrescription.notes) ? String(tempPrescription.notes).trim() : null,
       };
 
-      const { error } = await supabase.from("eye_power").insert([payload]);
-      if (error) throw error;
+      const { error } = await supabase.from("prescriptions").insert([payload]);
+      if (error) {
+        console.error("Prescription insert failed:", error.message);
+        throw error;
+      }
 
       showNotification("Prescription recorded successfully!");
       setShowAddModal(false);
@@ -421,167 +484,282 @@ export default function Power({ userProfile }) {
           </div>
         </form>
 
+        {/* Registration Form (Visible when phone search yields no results) */}
+        {showRegForm && (
+          <div className="border-t border-gray-50 pt-8 space-y-6">
+            <div className="flex flex-col gap-1">
+              <h3 className="text-base font-black text-black uppercase tracking-widest">Register Customer Profile</h3>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">No customer found. Please create a new profile.</p>
+            </div>
+            <form onSubmit={handleRegister} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Name *</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="Full Name"
+                  value={regForm.name}
+                  onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Phone</label>
+                <input
+                  required
+                  type="tel"
+                  placeholder="Phone"
+                  value={regForm.phone}
+                  onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Age</label>
+                <input
+                  type="number"
+                  placeholder="Age"
+                  value={regForm.age}
+                  onChange={(e) => setRegForm({ ...regForm, age: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Email</label>
+                <input
+                  type="email"
+                  placeholder="Email Address"
+                  value={regForm.email}
+                  onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Street Address</label>
+                <input
+                  type="text"
+                  placeholder="Street"
+                  value={regForm.street}
+                  onChange={(e) => setRegForm({ ...regForm, street: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Town / City</label>
+                <input
+                  type="text"
+                  placeholder="Town"
+                  value={regForm.town}
+                  onChange={(e) => setRegForm({ ...regForm, town: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Postal Code</label>
+                <input
+                  type="text"
+                  placeholder="Pin Code"
+                  value={regForm.postal_code}
+                  onChange={(e) => setRegForm({ ...regForm, postal_code: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="md:col-span-2 w-full py-4 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all mt-4"
+              >
+                {loading ? "Registering..." : "Create Account"}
+              </button>
+            </form>
+          </div>
+        )}
+
         {/* Profiles section */}
         {customer && (
           <div className="border-t border-gray-50 pt-8 space-y-6">
-            <div>
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                Select Customer Profile
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                {profiles.map((p) => {
-                  const isSelected = selectedProfile?.id === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => handleProfileSelect(p)}
-                      className={`flex flex-col text-left p-5 rounded-2xl border transition-all ${
-                        isSelected
-                          ? "border-black bg-black text-white shadow-xl scale-[1.02]"
-                          : "border-gray-100 bg-gray-50/50 text-black hover:bg-gray-50"
-                      }`}
-                    >
-                      <span className="text-[10px] font-black uppercase tracking-widest opacity-60">
-                        {p.label}
-                      </span>
-                      <span className="text-sm font-black mt-1 uppercase tracking-tight">{p.name}</span>
-                      <span className="text-[10px] font-mono mt-1 opacity-70">{p.phone}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Prescription History Table */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-black uppercase tracking-wider text-black">
-                Prescription History for {selectedProfile?.name}
-              </h3>
-              <div className="overflow-x-auto border border-gray-50 rounded-[24px]">
-                {loadingHistory ? (
-                  <div className="p-10 text-center flex items-center justify-center gap-3">
-                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading history...</span>
-                  </div>
-                ) : history.length > 0 ? (
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                        <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Eye</th>
-                        <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">SPH</th>
-                        <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">CYL</th>
-                        <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">AXIS</th>
-                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 font-mono text-[11px] font-black">
-                      {history.map((pow) => {
-                        const hasNV = pow.nv_right_sph || pow.nv_left_sph || pow.nv_right_cyl || pow.nv_left_cyl;
-                        const rowSpan = hasNV ? 4 : 2;
-                        return (
-                          <Fragment key={pow.id}>
-                            {/* RE (DV) */}
-                            <tr className="hover:bg-gray-50/50">
-                              <td rowSpan={rowSpan} className="px-6 py-4 text-xs font-bold text-gray-600 border-r border-gray-100">
-                                {new Date(pow.prescribed_at || pow.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                              </td>
-                              <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">RE (DV)</td>
-                              <td className="px-6 py-3 text-center text-gray-700">{pow.dv_right_sph || "—"}</td>
-                              <td className="px-6 py-3 text-center text-gray-700">{pow.dv_right_cyl || "—"}</td>
-                              <td className="px-6 py-3 text-center text-gray-700">{pow.dv_right_axis || "—"}</td>
-                              <td rowSpan={rowSpan} className="px-6 py-4 text-xs font-medium text-gray-400 font-sans italic border-l border-gray-100 max-w-[200px]">
-                                {pow.notes || "—"}
-                              </td>
-                            </tr>
-                            {/* LE (DV) */}
-                            <tr className="hover:bg-gray-50/50 border-b border-gray-100">
-                              <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">LE (DV)</td>
-                              <td className="px-6 py-3 text-center text-gray-700">{pow.dv_left_sph || "—"}</td>
-                              <td className="px-6 py-3 text-center text-gray-700">{pow.dv_left_cyl || "—"}</td>
-                              <td className="px-6 py-3 text-center text-gray-700">{pow.dv_left_axis || "—"}</td>
-                            </tr>
-                            {/* Near Vision rows */}
-                            {hasNV && (
-                              <>
-                                <tr className="hover:bg-gray-50/50">
-                                  <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">RE (NV)</td>
-                                  <td className="px-6 py-3 text-center text-gray-700">{pow.nv_right_sph || "—"}</td>
-                                  <td className="px-6 py-3 text-center text-gray-700">{pow.nv_right_cyl || "—"}</td>
-                                  <td className="px-6 py-3 text-center text-gray-700">{pow.nv_right_axis || "—"}</td>
-                                </tr>
-                                <tr className="hover:bg-gray-50/50 border-b border-gray-100">
-                                  <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">LE (NV)</td>
-                                  <td className="px-6 py-3 text-center text-gray-700">{pow.nv_left_sph || "—"}</td>
-                                  <td className="px-6 py-3 text-center text-gray-700">{pow.nv_left_cyl || "—"}</td>
-                                  <td className="px-6 py-3 text-center text-gray-700">{pow.nv_left_axis || "—"}</td>
-                                </tr>
-                              </>
-                            )}
-                          </Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="p-10 text-center text-gray-400 italic">No prescription records found for this profile.</div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!customer && (
-          <div className="space-y-4 border-t border-gray-50 pt-8">
-            <h3 className="text-sm font-black uppercase tracking-wider text-black">
-              Recent Prescriptions
-            </h3>
-            <div className="overflow-x-auto border border-gray-50 rounded-[24px]">
-              {loadingRecent ? (
-                <div className="p-10 text-center flex items-center justify-center gap-3">
-                  <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading prescriptions...</span>
+            {!selectedProfile && profiles.length > 0 && (
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                  Select Customer Profile
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                  {profiles.map((p) => {
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleProfileSelect(p)}
+                        className="flex flex-col text-left p-5 rounded-2xl border border-gray-100 bg-gray-50/50 text-black hover:bg-gray-50 hover:scale-[1.01] transition-all"
+                      >
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">
+                          {p.label}
+                        </span>
+                        <span className="text-sm font-black mt-1 uppercase tracking-tight">{p.name}</span>
+                        <span className="text-[10px] font-mono mt-1 opacity-70">{p.phone}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              ) : recentPowers.length > 0 ? (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                      <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">RE (DV) SPH/CYL/AXIS</th>
-                      <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">LE (DV) SPH/CYL/AXIS</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 text-[11px] font-black font-mono">
-                    {recentPowers.map((pow) => (
-                      <tr key={pow.id} className="hover:bg-gray-50/50">
-                        <td className="px-6 py-4 font-sans">
-                          <span className="block text-xs font-black uppercase text-black">{pow.customers?.name || "Unknown"}</span>
-                          <span className="block text-[9px] text-gray-400 mt-0.5">{pow.customers?.phone}</span>
-                        </td>
-                        <td className="px-6 py-4 text-xs font-bold text-gray-600 font-sans">
-                          {new Date(pow.prescribed_at || pow.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-700">
-                          {pow.dv_right_sph || "0.00"} / {pow.dv_right_cyl || "0.00"} / {pow.dv_right_axis || "0"}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-700">
-                          {pow.dv_left_sph || "0.00"} / {pow.dv_left_cyl || "0.00"} / {pow.dv_left_axis || "0"}
-                        </td>
-                        <td className="px-6 py-4 text-gray-500 font-sans italic max-w-[200px]">
-                          {pow.notes || "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="p-10 text-center text-gray-400 italic">No recent prescriptions recorded.</div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {selectedProfile && (
+              <>
+                {/* Active Selected Profile Summary */}
+                <div className="flex justify-between items-center bg-gray-50 border border-gray-100 rounded-3xl p-6 shadow-sm">
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Active Profile</span>
+                    <h4 className="text-base font-black uppercase tracking-tight text-black mt-1">{selectedProfile.name}</h4>
+                    <p className="text-[10px] font-mono text-gray-400 mt-1">
+                      Phone: {selectedProfile.phone || customer.phone} {selectedProfile.parent_id ? `• Dependent (${selectedProfile.relationship || "Family"})` : "• Primary Profile"}
+                    </p>
+                  </div>
+                  {profiles.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProfile(null);
+                        setHistory([]);
+                      }}
+                      className="px-5 py-2.5 border border-black hover:bg-black hover:text-white transition-all rounded-xl text-[10px] font-black uppercase tracking-widest"
+                    >
+                      Change Profile
+                    </button>
+                  )}
+                </div>
+
+                {/* Prescription History Table */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-black">
+                    Prescription History for {selectedProfile.name}
+                  </h3>
+                  <div className="overflow-x-auto border border-gray-50 rounded-[24px]">
+                    {loadingHistory ? (
+                      <div className="p-10 text-center flex items-center justify-center gap-3">
+                        <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading history...</span>
+                      </div>
+                    ) : history.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                            <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Eye</th>
+                            <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">SPH</th>
+                            <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">CYL</th>
+                            <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">AXIS</th>
+                            <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 font-mono text-[11px] font-black">
+                          {history.map((pow) => {
+                            const hasNV = pow.nv_re_sph || pow.nv_le_sph || pow.nv_re_cyl || pow.nv_le_cyl;
+                            const rowSpan = hasNV ? 4 : 2;
+                            return (
+                              <Fragment key={pow.id}>
+                                {/* RE (DV) */}
+                                <tr className="hover:bg-gray-50/50">
+                                  <td rowSpan={rowSpan} className="px-6 py-4 text-xs font-bold text-gray-600 border-r border-gray-100">
+                                    {new Date(pow.prescribed_at || pow.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                                  </td>
+                                  <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">RE (DV)</td>
+                                  <td className="px-6 py-3 text-center text-gray-700">{pow.dv_re_sph || "—"}</td>
+                                  <td className="px-6 py-3 text-center text-gray-700">{pow.dv_re_cyl || "—"}</td>
+                                  <td className="px-6 py-3 text-center text-gray-700">{pow.dv_re_axis || "—"}</td>
+                                  <td rowSpan={rowSpan} className="px-6 py-4 text-xs font-medium text-gray-400 font-sans italic border-l border-gray-100 max-w-[200px]">
+                                    {pow.notes || "—"}
+                                  </td>
+                                </tr>
+                                {/* LE (DV) */}
+                                <tr className="hover:bg-gray-50/50 border-b border-gray-100">
+                                  <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">LE (DV)</td>
+                                  <td className="px-6 py-3 text-center text-gray-700">{pow.dv_le_sph || "—"}</td>
+                                  <td className="px-6 py-3 text-center text-gray-700">{pow.dv_le_cyl || "—"}</td>
+                                  <td className="px-6 py-3 text-center text-gray-700">{pow.dv_le_axis || "—"}</td>
+                                </tr>
+                                {/* Near Vision rows */}
+                                {hasNV && (
+                                  <>
+                                    <tr className="hover:bg-gray-50/50">
+                                      <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">RE (NV)</td>
+                                      <td className="px-6 py-3 text-center text-gray-700">{pow.nv_re_sph || "—"}</td>
+                                      <td className="px-6 py-3 text-center text-gray-700">{pow.nv_re_cyl || "—"}</td>
+                                      <td className="px-6 py-3 text-center text-gray-700">{pow.nv_re_axis || "—"}</td>
+                                    </tr>
+                                    <tr className="hover:bg-gray-50/50 border-b border-gray-100">
+                                      <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">LE (NV)</td>
+                                      <td className="px-6 py-3 text-center text-gray-700">{pow.nv_le_sph || "—"}</td>
+                                      <td className="px-6 py-3 text-center text-gray-700">{pow.nv_le_cyl || "—"}</td>
+                                      <td className="px-6 py-3 text-center text-gray-700">{pow.nv_le_axis || "—"}</td>
+                                    </tr>
+                                  </>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="p-10 text-center text-gray-400 italic">No prescription records found for this profile.</div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
+      </div>
+
+      {/* Unconditional Recent Prescriptions list always displayed at bottom of page */}
+      <div className="bg-white rounded-[32px] border border-gray-100 p-8 shadow-sm space-y-4">
+        <h3 className="text-sm font-black uppercase tracking-wider text-black">
+          Recent Prescriptions
+        </h3>
+        <div className="overflow-x-auto border border-gray-50 rounded-[24px]">
+          {loadingRecent ? (
+            <div className="p-10 text-center flex items-center justify-center gap-3">
+              <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading prescriptions...</span>
+            </div>
+          ) : recentPowers.length > 0 ? (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer</th>
+                  <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">RE (DV) SPH/CYL/AXIS</th>
+                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">LE (DV) SPH/CYL/AXIS</th>
+                  <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-[11px] font-black font-mono">
+                {recentPowers.map((pow) => (
+                  <tr key={pow.id} className="hover:bg-gray-50/50">
+                    <td className="px-6 py-4 font-sans">
+                      <span className="block text-xs font-black uppercase text-black">{pow.customers?.name || "Unknown"}</span>
+                      <span className="block text-[9px] text-gray-400 mt-0.5">{pow.customers?.phone}</span>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-bold text-gray-600 font-sans">
+                      {new Date(pow.prescribed_at || pow.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                    </td>
+                    <td className="px-6 py-4 text-center text-gray-700">
+                      {pow.dv_re_sph || "0.00"} / {pow.dv_re_cyl || "0.00"} / {pow.dv_re_axis || "0"}
+                    </td>
+                    <td className="px-6 py-4 text-center text-gray-700">
+                      {pow.dv_le_sph || "0.00"} / {pow.dv_le_cyl || "0.00"} / {pow.dv_le_axis || "0"}
+                    </td>
+                    <td className="px-6 py-4 text-gray-500 font-sans italic max-w-[200px]">
+                      {pow.notes || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="p-10 text-center text-gray-400 italic">No recent prescriptions recorded.</div>
+          )}
+        </div>
       </div>
 
       {/* Record Power Drawer */}

@@ -11,11 +11,13 @@ import {
   Warehouse,
   Truck,
   Store,
+  Building2,
   QrCode,
   Plus,
   List,
   Tags,
-  ClipboardList
+  ClipboardList,
+  FlaskConical
 } from "lucide-react";
 import { useState } from "react";
 const logoImg = '/assets/images/logo.webp';
@@ -42,9 +44,8 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
       className="flex flex-col bg-white text-black border-r border-gray-200 transition-all duration-300 w-full h-full tracking-wide"
     >
       {/* Logo */}
-      <div className={`flex items-center justify-center border-b border-gray-100 transition-all duration-300 ${
-        collapsed ? "py-1 px-0 min-h-[80px] overflow-visible" : "py-1 px-2 min-h-[120px]"
-      }`}>
+      <div className={`flex items-center justify-center border-b border-gray-100 transition-all duration-300 ${collapsed ? "py-1 px-0 min-h-[80px] overflow-visible" : "py-1 px-2 min-h-[120px]"
+        }`}>
         {collapsed ? (
           <img src={iconImg} alt="LensCare Icon" className="w-[73px] h-[73px] object-contain flex-shrink-0 max-w-none" />
         ) : (
@@ -58,22 +59,22 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 mb-2">Menu</p>
         )}
         {navItems.filter(item => item.role.includes(userProfile?.role)).map(({ to, label, icon: Icon }) => {
-          const isActive = to === "/" 
-            ? location.pathname === "/" 
-            : (to === "/reminders" 
-                ? (location.pathname === "/reminders" || location.pathname === "/notifications")
-                : (to === "/inventory"
-                    ? (location.pathname === "/inventory" || location.pathname === "/inventory/analytics" || location.pathname === "/inventory/store" || location.pathname === "/inventory/shipment" || location.pathname === "/inventory/provisioning" || location.pathname === "/inventory/vendors")
-                    : (to === "/products"
-                        ? (location.pathname === "/products" || location.pathname === "/products/:id" || location.pathname === "/categories" || location.pathname === "/barcode-creator" || location.pathname === "/barcodes")
-                        : (to === "/employees"
-                            ? (location.pathname.startsWith("/employees") || location.pathname.startsWith("/onboarding"))
-                            : location.pathname.startsWith(to)
-                          )
-                      )
+          const isActive = to === "/"
+            ? location.pathname === "/"
+            : (to === "/reminders"
+              ? (location.pathname === "/reminders" || location.pathname === "/notifications")
+              : (to === "/inventory"
+                ? (location.pathname === "/inventory" || location.pathname === "/inventory/analytics" || location.pathname === "/inventory/store" || location.pathname === "/inventory/shipment" || location.pathname === "/inventory/provisioning" || location.pathname === "/inventory/vendors")
+                : (to === "/products"
+                  ? (location.pathname === "/products" || location.pathname === "/products/:id" || location.pathname === "/categories" || location.pathname === "/barcode-creator" || location.pathname === "/barcodes")
+                  : (to === "/employees"
+                    ? (location.pathname.startsWith("/employees") || location.pathname.startsWith("/onboarding"))
+                    : location.pathname.startsWith(to)
                   )
-              );
-          
+                )
+              )
+            );
+
           return (
             <div key={to} className="w-full">
               <NavLink
@@ -228,21 +229,26 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
 
         {/* Admin Features */}
         {isAdmin && (
-          <NavLink
-            to="/store-management"
-            className={`
-              flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${location.pathname.startsWith("/store-management")
-                ? "bg-black text-white shadow-md"
-                : "text-gray-600 hover:text-black hover:bg-gray-100"
-              }
-              ${collapsed ? "justify-center" : ""}
-            `}
-            title={collapsed ? "Stores" : undefined}
-          >
-            <UserPlus size={18} className="flex-shrink-0" />
-            {!collapsed && <span>Stores</span>}
-          </NavLink>
+          <div className="space-y-0.5">
+            {!collapsed && (
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 mb-2 mt-4">Infrastructure</p>
+            )}
+            <NavLink
+              to="/infrastructure"
+              className={`
+                flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+                ${location.pathname.startsWith("/infrastructure")
+                  ? "bg-black text-white shadow-md"
+                  : "text-gray-600 hover:text-black hover:bg-gray-100"
+                }
+                ${collapsed ? "justify-center" : ""}
+              `}
+              title={collapsed ? "Infrastructure" : undefined}
+            >
+              <Building2 size={18} className="flex-shrink-0" />
+              {!collapsed && <span>Infrastructure</span>}
+            </NavLink>
+          </div>
         )}
       </nav>
 

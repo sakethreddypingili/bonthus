@@ -59,7 +59,7 @@ serve(async (req) => {
     }
 
     // 3. Process the action
-    const { action, email, password, role, store_id, userId } = await req.json()
+    const { action, email, password, role, operation_type, store_id, lab_id, userId, name, phone, current_address, permanent_address } = await req.json()
 
     if (action === 'create') {
       if (!email || !password) {
@@ -74,7 +74,7 @@ serve(async (req) => {
         email,
         password,
         email_confirm: true,
-        user_metadata: { role }
+        user_metadata: { role, operation_type, name }
       })
 
       if (authError) throw authError
@@ -85,10 +85,15 @@ serve(async (req) => {
         .insert([{
           id: authData.user.id,
           email,
-          name: email.split('@')[0],
+          name: name || email.split('@')[0],
           password_hash: 'managed_by_auth',
           role: role || 'sales',
+          operation_type: operation_type || 'store',
           store_id: store_id || null,
+          lab_id: lab_id || null,
+          phone: phone || null,
+          current_address: current_address || null,
+          permanent_address: permanent_address || null,
           is_active: true
         }])
 

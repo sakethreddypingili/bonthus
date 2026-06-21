@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { 
   ArrowLeft, 
   ArrowRight,
@@ -21,11 +21,13 @@ import SlideDrawer from "../components/common/SlideDrawer";
 export default function CustomerProfile({ userProfile }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [customer, setCustomer] = useState(null);
   const [orders, setOrders] = useState([]);
   const [eyePowers, setEyePowers] = useState([]);
   const [dependents, setDependents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [familyMembers, setFamilyMembers] = useState([]);
 
   // Dependent Modal/Form states
   const [showDepModal, setShowDepModal] = useState(false);
@@ -37,14 +39,95 @@ export default function CustomerProfile({ userProfile }) {
     setLoading(true);
     try {
       // Fetch customer basic info
-      const { data: custData, error: custError } = await supabase
+      const { data: custDataArray, error: custError } = await supabase
         .from('customers')
         .select('*')
         .eq('id', id)
-        .single();
+        .limit(1);
       
       if (custError) throw custError;
+      let custData = custDataArray && custDataArray.length > 0 ? custDataArray[0] : null;
+
+      let isDep = false;
+      if (custData) {
+        isDep = !!custData.parent_id;
+      } else {
+        // Fallback for store isolation / empty query: try parent ID from navigation state
+        const stateParentId = location.state?.parentId || location.state?.parent_id;
+        if (stateParentId) {
+          const { data: parentDataArray } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', stateParentId)
+            .limit(1);
+
+          if (parentDataArray && parentDataArray.length > 0) {
+            const parent = parentDataArray[0];
+            const { data: parentDeps } = await supabase
+              .from('customers')
+              .select('*')
+              .eq('parent_id', parent.id);
+
+            const matchedDep = parentDeps?.find(d => d.id === id);
+            if (matchedDep) {
+              custData = {
+                ...matchedDep,
+                phone: matchedDep.phone || parent.phone,
+                email: matchedDep.email || parent.email,
+                street: matchedDep.street || parent.street,
+                town: matchedDep.town || parent.town,
+                district: matchedDep.district || parent.district,
+                state: matchedDep.state || parent.state
+              };
+              isDep = true;
+            }
+          }
+        }
+      }
+      
+      // If dependent has missing core contact details, merge from parent row
+      if (custData && (isDep || custData.parent_id)) {
+        const parentId = custData.parent_id;
+        if (parentId) {
+          const { data: parentDataArray } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', parentId)
+            .limit(1);
+          if (parentDataArray && parentDataArray.length > 0) {
+            const parent = parentDataArray[0];
+            custData = {
+              ...custData,
+              phone: custData.phone || parent.phone,
+              email: custData.email || parent.email,
+              street: custData.street || parent.street,
+              town: custData.town || parent.town,
+              district: custData.district || parent.district,
+              state: custData.state || parent.state
+            };
+          }
+        }
+      }
+
       setCustomer(custData);
+
+      // Fetch family members sharing identical phone contact string
+      if (custData && custData.phone) {
+        const { data: siblingData, error: siblingError } = await supabase
+          .from('customers')
+          .select('id, name, email')
+          .eq('phone', custData.phone)
+          .neq('id', id);
+
+        if (siblingError) {
+          console.error("Error fetching sibling accounts:", siblingError.message);
+          setFamilyMembers([]);
+        } else {
+          setFamilyMembers(siblingData || []);
+        }
+      } else {
+        setFamilyMembers([]);
+      }
 
       // Fetch customer orders with items and products
       let orderQuery = supabase
@@ -110,11 +193,11 @@ export default function CustomerProfile({ userProfile }) {
 
       // Fetch dependents
       // If the current profile has a family_id, load members sharing that family_id
-      let dependentsQuery = supabase.from('dependents').select('*');
+      let dependentsQuery = supabase.from('customers').select('*');
       if (custData.family_id) {
         dependentsQuery = dependentsQuery.eq('family_id', custData.family_id);
       } else {
-        dependentsQuery = dependentsQuery.eq('parent_customer_id', id);
+        dependentsQuery = dependentsQuery.eq('parent_id', id);
       }
 
       const { data: dependentsData, error: dependentsError } = await dependentsQuery.order('created_at', { ascending: false });
@@ -123,7 +206,7 @@ export default function CustomerProfile({ userProfile }) {
 
       let combinedFamilyMembers = (dependentsData || []).map(d => ({
         ...d,
-        is_primary_customer: false
+        is_primary_customer: !d.parent_id
       }));
 
       // Fetch other primary customers sharing the same family_id
@@ -189,7 +272,7 @@ export default function CustomerProfile({ userProfile }) {
       const familyId = (customer.family_id && customer.family_id.trim() !== '') ? customer.family_id : null;
 
       const { data, error } = await supabase.rpc('save_dependent_with_family', {
-        p_parent_customer_id: customer.parent_customer_id || id,
+        p_parent_customer_id: customer.parent_id || id,
         p_name: depForm.name,
         p_relationship: depForm.relationship,
         p_phone: depForm.phone.trim() || null,
@@ -219,7 +302,7 @@ export default function CustomerProfile({ userProfile }) {
     if (!window.confirm("Are you sure you want to delete this family profile?")) return;
     try {
       const { error } = await supabase
-        .from('dependents')
+        .from('customers')
         .delete()
         .eq('id', depId);
       if (error) throw error;
@@ -270,7 +353,7 @@ export default function CustomerProfile({ userProfile }) {
             <p className="text-xs text-gray-500 flex items-center gap-1">
               <span className="font-mono">{customer.id}</span>
               <span className="mx-1">•</span>
-              <span>Joined {new Date(customer.created_at).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</span>
+              <span>Joined {customer.created_at && !isNaN(new Date(customer.created_at).getTime()) ? new Date(customer.created_at).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : "N/A"}</span>
             </p>
           </div>
         </div>
@@ -341,6 +424,36 @@ export default function CustomerProfile({ userProfile }) {
             </div>
           </div>
 
+          {/* Linked Family Accounts */}
+          <div className="section-card p-5 space-y-4">
+            <div className="border-b border-gray-100 pb-2">
+              <h3 className="text-sm font-bold text-[#000000] flex items-center gap-2">
+                <Users size={16} /> Linked Family Accounts
+              </h3>
+            </div>
+            {familyMembers.length > 0 ? (
+              <div className="space-y-3">
+                {familyMembers.map(member => (
+                  <div key={member.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div>
+                      <p className="text-xs font-black text-black uppercase tracking-tight">{member.name}</p>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{member.email || "No email"}</p>
+                    </div>
+                    <button 
+                      onClick={() => navigate('/customers/' + member.id, { state: { parentId: member.parent_id } })} 
+                      className="p-1.5 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest"
+                      title="View Profile"
+                    >
+                      View <ArrowRight size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 italic">No linked family accounts sharing this phone contact string.</p>
+            )}
+          </div>
+
           {/* Family Profiles / Dependents */}
           <div className="section-card p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
@@ -364,15 +477,31 @@ export default function CustomerProfile({ userProfile }) {
                     </div>
                     <div className="flex items-center gap-1.5">
                       {dep.is_primary_customer ? (
-                        <button 
-                          onClick={() => navigate(`/customers/${dep.id}`)} 
-                          className="p-1.5 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest"
-                          title="View Profile"
-                        >
-                          View <ArrowRight size={12} />
-                        </button>
+                        <>
+                          <button 
+                            onClick={() => navigate('/orders/new', { state: { customer: dep } })}
+                            className="p-1.5 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest"
+                            title="New Order"
+                          >
+                            <ShoppingBag size={12} /> Order
+                          </button>
+                          <button 
+                            onClick={() => navigate(`/customers/${dep.id}`, { state: { parentId: dep.parent_id || customer.id } })} 
+                            className="p-1.5 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest"
+                            title="View Profile"
+                          >
+                            View <ArrowRight size={12} />
+                          </button>
+                        </>
                       ) : (
                         <>
+                          <button 
+                            onClick={() => navigate('/orders/new', { state: { customer: customer, initialSelectedProfileId: dep.id } })}
+                            className="p-1.5 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest"
+                            title="New Order"
+                          >
+                            <ShoppingBag size={12} /> Order
+                          </button>
                           <button 
                             onClick={() => handleOpenEditDependent(dep)} 
                             className="p-1.5 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-all"
@@ -426,13 +555,20 @@ export default function CustomerProfile({ userProfile }) {
                                               p.nv_right_axis != null || p.nv_left_axis != null;
                       const showNV = hasNearVision(pow);
                       const groupRowSpan = showNV ? 4 : 2;
+                      
+                      const formatEyePowerDate = (dateStr) => {
+                        if (!dateStr) return "N/A";
+                        const d = new Date(dateStr);
+                        if (isNaN(d.getTime())) return "N/A";
+                        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                      };
 
                       return (
                         <React.Fragment key={pow.id}>
                           {/* Distance Vision Row */}
                           <tr className="hover:bg-gray-50/50">
                             <td rowSpan={groupRowSpan} className="px-5 py-4 text-xs font-medium text-gray-600 border-r border-gray-100">
-                              {new Date(pow.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              {formatEyePowerDate(pow.created_at)}
                             </td>
                             <td className="px-5 py-2 text-center font-bold text-black text-[10px] uppercase tracking-widest bg-gray-50">RE (DV)</td>
                             <td className="px-5 py-2 text-center font-bold">{pow.dv_right_sph ?? '-'}</td>
@@ -505,7 +641,7 @@ export default function CustomerProfile({ userProfile }) {
                           <span className="font-mono text-xs font-bold text-[#000000]">{order.id}</span>
                         </td>
                         <td className="px-5 py-4 text-xs text-gray-500 whitespace-nowrap">
-                          {new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {order.created_at && !isNaN(new Date(order.created_at).getTime()) ? new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "N/A"}
                         </td>
                         <td className="px-5 py-4 text-xs font-semibold text-gray-600 whitespace-nowrap">
                           {order.store?.name || 'N/A'}

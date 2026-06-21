@@ -1,7 +1,7 @@
 import React from 'react';
 import { Phone, MapPin } from 'lucide-react';
 import { INVOICE_BRAND } from '../../constants/brand';
-const logoImg = '/assets/images/image.png';;
+const logoImg = '/assets/images/bonthus-icon.webp';
 
 const numberToWords = (num) => {
   const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
@@ -86,52 +86,44 @@ const PdfInvoiceLayout = React.forwardRef(({
 
       {/* Primary Info Cards */}
       <div className="grid grid-cols-2 gap-3 px-8 mb-3">
-        {/* Company Details */}
+        {/* Company Details (Combined Billed From) */}
         <div className="bg-[#f8f9fc] rounded-2xl p-4 border border-slate-100 flex flex-col gap-2 min-h-[100px]">
           <div className="flex items-center gap-2">
-            <Phone size={14} className="text-slate-400" />
-            <span className="text-[13px] text-slate-800">Phone: {displayPhone}</span>
+            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Billed From</p>
           </div>
-          <div className="flex items-start gap-2">
-            <MapPin size={14} className="text-slate-400 mt-0.5 shrink-0" />
-            <div className="text-[12px] text-slate-600 leading-tight">
+          <p className="font-extrabold text-black text-[16px] uppercase">{INVOICE_BRAND.billedFromName}</p>
+          <div className="flex items-center gap-2 text-slate-600">
+            <Phone size={12} className="text-slate-400" />
+            <span className="text-[12px] font-medium">Phone: <span className="text-slate-900">{displayPhone}</span></span>
+          </div>
+          <div className="flex items-start gap-2 text-slate-600">
+            <MapPin size={12} className="text-slate-400 mt-0.5 shrink-0" />
+            <div className="text-[11px] text-slate-600 leading-tight">
               <p>{displayAddress}</p>
             </div>
           </div>
           {displayGstin && (
-            <div className="flex items-center gap-2 text-slate-600 border-t border-slate-100 pt-2 mt-2">
-              <span className="text-[13px] font-medium">GST No: <span className="font-semibold text-slate-800">{displayGstin}</span></span>
+            <div className="flex items-center gap-2 text-slate-600 border-t border-slate-100 pt-2 mt-1">
+              <span className="text-[12px] font-medium">GST No: <span className="font-semibold text-slate-800">{displayGstin}</span></span>
             </div>
           )}
         </div>
 
-        {/* Invoice Info */}
-        <div className="bg-[#f8f9fc] rounded-2xl p-4 border border-slate-100 flex flex-col items-start justify-start min-h-[100px]">
-          <h2 className="text-[24px] font-black text-slate-900 mb-1">INVOICE</h2>
-          <div className="space-y-0.5">
-            <p className="text-[14px] text-slate-700 font-medium text-left italic opacity-90">Invoice: <span className="font-bold text-slate-900 not-italic">{order?.id || '-'}</span></p>
-            <p className="text-[14px] text-slate-700 font-medium text-left italic opacity-90">Date: <span className="font-bold text-slate-900 not-italic">{new Date(order?.created_at || new Date()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></p>
+        {/* Invoice & Billed To Info */}
+        <div className="bg-[#f8f9fc] rounded-2xl p-4 border border-slate-100 flex flex-col items-start justify-between min-h-[100px]">
+          <div>
+            <h2 className="text-[20px] font-black text-slate-900 mb-1">INVOICE</h2>
+            <div className="space-y-0.5">
+              <p className="text-[13px] text-slate-700 font-medium text-left italic opacity-90">Invoice: <span className="font-bold text-slate-900 not-italic">{order?.id || '-'}</span></p>
+              <p className="text-[13px] text-slate-700 font-medium text-left italic opacity-90">Date: <span className="font-bold text-slate-900 not-italic">{new Date(order?.created_at || new Date()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></p>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Secondary Info Cards (Billing) */}
-      <div className="grid grid-cols-2 gap-4 px-8 mb-6">
-        <div className="bg-[#f8f9fc] rounded-2xl p-6 border border-slate-100 flex flex-col min-h-[120px]">
-          <p className="text-[12px] text-slate-500 font-bold tracking-wider mb-2 uppercase">BILLED FROM</p>
-          <p className="font-extrabold text-black text-[18px] mb-1">{INVOICE_BRAND.billedFromName}</p>
-          <p className="text-slate-600 text-[13px] leading-relaxed">
-            Phone: {displayPhone}
-            <br />
-            {displayAddress}
-          </p>
-        </div>
-
-        <div className="bg-[#f8f9fc] rounded-2xl p-6 border border-slate-100 flex flex-col min-h-[120px]">
-          <p className="text-[12px] text-slate-500 font-bold tracking-wider mb-2 uppercase">BILLED TO</p>
-          <p className="font-bold text-slate-900 text-[16px] uppercase mb-1">{customerName}</p>
-          <p className="text-slate-600 text-[13px]">Phone: {customerPhone}</p>
-          {order?.customers?.email && <p className="text-slate-500 text-[13px] mt-0.5">{order?.customers?.email}</p>}
+          <div className="mt-2 w-full pt-2 border-t border-slate-200">
+            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1 uppercase">BILLED TO</p>
+            <p className="font-bold text-slate-900 text-[14px] uppercase leading-none">{customerName}</p>
+            <p className="text-slate-600 text-[12px] mt-1 leading-none">Phone: {customerPhone}</p>
+            {order?.customers?.email && <p className="text-slate-500 text-[12px] mt-1 leading-none">{order?.customers?.email}</p>}
+          </div>
         </div>
       </div>
 
@@ -159,8 +151,8 @@ const PdfInvoiceLayout = React.forwardRef(({
                 const p = Number(item.price || 0);
                 const d = Number(item.discount_amt || 0);
 
-                const sgstR = Number(item.products_list?.products_category?.sgst || 0);
-                const cgstR = Number(item.products_list?.products_category?.cgst || 0);
+                const sgstR = Number(item.products?.product_categories?.sgst || 0);
+                const cgstR = Number(item.products?.product_categories?.cgst || 0);
                 const totalTaxR = sgstR + cgstR;
 
                 let taxable, sgstA, cgstA, total;
@@ -179,7 +171,7 @@ const PdfInvoiceLayout = React.forwardRef(({
                 return (
                   <tr key={item.id} className="bg-white border-b border-slate-400 last:border-b-0">
                     <td className="border-r border-slate-400 py-1.5 px-4 text-slate-600 font-medium uppercase text-[11px]">
-                      {item.products_list?.name || 'Custom Product'}
+                      {item.products?.name || 'Custom Product'}
                     </td>
                     <td className="border-r border-slate-400 py-1.5 px-2 text-center text-slate-600">{q}</td>
                     <td className="border-r border-slate-400 py-1.5 px-2 text-right text-slate-600">{p.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -424,7 +416,7 @@ const PdfInvoiceLayout = React.forwardRef(({
         {/* Right Column: Signatures */}
         <div className="flex flex-col justify-end items-end text-right">
           <div className="mt-4 flex flex-col items-center">
-            <p className="text-[11px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For "The Lenscare" {storeName}</p>
+            <p className="text-[11px] font-bold text-slate-900 mb-6 lowercase first-letter:uppercase">For {storeName}</p>
             <div className="w-40 h-[1px] bg-slate-400 mb-1"></div>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Authorized Signatory</p>
           </div>

@@ -7,20 +7,24 @@ import {
   Layout,
   Bell,
   Calendar,
-  ChevronDown
+  ChevronDown,
+  Activity,
+  FileText
 } from "lucide-react";
 import { useState } from "react";
 const logoImg = '/assets/images/logo.webp';
 const iconImg = '/assets/images/icon.webp';
 
 const navItems = [
-  { to: "/", label: "Dashboard", role: ["admin", "super_admin", "store_manager"], icon: LayoutDashboard },
-  { to: "/orders", label: "Orders", role: ["admin", "super_admin", "store_manager"], icon: ShoppingBag },
-  { to: "/products", label: "Products", role: ["admin", "super_admin", "store_manager"], icon: Package },
-  { to: "/customers", label: "Customers", role: ["admin", "super_admin", "store_manager"], icon: Users },
-  { to: "/reminders", label: "Board", role: ["admin", "super_admin", "store_manager", "employee"], icon: Layout },
-  { to: "/attendance", label: "Attendance", role: ["admin", "super_admin", "store_manager", "employee"], icon: ClipboardCheck },
-  { to: "/analytics", label: "Analytics", role: ["admin", "super_admin", "store_manager"], icon: BarChart2 },
+  { to: "/", label: "Dashboard", role: ["admin", "super_admin", "store_manager", "manager"], icon: LayoutDashboard },
+  { to: "/flow", label: "Flow", role: ["admin", "super_admin", "store_manager", "manager", "sales", "optometrist", "employee"], icon: Activity },
+  { to: "/power", label: "Power", role: ["admin", "super_admin", "store_manager", "manager", "sales", "optometrist", "employee"], icon: FileText },
+  { to: "/orders", label: "Orders", role: ["admin", "super_admin", "store_manager", "manager"], icon: ShoppingBag },
+  { to: "/products", label: "Products", role: ["admin", "super_admin", "store_manager", "manager"], icon: Package },
+  { to: "/customers", label: "Customers", role: ["admin", "super_admin", "store_manager", "manager"], icon: Users },
+  { to: "/reminders", label: "Board", role: ["admin", "super_admin", "store_manager", "manager", "employee", "sales", "optometrist"], icon: Layout },
+  { to: "/attendance", label: "Attendance", role: ["admin", "super_admin", "store_manager", "manager", "employee", "sales", "optometrist"], icon: ClipboardCheck },
+  { to: "/analytics", label: "Analytics", role: ["admin", "super_admin", "store_manager", "manager"], icon: BarChart2 },
 ];
 
 export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile, onLogout }) {
@@ -108,8 +112,8 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
           );
         })}
 
-        {/* Admin Features */}
-        {isAdmin && (
+        {/* Admin/Manager Features */}
+        {(isAdmin || userProfile?.role === 'manager' || userProfile?.role === 'store_manager') && (
           <NavLink
             to="/store-management"
             className={`

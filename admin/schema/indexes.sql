@@ -47,7 +47,7 @@ CREATE INDEX idx_attendance_user ON public.attendance USING btree (user_id);
 
 -- New Optimization Indexes
 CREATE INDEX IF NOT EXISTS idx_customers_family ON public.customers(family_id);
-CREATE INDEX IF NOT EXISTS idx_dependents_parent ON public.dependents(parent_customer_id);
+CREATE INDEX IF NOT EXISTS idx_customers_parent ON public.customers(parent_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_order ON public.invoices(order_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON public.invoice_items(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON public.stock_movements(product_id);
