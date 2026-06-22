@@ -63,14 +63,20 @@ export default function BarcodePrinter({ userProfile }) {
   const handlePrint = async () => {
     setPrintingStatus("SENDING...");
     addLog("PENDING", `Initiating print spool for ${printQuantity} copies...`);
+    console.log("[BarcodePrinter] Starting print job spooling. Quantity:", printQuantity);
+    console.log("[BarcodePrinter] TSPL command payload:\n", tsplOutput);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
+      console.warn("[BarcodePrinter] Aborting request - 5 second connection timeout reached.");
       controller.abort();
     }, 5000); // 5-second connection timeout controller
 
     try {
-      const response = await fetch("http://localhost:8080/print", {
+      const targetUrl = "http://localhost:9100/print";
+      console.log(`[BarcodePrinter] Dispatching fetch request to Local Agent at: ${targetUrl}`);
+      
+      const response = await fetch(targetUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -81,19 +87,27 @@ export default function BarcodePrinter({ userProfile }) {
 
       clearTimeout(timeoutId);
 
+      console.log(`[BarcodePrinter] Received response status: ${response.status} (${response.statusText})`);
+
       if (response.ok) {
         setPrintingStatus("SUCCESS: Print Job Sent");
         addLog("SUCCESS", "Spooler confirmed. Dispatched raw TSPL payload successfully.");
+        console.log("[BarcodePrinter] Print job successfully accepted by local daemon.");
       } else {
-        throw new Error(`HTTP Error Status: ${response.status}`);
+        const errorText = await response.text().catch(() => "No response body text available");
+        console.error(`[BarcodePrinter] HTTP Error received. Status: ${response.status}. Response body: ${errorText}`);
+        throw new Error(`HTTP Error Status: ${response.status} - ${errorText}`);
       }
     } catch (error) {
       clearTimeout(timeoutId);
       setPrintingStatus("ERROR: Connection Timeout (Local Agent Offline)");
+      console.error("[BarcodePrinter] Print dispatch failed. Detailed error object:", error);
       if (error.name === "AbortError") {
-        addLog("ERROR", "Connection Timeout: Print daemon at localhost:8080 did not respond within 5 seconds.");
+        addLog("ERROR", "Connection Timeout: Print daemon at localhost:9100 did not respond within 5 seconds.");
+        console.error("[BarcodePrinter] Request was aborted due to timeout. Verify the local daemon on port 9100 is running and not blocked by CORS/firewall.");
       } else {
         addLog("ERROR", `Failed to connect: ${error.message || "Local Agent is offline or unreachable."}`);
+        console.error("[BarcodePrinter] Connection or Network error. Make sure the local agent server is listening on port 9100. Error Message:", error.message);
       }
     }
   };
