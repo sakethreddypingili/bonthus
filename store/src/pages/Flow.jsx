@@ -406,10 +406,10 @@ export default function Flow({ userProfile }) {
                     </label>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[
-                        { id: "buy", label: "Buy Products" },
-                        { id: "eye_checkup", label: "Eye Checkup" },
-                        { id: "followup", label: "Order Followup" },
-                        { id: "other", label: "Other Reasons" },
+                        { id: "shopping", label: "Shopping" },
+                        { id: "eye_test", label: "Eye Test" },
+                        { id: "pickup", label: "Pick Up" },
+                        { id: "epair", label: "Epair" },
                       ].map((pOpt) => {
                         const isSelected = purpose === pOpt.id;
                         return (
@@ -475,6 +475,10 @@ export default function Flow({ userProfile }) {
                         <tbody className="divide-y divide-gray-100 text-[11px] font-black">
                           {history.map((v) => {
                             const purposeLabels = {
+                              shopping: "Shopping",
+                              eye_test: "Eye Test",
+                              pickup: "Pick Up",
+                              epair: "Epair",
                               buy: "Buy Products",
                               eye_checkup: "Eye Checkup",
                               followup: "Order Followup",
@@ -533,6 +537,10 @@ export default function Flow({ userProfile }) {
               <tbody className="divide-y divide-gray-100 text-[11px] font-black">
                 {recentVisits.map((v) => {
                   const purposeLabels = {
+                    shopping: "Shopping",
+                    eye_test: "Eye Test",
+                    pickup: "Pick Up",
+                    epair: "Epair",
                     buy: "Buy Products",
                     eye_checkup: "Eye Checkup",
                     followup: "Order Followup",

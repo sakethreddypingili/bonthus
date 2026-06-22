@@ -230,11 +230,7 @@ export default function Customers({ userProfile }) {
           <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Manage customer database and order history</p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:shadow-lg transition-all">
-            <Download size={14} /> Export
-          </button>
-        </div>
+
       </div>
 
       {/* Table Card */}

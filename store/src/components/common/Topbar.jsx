@@ -8,7 +8,6 @@ const titles = {
   "/customers": { title: "Customers", subtitle: "View and manage customer accounts" },
   "/attendance": { title: "Attendance", subtitle: "Manage attendance and QR check-ins" },
   "/analytics": { title: "Analytics", subtitle: "Sales trends, revenue insights & performance" },
-  "/store-management": { title: "Store", subtitle: "Manage stores and their access" },
   "/settings": { title: "Settings", subtitle: "Configure your store preferences" },
   "/reminders": { title: "Reminders", subtitle: "Manage your tasks and upcoming events" },
   "/notifications": { title: "Notifications", subtitle: "Stay updated with the latest alerts" },

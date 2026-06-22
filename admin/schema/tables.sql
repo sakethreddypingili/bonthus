@@ -170,6 +170,8 @@ CREATE TABLE IF NOT EXISTS public.prescriptions (
     nv_le_axis TEXT,
     pd_distance NUMERIC,
     pd_near NUMERIC,
+    pd_re NUMERIC,
+    pd_le NUMERIC,
     prism_re TEXT,
     prism_le TEXT,
     is_bifocal_progressive BOOLEAN NOT NULL DEFAULT false,

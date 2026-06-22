@@ -112,24 +112,6 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
           );
         })}
 
-        {/* Admin/Manager Features */}
-        {(isAdmin || userProfile?.role === 'manager' || userProfile?.role === 'store_manager') && (
-          <NavLink
-            to="/store-management"
-            className={`
-              flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${location.pathname.startsWith("/store-management")
-                ? "bg-black text-white shadow-md"
-                : "text-gray-600 hover:text-black hover:bg-gray-100"
-              }
-              ${collapsed ? "justify-center" : ""}
-            `}
-            title={collapsed ? "Store" : undefined}
-          >
-            <UserPlus size={18} className="flex-shrink-0" />
-            {!collapsed && <span>Store</span>}
-          </NavLink>
-        )}
       </nav>
 
       {/* Footer Actions */}

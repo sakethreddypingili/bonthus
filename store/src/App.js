@@ -12,7 +12,6 @@ import Analytics from "./pages/Analytics";
 import Attendance from "./pages/Attendance";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
-import StoreManagement from "./pages/StoreManagement";
 import CreateOrder from "./pages/CreateOrder";
 import InvoiceView from "./pages/InvoiceView";
 import EditOrder from "./pages/EditOrder";
@@ -380,7 +379,6 @@ function App() {
       <Route path="/attendance" element={<Attendance userProfile={userProfile} />} />
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
-      <Route path="/store-management" element={<StoreManagement userProfile={userProfile} />} />
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
       <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
       <Route path="/invoice/:id" element={<InvoiceView userProfile={userProfile} />} />
