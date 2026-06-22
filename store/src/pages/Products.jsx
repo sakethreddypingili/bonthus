@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Search, Plus, LayoutGrid, List, X, MoreVertical, ChevronDown, Check, Tags, Database } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import SlideDrawer from "../components/common/SlideDrawer";
+import { usePopup } from "../components/common/PopupProvider";
 
 export default function Products({ userProfile }) {
   const navigate = useNavigate();
+  const { showAlert } = usePopup();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -179,7 +181,7 @@ export default function Products({ userProfile }) {
       });
       fetchInventory();
     } catch (err) {
-      alert("Failed to save: " + err.message);
+      showAlert("Failed to save: " + err.message);
     } finally {
       setSaving(false);
     }

@@ -8,6 +8,7 @@ import { generateId, ID_RULES } from "../server/supabase/idGenerator";
 import SlideDrawer from '../components/common/SlideDrawer';
 import CommandDialog from '../components/common/CommandDialog';
 import ConfirmSheet from '../components/common/ConfirmSheet';
+import { usePopup } from "../components/common/PopupProvider";
 
 const pickBestEyePower = (eyePowerRows) => {
     if (!eyePowerRows) return null;
@@ -54,6 +55,7 @@ const pickBestEyePower = (eyePowerRows) => {
 export default function EditOrder({ userProfile }) {
     const { id: orderId } = useParams();
     const navigate = useNavigate();
+    const { showAlert } = usePopup();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -242,7 +244,7 @@ export default function EditOrder({ userProfile }) {
 
             } catch (err) {
                 console.error("Error fetching order:", err);
-                alert("Failed to load order: " + err.message);
+                await showAlert("Failed to load order: " + err.message);
                 navigate('/orders');
             } finally {
                 setLoading(false);
@@ -417,7 +419,7 @@ export default function EditOrder({ userProfile }) {
             }
             setShowAddProductModal(false);
         } catch (err) {
-            alert('Failed to add product: ' + err.message);
+            showAlert('Failed to add product: ' + err.message);
         } finally {
             setAddingProduct(false);
         }
@@ -519,10 +521,10 @@ export default function EditOrder({ userProfile }) {
             await supabase.from('order_items').insert(orderItemsPayload);
 
             // 5. Eye Power - Now stored per-item in order_items, no separate eye_power table needed
-            alert("Order updated successfully!");
+            await showAlert("Order updated successfully!");
             navigate('/orders');
         } catch (err) {
-            alert("Error updating order: " + err.message);
+            showAlert("Error updating order: " + err.message);
         } finally {
             setSaving(false);
         }
@@ -530,7 +532,7 @@ export default function EditOrder({ userProfile }) {
 
     const handleDisableOrder = async () => {
         if (!isAdmin) {
-            alert("Only admins can disable orders");
+            showAlert("Only admins can disable orders");
             return;
         }
         setDisablingOrder(true);
@@ -545,9 +547,9 @@ export default function EditOrder({ userProfile }) {
 
             setOrderDisabled(newDisabledStatus);
             setShowDisableModal(false);
-            alert(newDisabledStatus ? "Order disabled successfully" : "Order enabled successfully");
+            await showAlert(newDisabledStatus ? "Order disabled successfully" : "Order enabled successfully");
         } catch (err) {
-            alert("Error disabling order: " + err.message);
+            showAlert("Error disabling order: " + err.message);
         } finally {
             setDisablingOrder(false);
         }

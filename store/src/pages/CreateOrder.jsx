@@ -6,11 +6,14 @@ import { supabase } from "../server/supabase/supabase";
 import { generateId, ID_RULES } from "../server/supabase/idGenerator";
 import CommandDialog from "../components/common/CommandDialog";
 import { OVERLAY_CHROME_STYLE } from "../components/common/overlayChrome";
+import { usePopup } from "../components/common/PopupProvider";
 
 export default function CreateOrder({ userProfile }) {
     const navigate = useNavigate();
     const location = useLocation();
+    const { showAlert } = usePopup();
     const initialCustomer = location.state?.customer || {};
+
     const isCustomerLocked = !!location.state?.customer;
     const [profiles, setProfiles] = useState([]);
     const [selectedProfile, setSelectedProfile] = useState(null);
@@ -265,13 +268,14 @@ export default function CreateOrder({ userProfile }) {
             });
             setShowRegModal(false);
         } catch (err) {
-            alert("Error registering customer: " + err.message);
+            showAlert("Error registering customer: " + err.message);
         } finally {
             setLoading(false);
         }
     };
 
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showConfirmSave, setShowConfirmSave] = useState(false);
     const [payments, setPayments] = useState([{ id: Date.now(), mode: 'Cash', amount: '' }]);
 
     const roleLower = userProfile?.role?.toLowerCase();
@@ -380,7 +384,7 @@ export default function CreateOrder({ userProfile }) {
 
     const addItem = () => {
         if (storeSelectionRequired) {
-            alert("Please select a store first.");
+            showAlert("Please select a store first.");
             return;
         }
 
@@ -465,7 +469,7 @@ export default function CreateOrder({ userProfile }) {
         e.preventDefault();
 
         if (!currentStoreId) {
-            alert('Please select a store first.');
+            showAlert('Please select a store first.');
             return;
         }
 
@@ -504,7 +508,7 @@ export default function CreateOrder({ userProfile }) {
 
             setShowAddProductModal(false);
         } catch (err) {
-            alert('Failed to add product: ' + err.message);
+            showAlert('Failed to add product: ' + err.message);
         } finally {
             setAddingProduct(false);
         }
@@ -512,7 +516,7 @@ export default function CreateOrder({ userProfile }) {
 
     const selectProduct = async (item, product) => {
         if (items.some(i => i.id !== item.id && i.product_id === product.id)) {
-            alert('This product is already added to the order.');
+            showAlert('This product is already added to the order.');
             setItems(prev => prev.map(i => i.id === item.id ? { ...i, name: '', product_id: null, price: 0, stock: null, prescription: null, category_id: null, sgst: 0, cgst: 0, igst: 0 } : i));
             closeProductSearch();
             setProductSuggestions(prev => ({ ...prev, [item.id]: [] }));
@@ -669,12 +673,16 @@ export default function CreateOrder({ userProfile }) {
         setPayments(payments.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
-    const totalPaid = payments.filter(p => p.mode !== 'Due').reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const totalAccounted = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const paymentGap = (grossTotal - totalAccounted).toFixed(2);
-    const finalDueAmount = (grossTotal - totalPaid).toFixed(2);
+    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const totalAccounted = totalPaid;
+    const paymentGap = (grossTotal - totalPaid).toFixed(2);
+    const finalDueAmount = "0.00";
 
-    const handleFinalSave = async () => {
+    const handleFinalSave = () => {
+        setShowConfirmSave(true);
+    };
+
+    const executeFinalSave = async () => {
         setLoading(true);
         try {
             let customerId = null;
@@ -819,10 +827,10 @@ export default function CreateOrder({ userProfile }) {
                 }
             }
 
-            alert(`Invoice ${newOrderNumber} Saved Successfully!`);
+            await showAlert(`Invoice ${newOrderNumber} Saved Successfully!`);
             navigate('/orders');
         } catch (err) {
-            alert('Error creating invoice: ' + err.message);
+            showAlert('Error creating invoice: ' + err.message);
         } finally {
             setLoading(false);
             setShowPaymentModal(false);
@@ -833,12 +841,12 @@ export default function CreateOrder({ userProfile }) {
         e.preventDefault();
 
         if (!currentStoreId) {
-            alert("Please select a store before creating the invoice.");
+            showAlert("Please select a store before creating the invoice.");
             return;
         }
 
         if (!customer.name || !customer.phone) {
-            alert("Customer Name and Phone are required.");
+            showAlert("Customer Name and Phone are required.");
             return;
         }
 
@@ -856,7 +864,7 @@ export default function CreateOrder({ userProfile }) {
         });
 
         if (items.length === 1 && emptyItems.length === 1) {
-            alert("Please add at least one valid product to the order.");
+            showAlert("Please add at least one valid product to the order.");
             return;
         }
 
@@ -870,7 +878,7 @@ export default function CreateOrder({ userProfile }) {
         }
 
         if (errors.length > 0) {
-            alert("Cannot save invoice due to the following errors:\n\n" + errors.join("\n"));
+            showAlert("Cannot save invoice due to the following errors:\n\n" + errors.join("\n"));
             if (incompleteItems.length > 0) {
                 const first = incompleteItems[0].item;
                 setNewProduct({ name: first.name, category: first.type, price: first.price || '', stock: '10' });
@@ -880,8 +888,8 @@ export default function CreateOrder({ userProfile }) {
             return;
         }
 
-        // Pre-fill the first payment with total amount for convenience
-        setPayments([{ id: Date.now(), mode: 'Cash', amount: grossTotal.toFixed(2) }]);
+        // Pre-fill the first payment with total amount for convenience but leave mode empty to enforce selection
+        setPayments([{ id: Date.now(), mode: '', amount: grossTotal.toFixed(2) }]);
         setShowPaymentModal(true);
     };
     return (
@@ -915,7 +923,7 @@ export default function CreateOrder({ userProfile }) {
                         </div>
                     )}
                     <button onClick={handleSaveInvoice} disabled={loading || storeSelectionRequired} className="flex items-center gap-2 px-8 py-3 bg-black text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:shadow-2xl transition-all disabled:opacity-30">
-                        <Save size={18} /> {loading ? "Processing..." : "Commit Invoice"}
+                        <Save size={18} /> {loading ? "Processing..." : "Save"}
                     </button>
                 </div>
             </div>
@@ -1459,12 +1467,12 @@ export default function CreateOrder({ userProfile }) {
                                     <select
                                         value={p.mode}
                                         onChange={e => updatePayment(p.id, 'mode', e.target.value)}
-                                        className="w-full bg-transparent text-[11px] font-black uppercase focus:outline-none"
+                                        className="w-full bg-transparent text-[11px] font-black uppercase focus:outline-none cursor-pointer"
                                     >
-                                        <option>Cash</option>
-                                        <option>UPI</option>
-                                        <option>Card</option>
-                                        <option>Due</option>
+                                        <option value="">Select Mode</option>
+                                        <option value="Cash">Cash</option>
+                                        <option value="UPI">UPI</option>
+                                        <option value="Card">Card</option>
                                     </select>
                                 </div>
                                 <div className="flex-[2]">
@@ -1513,11 +1521,11 @@ export default function CreateOrder({ userProfile }) {
                         <button type="button" onClick={() => setShowPaymentModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors">Back</button>
                         <button
                             onClick={handleFinalSave}
-                            disabled={loading || Number(paymentGap) !== 0}
+                            disabled={loading || Number(paymentGap) !== 0 || payments.some(p => !p.mode)}
                             className="flex-[2] py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:shadow-2xl transition-all disabled:opacity-30 flex items-center justify-center gap-3"
                         >
                             {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save size={18} />}
-                            Finalize Transaction
+                            Save
                         </button>
                     </div>
                 </div>
@@ -1623,6 +1631,40 @@ export default function CreateOrder({ userProfile }) {
                     </button>
                 </form>
             </CommandDialog>
+
+            {/* Save Confirmation Dialog */}
+            {showConfirmSave && (
+                <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+                        onClick={() => setShowConfirmSave(false)}
+                    />
+                    <div className="relative bg-white border border-neutral-250 rounded-[24px] p-8 shadow-2xl max-w-sm w-full space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+                        <div className="space-y-2">
+                            <h3 className="text-sm font-black text-black uppercase tracking-widest">Confirm Save</h3>
+                            <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider">
+                                Are you sure you want to save this invoice?
+                            </p>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmSave(false)}
+                                className="flex-1 py-3 text-[10px] font-black uppercase tracking-wider border border-neutral-200 rounded-xl text-neutral-500 hover:text-black hover:bg-neutral-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={executeFinalSave}
+                                className="flex-1 py-3 text-[10px] font-black uppercase tracking-wider bg-black text-white rounded-xl hover:bg-neutral-800 transition-colors"
+                            >
+                                Confirm & Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

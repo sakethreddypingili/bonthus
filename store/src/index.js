@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import { BrowserRouter } from "react-router-dom";
+import { PopupProvider } from "./components/common/PopupProvider";
 
 const setFavicon = (href) => {
   const head = document.head || document.getElementsByTagName("head")[0];
@@ -30,13 +31,18 @@ const isDev = process.env.NODE_ENV === 'development';
 root.render(
   isDev ? (
     <BrowserRouter>
-      <App />
+      <PopupProvider>
+        <App />
+      </PopupProvider>
     </BrowserRouter>
   ) : (
     <React.StrictMode>
       <BrowserRouter>
-        <App />
+        <PopupProvider>
+          <App />
+        </PopupProvider>
       </BrowserRouter>
     </React.StrictMode>
   )
 );
+

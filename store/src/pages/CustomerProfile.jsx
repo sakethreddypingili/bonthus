@@ -17,11 +17,13 @@ import {
 } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import SlideDrawer from "../components/common/SlideDrawer";
+import { usePopup } from "../components/common/PopupProvider";
 
 export default function CustomerProfile({ userProfile }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showAlert, showConfirm } = usePopup();
   const [customer, setCustomer] = useState(null);
   const [orders, setOrders] = useState([]);
   const [eyePowers, setEyePowers] = useState([]);
@@ -304,14 +306,15 @@ export default function CustomerProfile({ userProfile }) {
       setShowDepModal(false);
       fetchCustomerData();
     } catch (err) {
-      alert("Error saving family profile: " + err.message);
+      showAlert("Error saving family profile: " + err.message);
     } finally {
       setSavingDep(false);
     }
   };
 
   const handleDeleteDependent = async (depId) => {
-    if (!window.confirm("Are you sure you want to delete this family profile?")) return;
+    const confirmed = await showConfirm("Are you sure you want to delete this family profile?");
+    if (!confirmed) return;
     try {
       const { error } = await supabase
         .from('customers')
@@ -320,7 +323,7 @@ export default function CustomerProfile({ userProfile }) {
       if (error) throw error;
       fetchCustomerData();
     } catch (err) {
-      alert("Error deleting family profile: " + err.message);
+      showAlert("Error deleting family profile: " + err.message);
     }
   };
 

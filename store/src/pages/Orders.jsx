@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../server/supabase/supabase";
 import CommandDialog from "../components/common/CommandDialog";
 import ConfirmSheet from "../components/common/ConfirmSheet";
+import { usePopup } from "../components/common/PopupProvider";
 
 const STATUS_COLORS = {
   Delivered: "bg-black text-white px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
@@ -16,6 +17,7 @@ const STATUS_COLORS = {
 const STATUSES = ["All", "Due", "Processing", "Delivered"];
 
 export default function Orders({ userProfile }) {
+  const { showAlert } = usePopup();
   const [dbOrders, setDbOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -180,7 +182,7 @@ export default function Orders({ userProfile }) {
       setEditingOrder(null);
       fetchOrders();
     } catch (err) {
-      alert("Error saving edit: " + err.message);
+      showAlert("Error saving edit: " + err.message);
     } finally {
       setSavingEdit(false);
     }
@@ -235,7 +237,7 @@ export default function Orders({ userProfile }) {
         setSearchedProfiles([]);
       }
     } catch (err) {
-      alert("Error looking up customer: " + err.message);
+      showAlert("Error looking up customer: " + err.message);
     } finally {
       setLoadingCustomer(false);
     }
@@ -687,7 +689,7 @@ export default function Orders({ userProfile }) {
                       setShowPaymentModal(false);
                       fetchOrders();
                     } catch (err) {
-                      alert(err.message);
+                      showAlert(err.message);
                     } finally {
                       setClearingBalance(false);
                     }
@@ -780,7 +782,7 @@ export default function Orders({ userProfile }) {
             setShowConfirmModal(false);
             fetchOrders();
           } catch (err) {
-            alert('Error: ' + err.message);
+            showAlert('Error: ' + err.message);
           } finally {
             setProcessingAction(false);
           }

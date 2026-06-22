@@ -1220,44 +1220,85 @@ export default function Power({ userProfile }) {
                 <tr>
                   <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer</th>
                   <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">RE (DV) SPH/CYL/AXIS</th>
-                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">LE (DV) SPH/CYL/AXIS</th>
+                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Eye</th>
+                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">SPH</th>
+                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">CYL</th>
+                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">AXIS</th>
+                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">ADD</th>
                   <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-[11px] font-black font-mono">
-                {recentPowers.map((pow) => (
-                  <tr key={pow.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-4 font-sans">
-                      <span className="block text-xs font-black uppercase text-black">{pow.customers?.name || "Unknown"}</span>
-                      <span className="block text-[9px] text-gray-400 mt-0.5">{pow.customers?.phone}</span>
-                    </td>
-                    <td className="px-6 py-4 text-xs font-bold text-gray-600 font-sans">
-                      {new Date(pow.prescribed_at || pow.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                    </td>
-                    <td className="px-6 py-4 text-center text-gray-700">
-                      {pow.dv_re_sph || "0.00"} / {pow.dv_re_cyl || "0.00"} / {pow.dv_re_axis || "0"}
-                    </td>
-                    <td className="px-6 py-4 text-center text-gray-700">
-                      {pow.dv_le_sph || "0.00"} / {pow.dv_le_cyl || "0.00"} / {pow.dv_le_axis || "0"}
-                    </td>
-                    <td className="px-6 py-4 text-gray-500 font-sans italic max-w-[200px]">
-                      {(() => {
-                        const { notesText, extraList } = getPrescriptionDisplay(pow);
-                        return (
-                          <div className="space-y-1">
-                            <div>{notesText || "—"}</div>
-                            {extraList.length > 0 && (
-                              <div className="text-[9px] font-black uppercase text-black not-italic bg-gray-50 px-2 py-1 rounded border border-gray-100 mt-1 inline-block">
-                                {extraList.join(" | ")}
+                {recentPowers.map((pow) => {
+                  const hasNV = !!(pow.nv_re_sph || pow.nv_le_sph || pow.nv_re_cyl || pow.nv_le_cyl || pow.re_add || pow.le_add);
+                  const mainRowSpan = hasNV ? 4 : 2;
+                  const eyeRowSpan = hasNV ? 2 : 1;
+                  return (
+                    <Fragment key={pow.id}>
+                      {/* Row 1: RE (DV) */}
+                      <tr className="hover:bg-gray-50/50">
+                        <td rowSpan={mainRowSpan} className="px-6 py-4 font-sans border-r border-gray-100">
+                          <span className="block text-xs font-black uppercase text-black">{pow.customers?.name || "Unknown"}</span>
+                          <span className="block text-[9px] text-gray-400 mt-0.5">{pow.customers?.phone}</span>
+                        </td>
+                        <td rowSpan={mainRowSpan} className="px-6 py-4 text-xs font-bold text-gray-600 border-r border-gray-100 font-sans">
+                          {new Date(pow.prescribed_at || pow.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                        </td>
+                        <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">RE (DV)</td>
+                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_re_sph || "—"}</td>
+                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_re_cyl || "—"}</td>
+                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_re_axis || "—"}</td>
+                        <td rowSpan={eyeRowSpan} className="px-6 py-3 text-center text-gray-700 border-l border-r border-gray-100 bg-neutral-50/30">
+                          {pow.re_add || pow.nv_re_add || calculateAddVal(pow.dv_re_sph, pow.nv_re_sph) || "—"}
+                        </td>
+                        <td rowSpan={mainRowSpan} className="px-6 py-4 text-xs font-medium text-gray-400 font-sans italic border-l border-gray-100 max-w-[200px]">
+                          {(() => {
+                            const { notesText, extraList } = getPrescriptionDisplay(pow);
+                            const filteredExtra = extraList.filter(item => !item.startsWith("ADD:"));
+                            return (
+                              <div className="space-y-1">
+                                <div>{notesText || "—"}</div>
+                                {filteredExtra.length > 0 && (
+                                  <div className="text-[9px] font-black uppercase text-black not-italic bg-gray-50 px-2 py-1 rounded border border-gray-100 mt-1 inline-block">
+                                    {filteredExtra.join(" | ")}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                  </tr>
-                ))}
+                            );
+                          })()}
+                        </td>
+                      </tr>
+                      {/* Row 2: RE (NV) */}
+                      {hasNV && (
+                        <tr className="hover:bg-gray-50/50">
+                          <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">RE (NV)</td>
+                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_re_sph || "—"}</td>
+                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_re_cyl || "—"}</td>
+                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_re_axis || "—"}</td>
+                        </tr>
+                      )}
+                      {/* Row 3: LE (DV) */}
+                      <tr className="hover:bg-gray-50/50">
+                        <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">LE (DV)</td>
+                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_le_sph || "—"}</td>
+                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_le_cyl || "—"}</td>
+                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_le_axis || "—"}</td>
+                        <td rowSpan={eyeRowSpan} className="px-6 py-3 text-center text-gray-700 border-l border-r border-gray-100 bg-neutral-50/30">
+                          {pow.le_add || pow.nv_le_add || calculateAddVal(pow.dv_le_sph, pow.nv_le_sph) || "—"}
+                        </td>
+                      </tr>
+                      {/* Row 4: LE (NV) */}
+                      {hasNV && (
+                        <tr className="hover:bg-gray-50/50 border-b border-gray-100">
+                          <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">LE (NV)</td>
+                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_le_sph || "—"}</td>
+                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_le_cyl || "—"}</td>
+                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_le_axis || "—"}</td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           ) : (
