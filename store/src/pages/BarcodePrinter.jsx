@@ -1,28 +1,35 @@
-import React, { useState } from "react";
-import { Printer, Terminal, Settings, HelpCircle } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Printer, Terminal, Settings, HelpCircle, Plus, FolderPlus } from "lucide-react";
+import { supabase } from "../server/supabase/supabase";
+import SlideDrawer from "../components/common/SlideDrawer";
 
 /**
  * BarcodePrinter Page Component
  * Refactored for a flat, solid straight rectangular label measuring 102mm x 25mm.
  * Target Printer: TSC TE244 (203 DPI / 8 dots per mm).
+ * Allows auto-resolving barcode, manual category selection, and inline category creation.
  */
 export default function BarcodePrinter({ userProfile }) {
   // 1. STATE MANAGEMENT
-  const [productName, setProductName] = useState("Premium EyeWear");
-  const [price, setPrice] = useState("1499");
   const [barcodeValue, setBarcodeValue] = useState("1414199999");
+  const [categories, setCategories] = useState([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [printQuantity, setPrintQuantity] = useState(1);
+  const [categoryName, setCategoryName] = useState("Scanning...");
+
+  // Inline Category Creation Modal state
+  const [showCatDrawer, setShowCatDrawer] = useState(false);
+  const [newCat, setNewCat] = useState({ name: '', description: '', parent_id: '' });
+  const [creatingCat, setCreatingCat] = useState(false);
 
   // Console log states
   const [logs, setLogs] = useState([
     { timestamp: new Date().toLocaleTimeString(), status: "INFO", message: "Barcode Printer module initialized." },
     { timestamp: new Date().toLocaleTimeString(), status: "INFO", message: "Printer profile selected: TSC TE244 (203 DPI)." }
   ]);
-  const [printingStatus, setPrintingStatus] = useState("IDLE"); // IDLE, SENDING, SUCCESS, ERROR
+  const [printingStatus, setPrintingStatus] = useState("IDLE");
 
   // 2. CONVERSION CONSTANTS
-  // TSC TE244 resolution: 203 DPI (8 dots per mm)
-  // const DOTS_PER_MM = 8;
   const LABEL_WIDTH_MM = 102;
   const LABEL_HEIGHT_MM = 25;
   const GAP_MM = 2;
@@ -35,31 +42,168 @@ export default function BarcodePrinter({ userProfile }) {
     ]);
   };
 
-  // 3. TSPL GENERATION ENGINE
-  const generateTsplCode = () => {
-    // Format price to prepend rupee symbol if not present
-    const formattedPrice = price.startsWith("₹") ? price : `₹ ${price}`;
+  // 3. FETCH CATEGORIES
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase.from('categories').select('*').order('name');
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (err) {
+      console.error("Error fetching categories:", err.message);
+    }
+  };
 
-    // Exact optimized TSPL command block for TSC TE244 straight label
-    return [
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  // Compute category paths
+  const categoryPaths = useMemo(() => {
+    const map = {};
+    categories.forEach(c => {
+      map[c.id] = c;
+    });
+    
+    const paths = {};
+    const getPath = (id) => {
+      if (paths[id]) return paths[id];
+      const cat = map[id];
+      if (!cat) return '';
+      if (!cat.parent_id) {
+        paths[id] = cat.name;
+        return cat.name;
+      }
+      const parentPath = getPath(cat.parent_id);
+      paths[id] = parentPath ? `${parentPath} > ${cat.name}` : cat.name;
+      return paths[id];
+    };
+    
+    categories.forEach(c => {
+      getPath(c.id);
+    });
+    return paths;
+  }, [categories]);
+
+  // 4. AUTO-RESOLVE CATEGORY BY BARCODE
+  useEffect(() => {
+    const fetchCategory = async () => {
+      if (!barcodeValue || barcodeValue.trim() === "") {
+        setCategoryName("No Barcode");
+        return;
+      }
+      
+      try {
+        const { data: bcData } = await supabase
+          .from('product_barcodes')
+          .select('product_id')
+          .eq('barcode', barcodeValue)
+          .maybeSingle();
+
+        let prodId = bcData?.product_id;
+        let query;
+        if (prodId) {
+          query = supabase
+            .from('products')
+            .select('id, name, category_id, category:categories(name)')
+            .eq('id', prodId);
+        } else {
+          query = supabase
+            .from('products')
+            .select('id, name, category_id, category:categories(name)')
+            .or(`sku.eq.${barcodeValue},upc.eq.${barcodeValue}`);
+        }
+
+        const { data: prodData, error: prodError } = await query.maybeSingle();
+        
+        if (prodError) throw prodError;
+        if (prodData) {
+          if (prodData.category_id) {
+            setSelectedCategoryId(prodData.category_id);
+          }
+          addLog("INFO", `Resolved "${barcodeValue}" to category "${prodData.category?.name || "Uncategorized"}" (${prodData.name})`);
+        }
+      } catch (err) {
+        console.error("Error auto-resolving barcode:", err.message);
+      }
+    };
+
+    const delayDebounce = setTimeout(() => {
+      fetchCategory();
+    }, 400);
+
+    return () => clearTimeout(delayDebounce);
+  }, [barcodeValue]);
+
+  // Update printed category name when selected category changes
+  useEffect(() => {
+    if (selectedCategoryId) {
+      setCategoryName(categoryPaths[selectedCategoryId] || "Uncategorized");
+    } else {
+      setCategoryName("Uncategorized");
+    }
+  }, [selectedCategoryId, categoryPaths]);
+
+  // Split Category path
+  const pathParts = useMemo(() => {
+    const parts = categoryName.split(" > ");
+    return {
+      root: parts[0] || "",
+      sub: parts.slice(1).join(" > ") || ""
+    };
+  }, [categoryName]);
+
+  // 5. INLINE CATEGORY CREATION
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    setCreatingCat(true);
+    try {
+      const { data, error } = await supabase.from('categories').insert([{
+        name: newCat.name,
+        description: newCat.description,
+        parent_id: newCat.parent_id || null
+      }]).select().single();
+
+      if (error) throw error;
+      
+      addLog("SUCCESS", `Created new category "${newCat.name}"`);
+      await fetchCategories();
+      setSelectedCategoryId(data.id);
+      setShowCatDrawer(false);
+      setNewCat({ name: '', description: '', parent_id: '' });
+    } catch (err) {
+      alert("Failed to create category: " + err.message);
+    } finally {
+      setCreatingCat(false);
+    }
+  };
+
+  // 6. TSPL GENERATION ENGINE
+  const generateTsplCode = () => {
+    const commands = [
       `SIZE ${LABEL_WIDTH_MM} mm, ${LABEL_HEIGHT_MM} mm`,
       `GAP ${GAP_MM} mm, 0 mm`,
       `DIRECTION 0,0`,
       `CLS`,
       `REFERENCE 0,0`,
-      `TEXT 40,30,"3",0,1,1,"${productName}"`,
-      `TEXT 40,75,"2",0,1,1,"(Inc. Of All Taxes)"`,
-      `TEXT 40,110,"2",0,1,1,"Qty 1"`,
-      `TEXT 40,145,"4",0,1,1,"${formattedPrice}"`,
-      `BARCODE 450,50,"128",75,1,0,2,4,"${barcodeValue}"`,
-      `TEXT 530,145,"3",0,1,1,"${barcodeValue}"`,
+      `TEXT 40,40,"3",0,1,1,"${pathParts.root}"`
+    ];
+
+    if (pathParts.sub) {
+      commands.push(`TEXT 40,100,"3",0,1,1,"${pathParts.sub}"`);
+    }
+
+    commands.push(
+      `BARCODE 350,30,"128",120,1,0,3,6,"${barcodeValue}"`,
+      `TEXT 530,165,"3",0,1,1,"${barcodeValue}"`,
       `PRINT ${printQuantity},1`
-    ].join("\n");
+    );
+
+    return commands.join("\n");
   };
 
   const tsplOutput = generateTsplCode();
 
-  // 4. DISPATCH LAYER (Option A - Asynchronous Local Daemon Service)
+  // 7. DISPATCH LAYER
   const handlePrint = async () => {
     setPrintingStatus("SENDING...");
     addLog("PENDING", `Initiating print spool for ${printQuantity} copies...`);
@@ -70,11 +214,10 @@ export default function BarcodePrinter({ userProfile }) {
     const timeoutId = setTimeout(() => {
       console.warn("[BarcodePrinter] Aborting request - 5 second connection timeout reached.");
       controller.abort();
-    }, 5000); // 5-second connection timeout controller
+    }, 5000);
 
     try {
       const targetUrl = "http://localhost:9100/print";
-      console.log(`[BarcodePrinter] Dispatching fetch request to Local Agent at: ${targetUrl}`);
       
       const response = await fetch(targetUrl, {
         method: "POST",
@@ -87,61 +230,52 @@ export default function BarcodePrinter({ userProfile }) {
 
       clearTimeout(timeoutId);
 
-      console.log(`[BarcodePrinter] Received response status: ${response.status} (${response.statusText})`);
-
       if (response.ok) {
         setPrintingStatus("SUCCESS: Print Job Sent");
         addLog("SUCCESS", "Spooler confirmed. Dispatched raw TSPL payload successfully.");
-        console.log("[BarcodePrinter] Print job successfully accepted by local daemon.");
       } else {
         const errorText = await response.text().catch(() => "No response body text available");
-        console.error(`[BarcodePrinter] HTTP Error received. Status: ${response.status}. Response body: ${errorText}`);
         throw new Error(`HTTP Error Status: ${response.status} - ${errorText}`);
       }
     } catch (error) {
       clearTimeout(timeoutId);
       setPrintingStatus("ERROR: Connection Timeout (Local Agent Offline)");
-      console.error("[BarcodePrinter] Print dispatch failed. Detailed error object:", error);
       if (error.name === "AbortError") {
         addLog("ERROR", "Connection Timeout: Print daemon at localhost:9100 did not respond within 5 seconds.");
-        console.error("[BarcodePrinter] Request was aborted due to timeout. Verify the local daemon on port 9100 is running and not blocked by CORS/firewall.");
       } else {
         addLog("ERROR", `Failed to connect: ${error.message || "Local Agent is offline or unreachable."}`);
-        console.error("[BarcodePrinter] Connection or Network error. Make sure the local agent server is listening on port 9100. Error Message:", error.message);
       }
     }
   };
 
-  // 5. MOCK BARCODE GENERATOR FOR SVG PREVIEW
+  // 8. MOCK BARCODE GENERATOR FOR SVG PREVIEW
   const renderMockBarcodeLines = () => {
     const lines = [];
-    let startX = 450;
-    const barcodeWidth = 280; // proportional size for preview
+    let startX = 350;
+    const barcodeWidth = 430; // wider barcode container
     const seed = barcodeValue || "1414199999";
     
-    for (let i = 0; i < seed.length * 3.5; i++) {
+    for (let i = 0; i < seed.length * 5; i++) {
       const charCode = seed.charCodeAt(i % seed.length);
-      const width = (charCode % 3) + 1; // bar thickness: 1, 2, or 3px
-      const gap = ((charCode + i) % 4) + 1; // gap width: 1 to 4px
+      const width = (charCode % 3) + 2; // thicker bars (2-4px)
+      const gap = ((charCode + i) % 4) + 2; // wider gaps (2-5px)
       
-      if (startX + width + gap > 450 + barcodeWidth) break;
+      if (startX + width + gap > 350 + barcodeWidth) break;
       
       lines.push(
         <rect
           key={i}
           x={startX}
-          y={50}
-          width={width * 2}
-          height={75}
+          y={30}
+          width={width * 1.8}
+          height={120} // taller barcode (120px)
           fill="black"
         />
       );
-      startX += (width + gap) * 2.2;
+      startX += (width + gap) * 1.8;
     }
     return lines;
   };
-
-  const formattedPrice = price.startsWith("₹") ? price : `₹ ${price}`;
 
   return (
     <div className="max-w-6xl mx-auto space-y-5 p-2 sm:p-4">
@@ -170,39 +304,6 @@ export default function BarcodePrinter({ userProfile }) {
             </h2>
             
             <div className="space-y-4">
-              {/* Product Name */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                  Product Name
-                </label>
-                <input
-                  type="text"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  placeholder="Premium EyeWear"
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all bg-white"
-                />
-              </div>
-
-              {/* Price / AOV */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                  Price / AOV (INR)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    value={price.replace(/[^\d]/g, "")}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="1499"
-                    className="w-full border border-gray-200 rounded-xl pl-8 pr-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all bg-white"
-                  />
-                </div>
-              </div>
-
               {/* Barcode Value */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
@@ -215,6 +316,34 @@ export default function BarcodePrinter({ userProfile }) {
                   placeholder="1414199999"
                   className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all bg-white"
                 />
+              </div>
+
+              {/* Category Dropdown & Quick Create */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Category Selection
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCatDrawer(true)}
+                    className="text-[9px] font-bold uppercase tracking-wider text-black flex items-center gap-1 hover:underline"
+                  >
+                    <FolderPlus className="w-3 h-3" /> Quick Add
+                  </button>
+                </div>
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all bg-white"
+                >
+                  <option value="">Uncategorized</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {categoryPaths[c.id] || c.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Quantity to Print */}
@@ -251,7 +380,7 @@ export default function BarcodePrinter({ userProfile }) {
             </h3>
             <ul className="text-xs text-gray-500 space-y-2 leading-relaxed">
               <li>• <strong>No Dumbbell Fold:</strong> Designed for standard 102mm x 25mm labels using full width.</li>
-              <li>• <strong>Text coordinates:</strong> Left column starts at X=40. Barcode begins at X=450 to fill the right half.</li>
+              <li>• <strong>Category Selection:</strong> Auto-resolves by barcode or select manually from the dropdown.</li>
               <li>• <strong>Direction:</strong> `DIRECTION 0,0` handles feeding orientation without text inversion.</li>
             </ul>
           </div>
@@ -268,7 +397,6 @@ export default function BarcodePrinter({ userProfile }) {
 
             {/* Simulated Label Canvas */}
             <div className="border border-dashed border-gray-300 rounded-xl p-4 bg-gray-50 flex items-center justify-center overflow-x-auto min-h-[160px]">
-              {/* Responsive SVG representing full 102mm x 25mm straight tag (816 x 200 viewbox) */}
               <svg
                 viewBox="0 0 816 200"
                 className="w-full max-w-2xl border border-gray-200 shadow-sm bg-white"
@@ -289,58 +417,36 @@ export default function BarcodePrinter({ userProfile }) {
                 {/* Left Column Text Group */}
                 <text
                   x="40"
-                  y="30"
+                  y="50"
                   fontFamily="'Plus Jakarta Sans', sans-serif"
                   fontWeight="bold"
                   fontSize="24"
                   fill="black"
                   dominantBaseline="middle"
                 >
-                  {productName || "Premium EyeWear"}
+                  {pathParts.root}
                 </text>
 
-                <text
-                  x="40"
-                  y="75"
-                  fontFamily="'Plus Jakarta Sans', sans-serif"
-                  fontWeight="600"
-                  fontSize="15"
-                  fill="#555555"
-                  dominantBaseline="middle"
-                >
-                  (Inc. Of All Taxes)
-                </text>
-
-                <text
-                  x="40"
-                  y="110"
-                  fontFamily="'Plus Jakarta Sans', sans-serif"
-                  fontWeight="600"
-                  fontSize="15"
-                  fill="#555555"
-                  dominantBaseline="middle"
-                >
-                  Qty 1
-                </text>
-
-                <text
-                  x="40"
-                  y="145"
-                  fontFamily="'Plus Jakarta Sans', sans-serif"
-                  fontWeight="bold"
-                  fontSize="28"
-                  fill="black"
-                  dominantBaseline="middle"
-                >
-                  {formattedPrice}
-                </text>
+                {pathParts.sub && (
+                  <text
+                    x="40"
+                    y="110"
+                    fontFamily="'Plus Jakarta Sans', sans-serif"
+                    fontWeight="bold"
+                    fontSize="22"
+                    fill="black"
+                    dominantBaseline="middle"
+                  >
+                    {pathParts.sub}
+                  </text>
+                )}
 
                 {/* Right Column: Barcode Representation */}
                 {renderMockBarcodeLines()}
 
                 <text
                   x="530"
-                  y="145"
+                  y="165"
                   fontFamily="monospace"
                   fontSize="22"
                   fill="black"
@@ -352,8 +458,6 @@ export default function BarcodePrinter({ userProfile }) {
               </svg>
             </div>
           </div>
-
-
 
           {/* Terminal styled Console Logs */}
           <div className="bg-black text-white border border-neutral-800 rounded-2xl overflow-hidden shadow-lg">
@@ -394,6 +498,65 @@ export default function BarcodePrinter({ userProfile }) {
         </div>
 
       </div>
+
+      {/* Drawer: Quick Create Category */}
+      <SlideDrawer
+        isOpen={showCatDrawer}
+        onClose={() => { setShowCatDrawer(false); setNewCat({ name: '', description: '', parent_id: '' }); }}
+        title="Quick Register Category"
+        subtitle="Append a new category directly to the database"
+      >
+        <div className="flex flex-col h-full">
+          <form onSubmit={handleCreateCategory} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Classification Name</label>
+              <input
+                type="text"
+                required
+                value={newCat.name}
+                onChange={e => setNewCat({ ...newCat, name: e.target.value })}
+                placeholder="E.g. Sunglasses"
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Parent Category (Optional)</label>
+              <select
+                value={newCat.parent_id}
+                onChange={e => setNewCat({ ...newCat, parent_id: e.target.value })}
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+              >
+                <option value="">None (Root Category)</option>
+                {categories.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {categoryPaths[c.id]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Description</label>
+              <textarea
+                rows="3"
+                value={newCat.description}
+                onChange={e => setNewCat({ ...newCat, description: e.target.value })}
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none resize-none transition-all"
+                placeholder="Define the bounds of this category..."
+              />
+            </div>
+
+            <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
+              <button type="button" onClick={() => setShowCatDrawer(false)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
+              <button type="submit" disabled={creatingCat} className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 disabled:opacity-50 transition-all">
+                {creatingCat ? "Creating..." : "Create Category"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </SlideDrawer>
+
     </div>
   );
 }

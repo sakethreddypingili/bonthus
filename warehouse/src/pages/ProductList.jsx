@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Plus, LayoutGrid, List, X, MoreVertical, ChevronDown, Check, Tags, Database } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
@@ -38,7 +38,7 @@ export default function ProductList({ userProfile }) {
       const defaultStore = isSuperAdmin ? (mainWarehouse?.id || sData?.[0]?.id) : userProfile?.store_id;
       setSelectedStore(defaultStore || "");
 
-      const { data: cData } = await supabase.from('categories').select('id, name').order('name');
+      const { data: cData } = await supabase.from('categories').select('id, name, parent_id').order('name');
       setCategories(cData || []);
     } catch (err) {
       console.error("Error fetching initial data:", err.message);
@@ -48,6 +48,32 @@ export default function ProductList({ userProfile }) {
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
+
+  const categoryPaths = useMemo(() => {
+    const map = {};
+    categories.forEach(c => {
+      map[c.id] = c;
+    });
+    
+    const paths = {};
+    const getPath = (id) => {
+      if (paths[id]) return paths[id];
+      const cat = map[id];
+      if (!cat) return '';
+      if (!cat.parent_id) {
+        paths[id] = cat.name;
+        return cat.name;
+      }
+      const parentPath = getPath(cat.parent_id);
+      paths[id] = parentPath ? `${parentPath} > ${cat.name}` : cat.name;
+      return paths[id];
+    };
+    
+    categories.forEach(c => {
+      getPath(c.id);
+    });
+    return paths;
+  }, [categories]);
 
   const fetchInventory = useCallback(async () => {
     if (!selectedStore) return;
@@ -67,7 +93,14 @@ export default function ProductList({ userProfile }) {
             brand,
             base_price,
             description,
-            category:categories(id, name)
+          product:products (
+            id,
+            name,
+            sku,
+            brand,
+            base_price,
+            description,
+            category:categories(id, name, parent_id)
           )
         `)
         .eq('store_id', selectedStore);
@@ -81,7 +114,7 @@ export default function ProductList({ userProfile }) {
         sku: item.product?.sku,
         brand: item.product?.brand,
         description: item.product?.description,
-        category: item.product?.category?.name,
+        category: item.product?.category ? categoryPaths[item.product.category.id] || item.product.category.name : "",
         category_id: item.product?.category?.id,
         price: item.unit_price || item.product?.base_price || 0,
         stock: item.stock_quantity,
@@ -388,7 +421,7 @@ export default function ProductList({ userProfile }) {
                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
                             <select value={productData.category_id} onChange={e => setProductData({...productData, category_id: e.target.value})} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest outline-none">
                                 <option value="">Select Category</option>
-                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                {categories.map(c => <option key={c.id} value={c.id}>{categoryPaths[c.id] || c.name}</option>)}
                             </select>
                         </div>
                     </div>

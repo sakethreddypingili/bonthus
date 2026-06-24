@@ -8,7 +8,7 @@ export default function Categories() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [newCat, setNewCat] = useState({ name: '', description: '' });
+  const [newCat, setNewCat] = useState({ name: '', description: '', parent_id: '' });
   const [saving, setSaving] = useState(false);
 
   const fetchCategories = useCallback(async () => {
@@ -42,19 +42,46 @@ export default function Categories() {
     fetchCategories();
   }, [fetchCategories]);
 
+  const categoryPaths = React.useMemo(() => {
+    const map = {};
+    categories.forEach(c => {
+      map[c.id] = c;
+    });
+    
+    const paths = {};
+    const getPath = (id) => {
+      if (paths[id]) return paths[id];
+      const cat = map[id];
+      if (!cat) return '';
+      if (!cat.parent_id) {
+        paths[id] = cat.name;
+        return cat.name;
+      }
+      const parentPath = getPath(cat.parent_id);
+      paths[id] = parentPath ? `${parentPath} > ${cat.name}` : cat.name;
+      return paths[id];
+    };
+    
+    categories.forEach(c => {
+      getPath(c.id);
+    });
+    return paths;
+  }, [categories]);
+
   const handleCreateCategory = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
       const { error } = await supabase.from('categories').insert([{
         name: newCat.name,
-        description: newCat.description
+        description: newCat.description,
+        parent_id: newCat.parent_id || null
       }]);
 
       if (error) throw error;
       
       setShowModal(false);
-      setNewCat({ name: '', description: '' });
+      setNewCat({ name: '', description: '', parent_id: '' });
       fetchCategories();
     } catch (err) {
       alert("Failed to register classification: " + err.message);
@@ -131,6 +158,11 @@ export default function Categories() {
                   <td className="px-8 py-6 text-[11px] font-black text-black uppercase tracking-tight">
                     <div className="flex items-center gap-2">
                       <Tags size={14} className="text-gray-400 group-hover:text-black transition-colors" />
+                      {cat.parent_id && categoryPaths[cat.parent_id] && (
+                        <span className="text-gray-400 font-normal mr-1">
+                          {categoryPaths[cat.parent_id]} &gt;
+                        </span>
+                      )}
                       {cat.name}
                     </div>
                   </td>
@@ -155,7 +187,7 @@ export default function Categories() {
 
       <SlideDrawer
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setNewCat({ name: '', description: '' }); }}
+        onClose={() => { setShowModal(false); setNewCat({ name: '', description: '', parent_id: '' }); }}
         title="New Classification"
         subtitle="Append inventory structure"
       >
@@ -171,6 +203,22 @@ export default function Categories() {
                 placeholder="E.g. Sunglasses"
                 className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Parent Category (Optional)</label>
+              <select
+                value={newCat.parent_id}
+                onChange={e => setNewCat({ ...newCat, parent_id: e.target.value })}
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
+              >
+                <option value="">None (Root Category)</option>
+                {categories.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {categoryPaths[c.id]}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">

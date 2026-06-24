@@ -229,10 +229,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
 
         {/* Admin Features */}
         {isAdmin && (
-          <div className="space-y-0.5">
-            {!collapsed && (
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 mb-2 mt-4">Infrastructure</p>
-            )}
+          <div className="space-y-0.5 mt-4">
             <NavLink
               to="/infrastructure"
               className={`

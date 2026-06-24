@@ -138,6 +138,17 @@ CREATE TABLE IF NOT EXISTS product_categories (
 );
 
 -- -------------------------------------------------------------------------
+-- TABLE 5.6: categories (Primary category table used in app)
+-- -------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    description TEXT,
+    parent_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- -------------------------------------------------------------------------
 -- TABLE 6: products
 -- -------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS products (

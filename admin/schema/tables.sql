@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS public.categories (
     id UUID NOT NULL DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     description TEXT,
+    parent_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
 );
