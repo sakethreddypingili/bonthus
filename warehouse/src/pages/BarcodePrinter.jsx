@@ -69,8 +69,8 @@ export default function BarcodePrinter({ userProfile }) {
   }, []);
 
   // 2. CONVERSION CONSTANTS
-  const LABEL_WIDTH_MM = 102;
-  const LABEL_HEIGHT_MM = 25;
+  const LABEL_WIDTH_MM = 25;
+  const LABEL_HEIGHT_MM = 102;
   const GAP_MM = 2;
 
   // Helper to add log entries
@@ -224,16 +224,16 @@ export default function BarcodePrinter({ userProfile }) {
       `DIRECTION 0,0`,
       `CLS`,
       `REFERENCE 0,0`,
-      `TEXT 40,40,"3",0,1,1,"${pathParts.root}"`
+      `TEXT 35,60,"3",0,1,1,"${pathParts.root}"`
     ];
 
     if (pathParts.sub) {
-      commands.push(`TEXT 40,100,"3",0,1,1,"${pathParts.sub}"`);
+      commands.push(`TEXT 35,120,"3",0,1,1,"${pathParts.sub}"`);
     }
 
     commands.push(
-      `BARCODE 350,30,"128",120,1,0,3,6,"${barcodeValue}"`,
-      `TEXT 530,165,"3",0,1,1,"${barcodeValue}"`,
+      `BARCODE 120,550,"128",80,1,90,2,4,"${barcodeValue}"`,
+      `TEXT 45,550,"3",90,1,1,"${barcodeValue}"`,
       `PRINT ${printQuantity},1`
     );
 
@@ -314,7 +314,7 @@ export default function BarcodePrinter({ userProfile }) {
             <style>
               @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700&family=Space+Mono:wght@700&display=swap');
               @page {
-                size: 102mm 25mm;
+                size: 25mm 102mm;
                 margin: 0;
               }
               body {
@@ -323,14 +323,14 @@ export default function BarcodePrinter({ userProfile }) {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                width: 102mm;
-                height: 25mm;
+                width: 25mm;
+                height: 102mm;
                 box-sizing: border-box;
                 overflow: hidden;
               }
               svg {
-                width: 102mm;
-                height: 25mm;
+                width: 25mm;
+                height: 102mm;
                 display: block;
               }
             </style>
@@ -347,8 +347,8 @@ export default function BarcodePrinter({ userProfile }) {
                   for (let i = 0; i < totalCopies; i++) {
                     const pageDiv = document.createElement("div");
                     pageDiv.style.pageBreakAfter = i === totalCopies - 1 ? "avoid" : "always";
-                    pageDiv.style.width = "102mm";
-                    pageDiv.style.height = "25mm";
+                    pageDiv.style.width = "25mm";
+                    pageDiv.style.height = "102mm";
                     pageDiv.style.display = "flex";
                     pageDiv.style.alignItems = "center";
                     pageDiv.style.justifyContent = "center";
@@ -380,8 +380,8 @@ export default function BarcodePrinter({ userProfile }) {
   // 8. MOCK BARCODE GENERATOR FOR SVG PREVIEW
   const renderMockBarcodeLines = () => {
     const lines = [];
-    let startX = 350;
-    const barcodeWidth = 430;
+    let startX = -70;
+    const barcodeWidth = 140;
     const seed = barcodeValue || "1414199999";
     
     for (let i = 0; i < seed.length * 5; i++) {
@@ -389,19 +389,19 @@ export default function BarcodePrinter({ userProfile }) {
       const width = (charCode % 3) + 2;
       const gap = ((charCode + i) % 4) + 2;
       
-      if (startX + width + gap > 350 + barcodeWidth) break;
+      if (startX + width + gap > 70) break;
       
       lines.push(
         <rect
           key={i}
           x={startX}
-          y={30}
-          width={width * 1.8}
-          height={120}
+          y={-40}
+          width={width * 1.3}
+          height={80}
           fill="black"
         />
       );
-      startX += (width + gap) * 1.8;
+      startX += (width + gap) * 1.3;
     }
     return lines;
   };
@@ -559,70 +559,67 @@ export default function BarcodePrinter({ userProfile }) {
           {/* Label Preview Container */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
             <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
-              Real-time Sticker Preview (102mm x 25mm)
+              Real-time Sticker Preview (25mm x 102mm - Dumbbell)
             </h2>
 
             {/* Simulated Label Canvas */}
-            <div className="border border-dashed border-gray-300 rounded-xl p-4 bg-gray-50 flex items-center justify-center overflow-x-auto min-h-[160px]">
+            <div className="border border-dashed border-gray-300 rounded-xl p-4 bg-gray-50 flex items-center justify-center overflow-x-auto min-h-[300px]">
               <svg
                 id="preview-label-svg"
-                viewBox="0 0 816 200"
-                className="w-full max-w-2xl border border-gray-200 shadow-sm bg-white"
+                viewBox="0 0 200 816"
+                className="h-[400px] w-auto border border-gray-200 shadow-sm bg-white"
                 xmlns="http://www.w3.org/2000/svg"
               >
-                {/* Full Straight Sticker Border */}
-                <rect
-                  x="0"
-                  y="0"
-                  width="816"
-                  height="200"
+                {/* Dumbbell sticker boundary path */}
+                <path
+                  d="M 65,260 A 30,30 0 0,0 10,230 V 40 A 30,30 0 0,1 40,10 H 160 A 30,30 0 0,1 190,40 V 230 A 30,30 0 0,0 135,260 V 556 A 30,30 0 0,0 190,586 V 776 A 30,30 0 0,1 160,806 H 40 A 30,30 0 0,1 10,776 V 586 A 30,30 0 0,0 65,556 Z"
                   fill="#fafafa"
                   stroke="#dddddd"
                   strokeWidth="2"
-                  rx="4"
                 />
 
-                {/* Left Column Text Group */}
+                {/* Top Lobe Content (Text Group) */}
                 <text
-                  x="40"
-                  y="50"
+                  x="100"
+                  y="110"
                   fontFamily="'Plus Jakarta Sans', sans-serif"
                   fontWeight="bold"
                   fontSize="24"
                   fill="black"
-                  dominantBaseline="middle"
+                  textAnchor="middle"
                 >
                   {pathParts.root}
                 </text>
 
                 {pathParts.sub && (
                   <text
-                    x="40"
-                    y="110"
+                    x="100"
+                    y="170"
                     fontFamily="'Plus Jakarta Sans', sans-serif"
                     fontWeight="bold"
-                    fontSize="22"
+                    fontSize="20"
                     fill="black"
-                    dominantBaseline="middle"
+                    textAnchor="middle"
                   >
                     {pathParts.sub}
                   </text>
                 )}
 
-                {/* Right Column: Barcode Representation */}
-                {renderMockBarcodeLines()}
-
-                <text
-                  x="530"
-                  y="165"
-                  fontFamily="monospace"
-                  fontSize="22"
-                  fill="black"
-                  fontWeight="bold"
-                  dominantBaseline="middle"
-                >
-                  {barcodeValue || "1414199999"}
-                </text>
+                {/* Bottom Lobe Content (Rotated Barcode Group) */}
+                <g transform="translate(100, 680) rotate(90)">
+                  {renderMockBarcodeLines()}
+                  <text
+                    x="0"
+                    y="65"
+                    fontFamily="monospace"
+                    fontSize="18"
+                    fill="black"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                  >
+                    {barcodeValue || "1414199999"}
+                  </text>
+                </g>
               </svg>
             </div>
           </div>
