@@ -69,8 +69,8 @@ export default function BarcodePrinter({ userProfile }) {
   }, []);
 
   // 2. CONVERSION CONSTANTS
-  const LABEL_WIDTH_MM = 30;
-  const LABEL_HEIGHT_MM = 50;
+  const LABEL_WIDTH_MM = 55;
+  const LABEL_HEIGHT_MM = 35;
   const GAP_MM = 2;
 
   // Helper to add log entries
@@ -224,16 +224,16 @@ export default function BarcodePrinter({ userProfile }) {
       `DIRECTION 0,0`,
       `CLS`,
       `REFERENCE 0,0`,
-      `TEXT 20,20,"3",0,1,1,"${pathParts.root}"`
+      `TEXT 20,60,"3",0,1,1,"${pathParts.root}"`
     ];
 
     if (pathParts.sub) {
-      commands.push(`TEXT 20,70,"3",0,1,1,"${pathParts.sub}"`);
+      commands.push(`TEXT 20,120,"3",0,1,1,"${pathParts.sub}"`);
     }
 
     commands.push(
-      `BARCODE 20,120,"128",80,1,0,2,3,"${barcodeValue}"`,
-      `TEXT 20,220,"3",0,1,1,"${barcodeValue}"`,
+      `BARCODE 290,50,"128",80,0,0,2,2,"${barcodeValue}"`,
+      `TEXT 290,150,"3",0,1,1,"${barcodeValue}"`,
       `PRINT ${printQuantity},1`
     );
 
@@ -321,7 +321,7 @@ export default function BarcodePrinter({ userProfile }) {
               @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700&family=Space+Mono:wght@700&display=swap');
               @media print {
                 @page {
-                  size: 30mm 50mm;
+                  size: 55mm 35mm;
                   margin: 0;
                 }
                 body {
@@ -335,14 +335,14 @@ export default function BarcodePrinter({ userProfile }) {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                width: 30mm;
-                height: 50mm;
+                width: 55mm;
+                height: 35mm;
                 box-sizing: border-box;
                 overflow: hidden;
               }
               .print-wrapper {
-                width: 30mm;
-                height: 50mm;
+                width: 55mm;
+                height: 35mm;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
@@ -351,8 +351,8 @@ export default function BarcodePrinter({ userProfile }) {
                 overflow: hidden;
               }
               svg {
-                width: 30mm;
-                height: 50mm;
+                width: 55mm;
+                height: 35mm;
                 display: block;
               }
             </style>
@@ -371,8 +371,8 @@ export default function BarcodePrinter({ userProfile }) {
                   for (let i = 0; i < totalCopies; i++) {
                     const pageDiv = document.createElement("div");
                     pageDiv.style.pageBreakAfter = i === totalCopies - 1 ? "avoid" : "always";
-                    pageDiv.style.width = "30mm";
-                    pageDiv.style.height = "50mm";
+                    pageDiv.style.width = "55mm";
+                    pageDiv.style.height = "35mm";
                     pageDiv.style.display = "flex";
                     pageDiv.style.alignItems = "center";
                     pageDiv.style.justifyContent = "center";
@@ -404,7 +404,7 @@ export default function BarcodePrinter({ userProfile }) {
   // 8. MOCK BARCODE GENERATOR FOR SVG PREVIEW
   const renderMockBarcodeLines = () => {
     const lines = [];
-    let startX = 40;
+    let startX = 360;
     const seed = barcodeValue || "1414199999";
     
     for (let i = 0; i < seed.length * 5; i++) {
@@ -412,15 +412,15 @@ export default function BarcodePrinter({ userProfile }) {
       const width = (charCode % 3) + 2;
       const gap = ((charCode + i) % 4) + 2;
       
-      if (startX + width + gap > 200) break;
+      if (startX + width + gap > 520) break;
       
       lines.push(
         <rect
           key={i}
           x={startX}
-          y={270}
+          y={130}
           width={width * 1.5}
-          height={60}
+          height={80}
           fill="black"
         />
       );
@@ -566,10 +566,10 @@ export default function BarcodePrinter({ userProfile }) {
           <div className="bg-[#F8F9FB] border border-gray-200 rounded-2xl p-5 space-y-3">
             <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
               <HelpCircle className="w-3.5 h-3.5 text-gray-400" />
-              Straight Sticker Layout Specifications
+              Horizontal Dumbbell Sticker Layout Specifications
             </h3>
             <ul className="text-xs text-gray-500 space-y-2 leading-relaxed">
-              <li>• <strong>No Dumbbell Fold:</strong> Designed for standard 102mm x 25mm labels using full width.</li>
+              <li>• <strong>Horizontal Dumbbell:</strong> Designed for standard 55mm x 35mm labels using dual lobes.</li>
               <li>• <strong>Category Selection:</strong> Auto-resolves by barcode or select manually from the dropdown.</li>
               <li>• <strong>Direction:</strong> `DIRECTION 0,0` handles feeding orientation without text inversion.</li>
             </ul>
@@ -582,29 +582,29 @@ export default function BarcodePrinter({ userProfile }) {
           {/* Label Preview Container */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
             <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
-              Real-time Sticker Preview (30mm x 50mm - Dumbbell)
+              Real-time Sticker Preview (55mm x 35mm - Dumbbell)
             </h2>
 
             {/* Simulated Label Canvas */}
             <div className="border border-dashed border-gray-300 rounded-xl p-4 bg-gray-50 flex items-center justify-center overflow-x-auto min-h-[300px]">
               <svg
                 id="preview-label-svg"
-                viewBox="0 0 240 400"
-                className="h-[350px] w-auto border border-gray-200 shadow-sm bg-white"
+                viewBox="0 0 550 350"
+                className="w-full max-w-[450px] h-auto border border-gray-200 shadow-sm bg-white"
                 xmlns="http://www.w3.org/2000/svg"
               >
                 {/* Dumbbell sticker boundary path */}
                 <path
-                  d="M 95,150 A 25,25 0 0,0 15,125 V 40 A 25,25 0 0,1 40,15 H 200 A 25,25 0 0,1 225,40 V 125 A 25,25 0 0,0 145,150 V 250 A 25,25 0 0,0 225,275 V 360 A 25,25 0 0,1 200,385 H 40 A 25,25 0 0,1 15,360 V 275 A 25,25 0 0,0 95,250 Z"
+                  d="M 30,20 H 190 A 30,30 0 0,1 220,50 V 110 A 30,30 0 0,0 250,140 H 300 A 30,30 0 0,0 330,110 V 50 A 30,30 0 0,1 360,20 H 520 A 30,30 0 0,1 550,50 V 300 A 30,30 0 0,1 520,330 H 360 A 30,30 0 0,1 330,300 V 240 A 30,30 0 0,0 300,210 H 250 A 30,30 0 0,0 220,240 V 300 A 30,30 0 0,1 190,330 H 30 A 30,30 0 0,1 0,300 V 50 A 30,30 0 0,1 30,20 Z"
                   fill="#fafafa"
                   stroke="#dddddd"
                   strokeWidth="2"
                 />
 
-                {/* Top Lobe Content (Text Group) */}
+                {/* Left Lobe Content (Text Group) */}
                 <text
-                  x="120"
-                  y="50"
+                  x="110"
+                  y="140"
                   fontFamily="'Plus Jakarta Sans', sans-serif"
                   fontWeight="bold"
                   fontSize="22"
@@ -616,8 +616,8 @@ export default function BarcodePrinter({ userProfile }) {
 
                 {pathParts.sub && (
                   <text
-                    x="120"
-                    y="95"
+                    x="110"
+                    y="195"
                     fontFamily="'Plus Jakarta Sans', sans-serif"
                     fontWeight="bold"
                     fontSize="18"
@@ -628,13 +628,13 @@ export default function BarcodePrinter({ userProfile }) {
                   </text>
                 )}
 
-                {/* Bottom Lobe Content (Horizontal Barcode Group) */}
+                {/* Right Lobe Content (Horizontal Barcode Group) */}
                 {renderMockBarcodeLines()}
                 <text
-                  x="120"
-                  y="360"
+                  x="440"
+                  y="250"
                   fontFamily="monospace"
-                  fontSize="16"
+                  fontSize="18"
                   fill="black"
                   fontWeight="bold"
                   textAnchor="middle"
