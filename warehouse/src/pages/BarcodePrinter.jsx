@@ -292,6 +292,91 @@ export default function BarcodePrinter({ userProfile }) {
     }
   };
 
+  const handleBrowserPrint = () => {
+    addLog("INFO", "Initiating direct browser print...");
+    setPrintingStatus("SENDING...");
+    try {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "absolute";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "none";
+      document.body.appendChild(iframe);
+      
+      const doc = iframe.contentWindow.document;
+      const svgElement = document.getElementById("preview-label-svg");
+      const svgHtml = svgElement ? svgElement.outerHTML : "";
+      
+      doc.write(`
+        <html>
+          <head>
+            <title>Print Label</title>
+            <style>
+              @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700&family=Space+Mono:wght@700&display=swap');
+              @page {
+                size: 102mm 25mm;
+                margin: 0;
+              }
+              body {
+                margin: 0;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 102mm;
+                height: 25mm;
+                box-sizing: border-box;
+                overflow: hidden;
+              }
+              svg {
+                width: 102mm;
+                height: 25mm;
+                display: block;
+              }
+            </style>
+          </head>
+          <body>
+            ${svgHtml}
+            <script>
+              window.onload = function() {
+                const totalCopies = ${printQuantity};
+                if (totalCopies > 1) {
+                  const container = document.body;
+                  const labelHtml = container.innerHTML;
+                  container.innerHTML = "";
+                  for (let i = 0; i < totalCopies; i++) {
+                    const pageDiv = document.createElement("div");
+                    pageDiv.style.pageBreakAfter = i === totalCopies - 1 ? "avoid" : "always";
+                    pageDiv.style.width = "102mm";
+                    pageDiv.style.height = "25mm";
+                    pageDiv.style.display = "flex";
+                    pageDiv.style.alignItems = "center";
+                    pageDiv.style.justifyContent = "center";
+                    pageDiv.innerHTML = labelHtml;
+                    container.appendChild(pageDiv);
+                  }
+                }
+                
+                setTimeout(function() {
+                  window.print();
+                  setTimeout(function() {
+                    window.frameElement.remove();
+                  }, 100);
+                }, 300);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      doc.close();
+      setPrintingStatus("SUCCESS: Print Dialog Opened");
+      addLog("SUCCESS", `Direct browser print dialog opened for ${printQuantity} copies.`);
+    } catch (err) {
+      setPrintingStatus("ERROR: Print Failed");
+      addLog("ERROR", `Direct print failed: ${err.message}`);
+    }
+  };
+
   // 8. MOCK BARCODE GENERATOR FOR SVG PREVIEW
   const renderMockBarcodeLines = () => {
     const lines = [];
@@ -433,14 +518,25 @@ export default function BarcodePrinter({ userProfile }) {
               </div>
             </div>
 
-            <button
-              onClick={handlePrint}
-              disabled={printingStatus.includes("SENDING")}
-              className="mt-6 w-full flex items-center justify-center gap-2 bg-black hover:bg-neutral-800 text-white font-bold py-3.5 rounded-xl text-sm transition-all shadow-md active:scale-95 disabled:bg-neutral-400 disabled:cursor-not-allowed"
-            >
-              <Printer className="w-4 h-4" />
-              Send to local printer
-            </button>
+            <div className="mt-6 space-y-2">
+              <button
+                onClick={handleBrowserPrint}
+                disabled={printingStatus.includes("SENDING")}
+                className="w-full flex items-center justify-center gap-2 bg-black hover:bg-neutral-800 text-white font-bold py-3.5 rounded-xl text-sm transition-all shadow-md active:scale-95 disabled:bg-neutral-400 disabled:cursor-not-allowed"
+              >
+                <Printer className="w-4 h-4" />
+                Print Label (Direct Browser)
+              </button>
+
+              <button
+                onClick={handlePrint}
+                disabled={printingStatus.includes("SENDING")}
+                className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-xs transition-all active:scale-95 disabled:bg-neutral-100 disabled:text-neutral-400"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Spool via Local Print Agent (Raw TSPL)
+              </button>
+            </div>
           </div>
 
           {/* Quick Info */}
@@ -469,6 +565,7 @@ export default function BarcodePrinter({ userProfile }) {
             {/* Simulated Label Canvas */}
             <div className="border border-dashed border-gray-300 rounded-xl p-4 bg-gray-50 flex items-center justify-center overflow-x-auto min-h-[160px]">
               <svg
+                id="preview-label-svg"
                 viewBox="0 0 816 200"
                 className="w-full max-w-2xl border border-gray-200 shadow-sm bg-white"
                 xmlns="http://www.w3.org/2000/svg"
