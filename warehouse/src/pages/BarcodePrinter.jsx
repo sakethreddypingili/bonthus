@@ -69,8 +69,8 @@ export default function BarcodePrinter({ userProfile }) {
   }, []);
 
   // 2. CONVERSION CONSTANTS
-  const LABEL_WIDTH_MM = 35;
-  const LABEL_HEIGHT_MM = 55;
+  const LABEL_WIDTH_MM = 30;
+  const LABEL_HEIGHT_MM = 50;
   const GAP_MM = 2;
 
   // Helper to add log entries
@@ -224,16 +224,16 @@ export default function BarcodePrinter({ userProfile }) {
       `DIRECTION 0,0`,
       `CLS`,
       `REFERENCE 0,0`,
-      `TEXT 40,50,"3",0,1,1,"${pathParts.root}"`
+      `TEXT 20,20,"3",0,1,1,"${pathParts.root}"`
     ];
 
     if (pathParts.sub) {
-      commands.push(`TEXT 40,110,"3",0,1,1,"${pathParts.sub}"`);
+      commands.push(`TEXT 20,70,"3",0,1,1,"${pathParts.sub}"`);
     }
 
     commands.push(
-      `BARCODE 40,290,"128",80,1,0,2,4,"${barcodeValue}"`,
-      `TEXT 80,390,"3",0,1,1,"${barcodeValue}"`,
+      `BARCODE 20,120,"128",80,1,0,2,3,"${barcodeValue}"`,
+      `TEXT 20,220,"3",0,1,1,"${barcodeValue}"`,
       `PRINT ${printQuantity},1`
     );
 
@@ -249,47 +249,53 @@ export default function BarcodePrinter({ userProfile }) {
     console.log("[BarcodePrinter] Starting print job spooling. Quantity:", printQuantity);
     console.log("[BarcodePrinter] TSPL command payload:\n", tsplOutput);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      console.warn("[BarcodePrinter] Aborting request - 5 second connection timeout reached.");
-      controller.abort();
-    }, 5000);
+    const attemptFetch = async (retryCount = 1) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.warn("[BarcodePrinter] Aborting request - 15 second connection timeout reached.");
+        controller.abort();
+      }, 15000);
 
-    try {
-      const targetUrl = "http://localhost:9100/print";
-      addLog("INFO", `POST request dispatched to local print agent...`);
-      
-      const response = await fetch(targetUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ rawTspl: tsplOutput }),
-        signal: controller.signal,
-      });
+      try {
+        const targetUrl = "http://localhost:9100/print";
+        addLog("INFO", `POST request dispatched to local print agent (Attempt ${2 - retryCount})...`);
+        
+        const response = await fetch(targetUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ rawTspl: tsplOutput }),
+          signal: controller.signal,
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      if (response.ok) {
-        setPrintingStatus("SUCCESS: Print Job Sent");
-        addLog("SUCCESS", "Spooler confirmed. Dispatched raw TSPL payload successfully.");
-      } else {
-        const errorText = await response.text().catch(() => "No response body text available");
-        throw new Error(`HTTP Error Status: ${response.status} - ${errorText}`);
+        if (response.ok) {
+          setPrintingStatus("SUCCESS: Print Job Sent");
+          addLog("SUCCESS", "Spooler confirmed. Dispatched raw TSPL payload successfully.");
+        } else {
+          const errorText = await response.text().catch(() => "No response body text available");
+          throw new Error(`HTTP Error Status: ${response.status} - ${errorText}`);
+        }
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (retryCount > 0) {
+          addLog("WARNING", "Handshake connection dropped. Retrying spool request once...");
+          return attemptFetch(retryCount - 1);
+        }
+        setPrintingStatus("ERROR: Spooler Offline");
+        console.log("Local Print Daemon Not Detected");
+        addLog("ERROR", `Local Print Daemon Not Detected: ${error.name} - ${error.message}`);
+        addLog("DIAGNOSTIC", "🔍 ---- DIAGNOSTIC CHECKLIST ----");
+        addLog("DIAGNOSTIC", "1. Ensure print agent is running: run 'node local-print-agent.js' directly in your command line.");
+        addLog("DIAGNOSTIC", "2. If using Cloudflare Tunnel (HTTPS), the browser may block localhost (HTTP) requests due to Mixed Content policies.");
+        addLog("DIAGNOSTIC", "3. Check if local agent responds: open http://localhost:9100/ in a new tab.");
+        addLog("DIAGNOSTIC", "----------------------------------");
       }
-    } catch (error) {
-      clearTimeout(timeoutId);
-      setPrintingStatus("ERROR: Spooler Offline");
-      console.error("[BarcodePrinter] Print dispatch failed. Detailed error object:", error);
-      
-      addLog("ERROR", `Failed to connect: ${error.name} - ${error.message}`);
-      addLog("DIAGNOSTIC", "🔍 ---- DIAGNOSTIC CHECKLIST ----");
-      addLog("DIAGNOSTIC", "1. Ensure print agent is running: run 'node scripts/local-print-agent.js' in your terminal.");
-      addLog("DIAGNOSTIC", "2. If using Cloudflare Tunnel (HTTPS), the browser may block localhost (HTTP) requests due to Mixed Content policies.");
-      addLog("DIAGNOSTIC", "3. Check if local agent responds: open http://localhost:9100/ in a new tab.");
-      addLog("DIAGNOSTIC", "4. Check for CORS blocking in browser console.");
-      addLog("DIAGNOSTIC", "----------------------------------");
-    }
+    };
+
+    await attemptFetch(1);
   };
 
   const handleBrowserPrint = () => {
@@ -315,7 +321,7 @@ export default function BarcodePrinter({ userProfile }) {
               @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700&family=Space+Mono:wght@700&display=swap');
               @media print {
                 @page {
-                  size: 35mm 55mm;
+                  size: 30mm 50mm;
                   margin: 0;
                 }
                 body {
@@ -329,14 +335,14 @@ export default function BarcodePrinter({ userProfile }) {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                width: 35mm;
-                height: 55mm;
+                width: 30mm;
+                height: 50mm;
                 box-sizing: border-box;
                 overflow: hidden;
               }
               .print-wrapper {
-                width: 35mm;
-                height: 55mm;
+                width: 30mm;
+                height: 50mm;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
@@ -345,8 +351,8 @@ export default function BarcodePrinter({ userProfile }) {
                 overflow: hidden;
               }
               svg {
-                width: 35mm;
-                height: 55mm;
+                width: 30mm;
+                height: 50mm;
                 display: block;
               }
             </style>
@@ -365,8 +371,8 @@ export default function BarcodePrinter({ userProfile }) {
                   for (let i = 0; i < totalCopies; i++) {
                     const pageDiv = document.createElement("div");
                     pageDiv.style.pageBreakAfter = i === totalCopies - 1 ? "avoid" : "always";
-                    pageDiv.style.width = "35mm";
-                    pageDiv.style.height = "55mm";
+                    pageDiv.style.width = "30mm";
+                    pageDiv.style.height = "50mm";
                     pageDiv.style.display = "flex";
                     pageDiv.style.alignItems = "center";
                     pageDiv.style.justifyContent = "center";
@@ -406,15 +412,15 @@ export default function BarcodePrinter({ userProfile }) {
       const width = (charCode % 3) + 2;
       const gap = ((charCode + i) % 4) + 2;
       
-      if (startX + width + gap > 240) break;
+      if (startX + width + gap > 200) break;
       
       lines.push(
         <rect
           key={i}
           x={startX}
-          y={295}
+          y={270}
           width={width * 1.5}
-          height={80}
+          height={60}
           fill="black"
         />
       );
