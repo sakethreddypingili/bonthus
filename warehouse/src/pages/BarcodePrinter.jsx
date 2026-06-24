@@ -28,6 +28,45 @@ export default function BarcodePrinter({ userProfile }) {
     { timestamp: new Date().toLocaleTimeString(), status: "INFO", message: "Printer profile selected: TSC TE244 (203 DPI)." }
   ]);
   const [printingStatus, setPrintingStatus] = useState("IDLE");
+  const [agentStatus, setAgentStatus] = useState("CHECKING");
+
+  // Check connectivity with local print agent with backoff to prevent flooding console when offline
+  useEffect(() => {
+    let active = true;
+    let timeoutId;
+    let checkDelay = 3000;
+
+    const checkAgent = async () => {
+      try {
+        const res = await fetch("http://localhost:9100/ping", { method: "GET", mode: "cors" });
+        if (res.ok) {
+          if (active) {
+            setAgentStatus("ONLINE");
+            checkDelay = 5000; // Normal online poll interval
+          }
+        } else {
+          if (active) {
+            setAgentStatus("OFFLINE");
+            checkDelay = Math.min(checkDelay * 2, 30000); // Backoff to prevent flooding
+          }
+        }
+      } catch (err) {
+        if (active) {
+          setAgentStatus("OFFLINE");
+          checkDelay = Math.min(checkDelay * 2, 30000); // Backoff to prevent flooding
+        }
+      }
+      if (active) {
+        timeoutId = setTimeout(checkAgent, checkDelay);
+      }
+    };
+
+    checkAgent();
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   // 2. CONVERSION CONSTANTS
   const LABEL_WIDTH_MM = 102;
@@ -218,6 +257,7 @@ export default function BarcodePrinter({ userProfile }) {
 
     try {
       const targetUrl = "http://localhost:9100/print";
+      addLog("INFO", `POST request dispatched to local print agent...`);
       
       const response = await fetch(targetUrl, {
         method: "POST",
@@ -232,19 +272,23 @@ export default function BarcodePrinter({ userProfile }) {
 
       if (response.ok) {
         setPrintingStatus("SUCCESS: Print Job Sent");
-        addLog("SUCCESS", "Spooler confirmed. Dispatched rawTL payload successfully.");
+        addLog("SUCCESS", "Spooler confirmed. Dispatched raw TSPL payload successfully.");
       } else {
         const errorText = await response.text().catch(() => "No response body text available");
         throw new Error(`HTTP Error Status: ${response.status} - ${errorText}`);
       }
     } catch (error) {
       clearTimeout(timeoutId);
-      setPrintingStatus("ERROR: Connection Timeout (Local Agent Offline)");
-      if (error.name === "AbortError") {
-        addLog("ERROR", "Connection Timeout: Print daemon at localhost:9100 did not respond within 5 seconds.");
-      } else {
-        addLog("ERROR", `Failed to connect: ${error.message || "Local Agent is offline or unreachable."}`);
-      }
+      setPrintingStatus("ERROR: Spooler Offline");
+      console.error("[BarcodePrinter] Print dispatch failed. Detailed error object:", error);
+      
+      addLog("ERROR", `Failed to connect: ${error.name} - ${error.message}`);
+      addLog("DIAGNOSTIC", "🔍 ---- DIAGNOSTIC CHECKLIST ----");
+      addLog("DIAGNOSTIC", "1. Ensure print agent is running: run 'node scripts/local-print-agent.js' in your terminal.");
+      addLog("DIAGNOSTIC", "2. If using Cloudflare Tunnel (HTTPS), the browser may block localhost (HTTP) requests due to Mixed Content policies.");
+      addLog("DIAGNOSTIC", "3. Check if local agent responds: open http://localhost:9100/ in a new tab.");
+      addLog("DIAGNOSTIC", "4. Check for CORS blocking in browser console.");
+      addLog("DIAGNOSTIC", "----------------------------------");
     }
   };
 
@@ -290,7 +334,34 @@ export default function BarcodePrinter({ userProfile }) {
             TSC TE244 Layout Spooler & Hardware Manager
           </p>
         </div>
+        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5 self-start sm:self-center">
+          <span className={`w-2 h-2 rounded-full ${
+            agentStatus === "ONLINE" ? "bg-green-500 animate-pulse" :
+            agentStatus === "OFFLINE" ? "bg-red-500 animate-pulse" : "bg-yellow-500"
+          }`} />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">
+            Local Agent: {agentStatus}
+          </span>
+        </div>
       </div>
+
+      {agentStatus === "OFFLINE" && (
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded-2xl p-4 text-xs space-y-2">
+          <div className="flex items-center gap-2 font-bold text-sm">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
+            ⚠️ LOCAL PRINT AGENT IS OFFLINE
+          </div>
+          <p>
+            Your browser cannot communicate with the local hardware spooler at <code>http://localhost:9100</code>.
+          </p>
+          <div className="bg-white/60 p-3 rounded-lg border border-red-100 font-mono text-[10px] leading-relaxed text-red-900 space-y-1">
+            <div><strong>How to fix:</strong></div>
+            <div>1. Open a new terminal in the project directory.</div>
+            <div>2. Run the print agent command: <code className="bg-red-100 px-1 py-0.5 rounded text-black font-bold">node scripts/local-print-agent.js</code></div>
+            <div>3. <strong>Cloudflare / HTTPS Warning:</strong> If you are accessing this site via HTTPS (e.g., Cloudflare tunnel), browsers block connections to HTTP localhost by default. You must open <a href="http://localhost:9100/ping" target="_blank" rel="noreferrer" className="underline font-bold text-blue-700">http://localhost:9100/ping</a> in a new tab and click "Proceed" / "Allow" or access the application via a non-secure local HTTP URL (e.g. your local dev server address) if possible.</div>
+          </div>
+        </div>
+      )}
 
       {/* Main Layout Workspace */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
@@ -485,11 +556,12 @@ export default function BarcodePrinter({ userProfile }) {
                   <span className={`flex-shrink-0 font-bold ${
                     log.status === "INFO" ? "text-blue-400" :
                     log.status === "PENDING" ? "text-amber-400" :
-                    log.status === "SUCCESS" ? "text-green-400" : "text-red-400"
+                    log.status === "SUCCESS" ? "text-green-400" :
+                    log.status === "DIAGNOSTIC" ? "text-yellow-500" : "text-red-400"
                   }`}>
                     {log.status}:
                   </span>
-                  <span className="text-neutral-300">{log.message}</span>
+                  <span className={log.status === "DIAGNOSTIC" ? "text-yellow-200" : "text-neutral-300"}>{log.message}</span>
                 </div>
               ))}
             </div>
@@ -548,7 +620,7 @@ export default function BarcodePrinter({ userProfile }) {
             </div>
 
             <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
-              <button type="button" onClick={() => setShowCatDrawer(true)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
+              <button type="button" onClick={() => setShowCatDrawer(false)} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
               <button type="submit" disabled={creatingCat} className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 disabled:opacity-50 transition-all">
                 {creatingCat ? "Creating..." : "Create Category"}
               </button>

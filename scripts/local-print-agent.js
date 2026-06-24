@@ -19,6 +19,12 @@ const server = http.createServer((req, res) => {
   }
 
 
+  if (req.method === "GET" && (req.url === "/ping" || req.url === "/")) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "online", version: "1.0.0" }));
+    return;
+  }
+
   if (req.method === "POST" && req.url === "/print") {
     let body = "";
     req.on("data", (chunk) => {
