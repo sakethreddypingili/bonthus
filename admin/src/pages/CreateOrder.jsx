@@ -8,6 +8,7 @@ import CommandDialog from "../components/common/CommandDialog";
 import SlideDrawer from "../components/common/SlideDrawer";
 import AlertDialog from "../components/common/AlertDialog";
 import { OVERLAY_CHROME_STYLE } from "../components/common/overlayChrome";
+import LensWizard from "../components/order/LensWizard";
 
 export default function CreateOrder({ userProfile }) {
     const navigate = useNavigate();
@@ -77,8 +78,10 @@ export default function CreateOrder({ userProfile }) {
     }, [customer.phone]);
 
     const [items, setItems] = useState([
-        { id: 1, name: "", type: "Lens", quantity: 1, unit_price: 0, discount: 0, product_id: null, stock: null, prescription: null, category_id: null, sgst: 0, cgst: 0, igst: 0 }
+        { id: 1, name: "", type: "Frame", quantity: 1, unit_price: 0, discount: 0, product_id: null, stock: null, prescription: null, category_id: null, sgst: 0, cgst: 0, igst: 0 }
     ]);
+    const [activeFrameItem, setActiveFrameItem] = useState(null);
+    const [isLensWizardOpen, setIsLensWizardOpen] = useState(false);
 
     const [voucherCode, setVoucherCode] = useState("");
     const [appliedVoucher, setAppliedVoucher] = useState(null);
@@ -560,6 +563,7 @@ export default function CreateOrder({ userProfile }) {
                     .from('products')
                     .select('id, name, base_price, category_id, product_categories(*), store_inventory!inner(stock_quantity, unit_price)')
                     .eq('store_inventory.store_id', currentStoreId)
+                    .neq('category_id', 'd705f4e3-0ac1-4777-9c38-5249d9a1993c')
                     .ilike('name', `%${value.trim()}%`)
                     .order('name', { ascending: true })
                     .limit(15);
@@ -635,6 +639,115 @@ export default function CreateOrder({ userProfile }) {
             showAlert("Failed", 'Failed to add product: ' + err.message, "error");
         } finally {
             setAddingProduct(false);
+        }
+    };
+
+    const handleAddLensForFrame = (item) => {
+        if (!currentStoreId) {
+            showAlert("Store Required", 'Please select a store first.', "warning");
+            return;
+        }
+        setActiveFrameItem(item);
+        setIsLensWizardOpen(true);
+    };
+
+    const handleSelectLens = async (lensDetails) => {
+        setLoading(true);
+        try {
+            // Find if a product with the same name exists under the 'lens' category
+            const { data: existingProd, error: findError } = await supabase
+                .from('products')
+                .select('id')
+                .eq('name', lensDetails.name)
+                .eq('category_id', 'd705f4e3-0ac1-4777-9c38-5249d9a1993c')
+                .maybeSingle();
+
+            let productId = existingProd?.id;
+
+            if (!productId) {
+                // Generate a custom SKU
+                const customSku = generateId(ID_RULES.PRODUCTS.prefix, ID_RULES.PRODUCTS.digits);
+
+                // Create product
+                const { data: newProd, error: insertError } = await supabase
+                    .from('products')
+                    .insert([{
+                        sku: customSku,
+                        name: lensDetails.name,
+                        category_id: 'd705f4e3-0ac1-4777-9c38-5249d9a1993c',
+                        base_price: Number(lensDetails.price)
+                    }])
+                    .select('id')
+                    .single();
+
+                if (insertError) throw insertError;
+                productId = newProd.id;
+
+                // Create inventory entry for store
+                const { error: invError } = await supabase
+                    .from('store_inventory')
+                    .insert([{
+                        store_id: currentStoreId,
+                        product_id: productId,
+                        stock_quantity: 9999, // Lenses are bespoke, mock high stock
+                        unit_price: Number(lensDetails.price)
+                    }]);
+                if (invError) throw invError;
+            }
+
+            // Fetch category taxes for lens category
+            let categoryTaxes = { category_id: 'd705f4e3-0ac1-4777-9c38-5249d9a1993c', sgst: 0, cgst: 0, igst: 0 };
+            try {
+                const { data: taxData } = await supabase
+                    .from('product_categories')
+                    .select('id, sgst, cgst, igst')
+                    .eq('id', 'd705f4e3-0ac1-4777-9c38-5249d9a1993c')
+                    .maybeSingle();
+                if (taxData) {
+                    categoryTaxes = {
+                        category_id: taxData.id,
+                        sgst: taxData.sgst || 0,
+                        cgst: taxData.cgst || 0,
+                        igst: taxData.igst || 0
+                    };
+                }
+            } catch (err) {
+                console.error('Error fetching lens category taxes:', err);
+            }
+
+            // Add to items list as a new item directly after the active frame item
+            const newLensItem = {
+                id: Date.now(),
+                name: lensDetails.name,
+                type: 'lens',
+                quantity: 1,
+                unit_price: Number(lensDetails.price),
+                discount: 0,
+                product_id: productId,
+                stock: 9999,
+                prescription: null,
+                ...categoryTaxes,
+                custom_lens_specs: {
+                    ...lensDetails.custom_lens_specs,
+                    linked_frame_item_id: activeFrameItem?.id,
+                    linked_frame_name: activeFrameItem?.name
+                }
+            };
+
+            setItems(prev => {
+                const index = prev.findIndex(i => i.id === activeFrameItem?.id);
+                if (index !== -1) {
+                    const nextItems = [...prev];
+                    nextItems.splice(index + 1, 0, newLensItem);
+                    return nextItems;
+                }
+                return [...prev, newLensItem];
+            });
+
+        } catch (err) {
+            showAlert("Error", 'Failed to process lens selection: ' + err.message, "error");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -983,7 +1096,8 @@ export default function CreateOrder({ userProfile }) {
                 quantity: Number(item.quantity),
                 unit_price: Number(item.price),
                 discount_amount: Number(item.discount || 0),
-                total_price: item.lineTotal
+                total_price: item.lineTotal,
+                custom_lens_specs: item.custom_lens_specs || null
             }));
 
             const { error: itemsError } = await supabase.from('order_items').insert(orderItemsPayload);
@@ -1471,7 +1585,7 @@ export default function CreateOrder({ userProfile }) {
                                 required
                             >
                                 <option value="">Select Category</option>
-                                {storeCategories.map(cat => (
+                                {storeCategories.filter(cat => cat.name !== 'lens').map(cat => (
                                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                                 ))}
                             </select>

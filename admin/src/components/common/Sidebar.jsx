@@ -17,7 +17,9 @@ import {
   List,
   Tags,
   ClipboardList,
-  FlaskConical
+  FlaskConical,
+  Wrench,
+  ScanBarcode
 } from "lucide-react";
 import { useState } from "react";
 const logoImg = '/assets/images/logo.webp';
@@ -31,6 +33,7 @@ const navItems = [
   { to: "/customers", label: "Customers", role: ["admin", "super_admin", "store_manager"], icon: Users },
   { to: "/employees", label: "Employees", role: ["admin", "super_admin"], icon: UserPlus },
   { to: "/reminders", label: "Board", role: ["admin", "super_admin", "store_manager", "employee"], icon: Layout },
+  { to: "/repairs", label: "Repairs", role: ["admin", "super_admin", "store_manager"], icon: Wrench },
   { to: "/analytics", label: "Analytics", role: ["admin", "super_admin", "store_manager"], icon: BarChart2 },
 ];
 
@@ -66,7 +69,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
               : (to === "/inventory"
                 ? (location.pathname === "/inventory" || location.pathname === "/inventory/analytics" || location.pathname === "/inventory/store" || location.pathname === "/inventory/shipment" || location.pathname === "/inventory/provisioning" || location.pathname === "/inventory/vendors")
                 : (to === "/products"
-                  ? (location.pathname === "/products" || location.pathname === "/products/:id" || location.pathname === "/categories" || location.pathname === "/barcode-creator" || location.pathname === "/barcodes")
+                  ? (location.pathname === "/products" || location.pathname === "/products/:id" || location.pathname === "/categories" || location.pathname === "/barcode-creator" || location.pathname === "/barcodes" || location.pathname === "/products/scan")
                   : (to === "/employees"
                     ? (location.pathname.startsWith("/employees") || location.pathname.startsWith("/onboarding"))
                     : location.pathname.startsWith(to)
@@ -100,7 +103,8 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                     { to: "/products", label: "Product List", icon: List },
                     { to: "/categories", label: "Categories", icon: Tags },
                     { to: "/barcode-creator", label: "Barcode Creator", icon: Plus },
-                    { to: "/barcodes", label: "Barcode Studio", icon: QrCode }
+                    { to: "/barcodes", label: "Barcode Studio", icon: QrCode },
+                    { to: "/products/scan", label: "Scan Barcode", icon: ScanBarcode }
                   ].map((sub) => {
                     const isSubActive = location.pathname === sub.to;
                     const SubIcon = sub.icon;

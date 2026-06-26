@@ -10,6 +10,8 @@ import EntityDetails from "./pages/EntityDetails";
 import Categories from "./pages/Categories";
 import BarcodeCreator from "./pages/BarcodeCreator";
 import Barcodes from "./pages/Barcodes";
+import MobileScan from "./pages/MobileScan";
+import ProductScanner from "./pages/ProductScanner";
 import InventoryDashboard from "./pages/InventoryDashboard";
 import InventoryAnalytics from "./pages/InventoryAnalytics";
 import InventoryStoreIntelligence from "./pages/InventoryStoreIntelligence";
@@ -30,6 +32,7 @@ import InvoiceView from "./pages/InvoiceView";
 import Notifications from "./pages/Notifications";
 import EmployeeManagement from "./pages/EmployeeManagement";
 import Infrastructure from "./pages/Infrastructure";
+import Repairs from "./pages/Repairs";
 import { PROFILE_CACHE_KEY, logout } from "./utils/auth";
 
 
@@ -283,11 +286,12 @@ function App() {
     );
   }
 
-  // Public invoice route (accessible without login)
-  if (!session && window.location.pathname.startsWith('/invoice/')) {
+  // Public invoice and mobile scan routes (accessible without login)
+  if (!session && (window.location.pathname.startsWith('/invoice/') || window.location.pathname.startsWith('/mobile-scan'))) {
     return (
       <Routes>
         <Route path="/invoice/:orderNumber" element={<InvoiceView userProfile={null} />} />
+        <Route path="/mobile-scan" element={<MobileScan />} />
       </Routes>
     );
   }
@@ -355,6 +359,8 @@ function App() {
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/invoice/:orderNumber" element={<InvoiceView userProfile={userProfile} />} />
+      <Route path="/mobile-scan" element={<MobileScan />} />
+      <Route path="/products/scan" element={<ProductScanner userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/attendance" replace />} />
     </Routes>
   );
@@ -367,6 +373,7 @@ function App() {
       <Route path="/orders/edit/:id" element={<EditOrder userProfile={userProfile} />} />
       <Route path="/products" element={<ProductList userProfile={userProfile} />} />
       <Route path="/products/:id" element={<EntityDetails userProfile={userProfile} />} />
+      <Route path="/products/scan" element={<ProductScanner userProfile={userProfile} />} />
       <Route path="/categories" element={<Categories userProfile={userProfile} />} />
       <Route path="/barcode-creator" element={<BarcodeCreator userProfile={userProfile} />} />
       <Route path="/barcodes" element={<Barcodes userProfile={userProfile} />} />
@@ -384,8 +391,10 @@ function App() {
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/employees" element={<EmployeeManagement userProfile={userProfile} />} />
       <Route path="/infrastructure" element={<Infrastructure userProfile={userProfile} />} />
+      <Route path="/repairs" element={<Repairs userProfile={userProfile} />} />
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
       <Route path="/invoice/:orderNumber" element={<InvoiceView userProfile={userProfile} />} />
+      <Route path="/mobile-scan" element={<MobileScan />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

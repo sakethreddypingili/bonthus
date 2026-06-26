@@ -33,10 +33,11 @@
     "postcss": "^8.5.15",
     "tailwindcss": "^3.3.5"
   },
+  "proxy": "http://localhost:5000",
   "scripts": {
     "postinstall": "patch-package",
-    "dev": "PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem react-scripts start",
-    "dev:nostrict": "PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem FAST_REFRESH=false react-scripts start",
+    "dev": "concurrently \"node src/server/server.js\" \"PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem react-scripts start\"",
+    "dev:nostrict": "concurrently \"node src/server/server.js\" \"PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem FAST_REFRESH=false react-scripts start\"",
     "start": "PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem react-scripts start",
     "db:grants": "node ../scripts/run_unified_schema_update.cjs --grants-only",
     "db:policies": "node ../scripts/run_unified_schema_update.cjs --policies-only",

@@ -1,8 +1,15 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, LayoutGrid, List, X, MoreVertical, ChevronDown, Check, Tags, Database } from "lucide-react";
+import { Search, Plus, LayoutGrid, List, MoreVertical, ChevronDown, Check, Database, ChevronRight } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import SlideDrawer from "../components/common/SlideDrawer";
+
+// Auto-generate a unique SKU like AST-782341
+const generateSKU = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const rand = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return `AST-${rand}`;
+};
 
 export default function ProductList({ userProfile }) {
   const navigate = useNavigate();
@@ -14,7 +21,9 @@ export default function ProductList({ userProfile }) {
   const [stores, setStores] = useState([]);
   const [selectedStore, setSelectedStore] = useState("");
   const [categories, setCategories] = useState([]);
-  
+  // cascading category picker: array of selected IDs at each level
+  const [cascadePath, setCascadePath] = useState([]);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -38,7 +47,20 @@ export default function ProductList({ userProfile }) {
       const defaultStore = isSuperAdmin ? (mainWarehouse?.id || sData?.[0]?.id) : userProfile?.store_id;
       setSelectedStore(defaultStore || "");
 
-      const { data: cData } = await supabase.from('categories').select('id, name, parent_id').order('name');
+      let cData = [];
+      try {
+        const catRes = await fetch('/api/categories');
+        const catResult = await catRes.json();
+        if (catResult.success) {
+          cData = catResult.data;
+        } else {
+          const { data } = await supabase.from('categories').select('id, name, parent_id').order('name');
+          cData = data;
+        }
+      } catch (e) {
+        const { data } = await supabase.from('categories').select('id, name, parent_id').order('name');
+        cData = data;
+      }
       setCategories(cData || []);
     } catch (err) {
       console.error("Error fetching initial data:", err.message);
@@ -48,6 +70,17 @@ export default function ProductList({ userProfile }) {
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
+
+  // Build a map: parentId (or null) -> [child categories]
+  const categoryChildMap = useMemo(() => {
+    const map = {};
+    categories.forEach(c => {
+      const key = c.parent_id || '__root__';
+      if (!map[key]) map[key] = [];
+      map[key].push(c);
+    });
+    return map;
+  }, [categories]);
 
   const categoryPaths = useMemo(() => {
     const map = {};
@@ -93,13 +126,6 @@ export default function ProductList({ userProfile }) {
             brand,
             base_price,
             description,
-          product:products (
-            id,
-            name,
-            sku,
-            brand,
-            base_price,
-            description,
             category:categories(id, name, parent_id)
           )
         `)
@@ -107,7 +133,7 @@ export default function ProductList({ userProfile }) {
 
       if (error) throw error;
 
-      const mapped = data.map(item => ({
+      const mapped = (data || []).map(item => ({
         id: item.product?.id,
         inventory_id: item.id,
         name: item.product?.name,
@@ -128,7 +154,7 @@ export default function ProductList({ userProfile }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedStore]);
+  }, [selectedStore, categoryPaths]);
 
   useEffect(() => {
     fetchInventory();
@@ -206,6 +232,7 @@ export default function ProductList({ userProfile }) {
       setShowAddModal(false);
       setShowEditModal(false);
       setEditingItem(null);
+      setCascadePath([]);
       setProductData({
         name: '', sku: '', brand: '', base_price: '', category_id: '', description: '',
         stock_quantity: 0, low_stock_threshold: 5, unit_price: ''
@@ -217,6 +244,20 @@ export default function ProductList({ userProfile }) {
       setSaving(false);
     }
   };
+
+  // When opening edit mode, reconstruct the cascade path from category_id
+  const buildCascadePathForCategory = useCallback((targetId) => {
+    if (!targetId) { setCascadePath([]); return; }
+    const catMap = {};
+    categories.forEach(c => { catMap[c.id] = c; });
+    const path = [];
+    let current = catMap[targetId];
+    while (current) {
+      path.unshift(current.id);
+      current = current.parent_id ? catMap[current.parent_id] : null;
+    }
+    setCascadePath(path);
+  }, [categories]);
 
   const handleEditClick = (item) => {
     setEditingItem(item);
@@ -231,7 +272,30 @@ export default function ProductList({ userProfile }) {
       low_stock_threshold: item.minStock,
       unit_price: item.price
     });
+    buildCascadePathForCategory(item.category_id);
     setShowEditModal(true);
+  };
+
+  const handleOpenAdd = () => {
+    setEditingItem(null);
+    setCascadePath([]);
+    setProductData({
+      name: '', sku: generateSKU(), brand: '', base_price: '', category_id: '', description: '',
+      stock_quantity: 0, low_stock_threshold: 5, unit_price: ''
+    });
+    setShowAddModal(true);
+  };
+
+  const handleCategoryLevelSelect = (depth, selectedId) => {
+    if (!selectedId) {
+      const newPath = cascadePath.slice(0, depth);
+      setCascadePath(newPath);
+      setProductData(prev => ({ ...prev, category_id: newPath[newPath.length - 1] || '' }));
+      return;
+    }
+    const newPath = [...cascadePath.slice(0, depth), selectedId];
+    setCascadePath(newPath);
+    setProductData(prev => ({ ...prev, category_id: selectedId }));
   };
 
   const filtered = inventory.filter(p => {
@@ -275,7 +339,7 @@ export default function ProductList({ userProfile }) {
             {isSuperAdmin && <ChevronDown size={14} className="text-black -ml-6" />}
           </div>
           <button 
-            onClick={() => { setEditingItem(null); setShowAddModal(true); }}
+            onClick={handleOpenAdd}
             className="flex items-center gap-2 px-6 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
           >
             <Plus size={14} strokeWidth={3} /> New Product
@@ -394,24 +458,28 @@ export default function ProductList({ userProfile }) {
 
       <SlideDrawer
         isOpen={showAddModal || showEditModal}
-        onClose={() => { setShowAddModal(false); setShowEditModal(false); setEditingItem(null); }}
+        onClose={() => { setShowAddModal(false); setShowEditModal(false); setEditingItem(null); setCascadePath([]); }}  
         title={editingItem ? "Refine Product" : "Register Product"}
         subtitle={editingItem ? "Update global and unit specifics" : "Add entity to master catalog"}
       >
         <div className="flex flex-col h-full">
             <form onSubmit={handleSaveProduct} className="space-y-8">
                 <div className="space-y-6">
+                    {/* Row 1: Name + auto SKU display */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Entity Name</label>
                             <input required value={productData.name} onChange={e => setProductData({...productData, name: e.target.value})} type="text" className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none" placeholder="Product Name" />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">SKU / ID</label>
-                            <input required value={productData.sku} onChange={e => setProductData({...productData, sku: e.target.value})} type="text" className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none" placeholder="SKU-XXXX" />
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Auto SKU</label>
+                            <div className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-400 select-all font-mono">
+                              {productData.sku || '—'}
+                            </div>
                         </div>
                     </div>
 
+                    {/* Row 2: Brand + Category (full-width cascade) */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Brand</label>
@@ -419,11 +487,63 @@ export default function ProductList({ userProfile }) {
                         </div>
                         <div className="space-y-2">
                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
-                            <select value={productData.category_id} onChange={e => setProductData({...productData, category_id: e.target.value})} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest outline-none">
-                                <option value="">Select Category</option>
-                                {categories.map(c => <option key={c.id} value={c.id}>{categoryPaths[c.id] || c.name}</option>)}
-                            </select>
+                            <div className="text-[9px] font-black text-gray-300 uppercase tracking-widest">(Pick below)</div>
                         </div>
+                    </div>
+
+                    {/* Category cascade — same style as Categories page */}
+                    <div className="space-y-3">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Category Path</p>
+
+                      {/* Level 0: root */}
+                      {(categoryChildMap['__root__'] || []).length > 0 && (
+                        <ProductCascadeLevel
+                          depth={0}
+                          options={categoryChildMap['__root__'] || []}
+                          selectedId={cascadePath[0] || ''}
+                          onSelect={id => handleCategoryLevelSelect(0, id)}
+                        />
+                      )}
+
+                      {/* Deeper levels */}
+                      {cascadePath.map((selectedId, depth) => {
+                        const children = categoryChildMap[selectedId] || [];
+                        if (children.length === 0) return null;
+                        return (
+                          <ProductCascadeLevel
+                            key={selectedId}
+                            depth={depth + 1}
+                            options={children}
+                            selectedId={cascadePath[depth + 1] || ''}
+                            onSelect={id => handleCategoryLevelSelect(depth + 1, id)}
+                          />
+                        );
+                      })}
+
+                      {/* Breadcrumb confirmation pill */}
+                      {productData.category_id && cascadePath.length > 0 && (() => {
+                        const lastId = cascadePath[cascadePath.length - 1];
+                        const hasChildren = (categoryChildMap[lastId] || []).length > 0;
+                        const breadcrumb = cascadePath
+                          .map(id => categories.find(c => c.id === id)?.name)
+                          .filter(Boolean)
+                          .join(' › ');
+                        return (
+                          <div className="space-y-1 mt-1">
+                            <div className="flex items-center gap-2 px-4 py-2.5 bg-black rounded-xl">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />
+                              <span className="text-[9px] font-black text-white uppercase tracking-widest truncate flex-1">
+                                ✓ {breadcrumb}
+                              </span>
+                            </div>
+                            {hasChildren && (
+                              <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                ↳ Pick a deeper sub-level or submit as-is
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="space-y-2">
@@ -454,7 +574,7 @@ export default function ProductList({ userProfile }) {
                 </div>
 
                 <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
-                    <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); setEditingItem(null); }} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black">Abort</button>
+                    <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); setEditingItem(null); setCascadePath([]); }} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black">Abort</button>
                     <button type="submit" disabled={saving} className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 disabled:opacity-50 transition-all">
                         {saving ? "Syncing..." : (editingItem ? "Update Matrix" : "Commit Entity")}
                     </button>
@@ -462,6 +582,40 @@ export default function ProductList({ userProfile }) {
             </form>
         </div>
       </SlideDrawer>
+    </div>
+  );
+}
+
+// ─── Cascade level box — mirrors Categories.jsx CascadeLevel ─────────────────
+function ProductCascadeLevel({ depth, options, selectedId, onSelect }) {
+  const levelLabels = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'];
+  const label = levelLabels[depth] || `Level ${depth + 1}`;
+
+  return (
+    <div className="relative">
+      {depth > 0 && (
+        <div className="absolute -top-3 left-3 flex items-center gap-1">
+          <div className="w-px h-3 bg-gray-200" />
+          <ChevronRight size={10} className="text-gray-300 -ml-0.5" />
+        </div>
+      )}
+      <div className={`rounded-xl overflow-hidden border transition-all ${
+        selectedId ? 'border-black bg-white' : 'border-gray-100 bg-gray-50'
+      }`}>
+        <div className="flex items-center px-4 py-0.5 border-b border-gray-50">
+          <span className="text-[8px] font-black text-gray-300 uppercase tracking-[0.2em]">{label}</span>
+        </div>
+        <select
+          value={selectedId}
+          onChange={e => onSelect(e.target.value)}
+          className="w-full px-4 py-3 bg-transparent text-[11px] font-bold uppercase tracking-widest outline-none cursor-pointer text-black appearance-none"
+        >
+          <option value="">— Select —</option>
+          {options.map(cat => (
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

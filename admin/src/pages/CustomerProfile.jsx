@@ -19,6 +19,7 @@ export default function CustomerProfile({ userProfile }) {
   const [customer, setCustomer] = useState(null);
   const [orders, setOrders] = useState([]);
   const [eyePowers, setEyePowers] = useState([]);
+  const [warranties, setWarranties] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -100,6 +101,17 @@ export default function CustomerProfile({ userProfile }) {
         
         if (eyeError) throw eyeError;
         setEyePowers(eyeData || []);
+
+        // Fetch warranty info
+        try {
+          const res = await fetch(`/api/customers/${id}/warranty`);
+          const result = await res.json();
+          if (result.success) {
+            setWarranties(result.data || []);
+          }
+        } catch (err) {
+          console.error("Error fetching warranty data:", err);
+        }
 
       } catch (err) {
         console.error("Error fetching customer profile:", err.message);
@@ -319,6 +331,46 @@ export default function CustomerProfile({ userProfile }) {
                     {pow.notes && (
                       <p className="mt-4 text-[9px] font-bold text-gray-400 uppercase tracking-tight line-clamp-1 italic">"{pow.notes}"</p>
                     )}
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="bg-white border border-gray-100 rounded-[40px] p-10 shadow-sm">
+            <h3 className="text-xs font-black text-black uppercase tracking-[0.3em] mb-10 flex items-center gap-3">
+              Warranty Lifecycle <span className="w-8 h-px bg-gray-100"></span>
+            </h3>
+
+            <div className="space-y-4">
+              {warranties.length === 0 ? (
+                <div className="p-8 text-center bg-gray-50 rounded-2xl border border-gray-100 text-gray-400 italic text-[11px] font-black uppercase tracking-wider">
+                  Nothing Found
+                </div>
+              ) : (
+                warranties.map((w, idx) => (
+                  <div key={idx} className="bg-white border border-gray-200 rounded-[28px] p-6 hover:border-black transition-all group">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <p className="text-[11px] font-black text-black uppercase tracking-tight truncate max-w-[180px]">{w.product_name}</p>
+                        <p className="text-[8px] font-bold text-gray-400 uppercase mt-0.5">{w.brand || "Generic"}</p>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${
+                        w.warranty_status === 'Active' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                      }`}>
+                        {w.warranty_status}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-gray-600">
+                      <div>
+                        <span className="text-[7px] text-gray-400 uppercase block">Invoice</span>
+                        <span className="text-black">{w.invoice_number}</span>
+                      </div>
+                      <div>
+                        <span className="text-[7px] text-gray-400 uppercase block">Expiry Date</span>
+                        <span className="text-black">{new Date(w.expiry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
