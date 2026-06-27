@@ -409,7 +409,7 @@ export default function Flow({ userProfile }) {
                         { id: "shopping", label: "Shopping" },
                         { id: "eye_test", label: "Eye Test" },
                         { id: "pickup", label: "Pick Up" },
-                        { id: "epair", label: "Epair" },
+                        { id: "repair", label: "Repair" },
                       ].map((pOpt) => {
                         const isSelected = purpose === pOpt.id;
                         return (
@@ -478,7 +478,8 @@ export default function Flow({ userProfile }) {
                               shopping: "Shopping",
                               eye_test: "Eye Test",
                               pickup: "Pick Up",
-                              epair: "Epair",
+                              repair: "Repair",
+                              epair: "Repair",
                               buy: "Buy Products",
                               eye_checkup: "Eye Checkup",
                               followup: "Order Followup",
@@ -540,7 +541,8 @@ export default function Flow({ userProfile }) {
                     shopping: "Shopping",
                     eye_test: "Eye Test",
                     pickup: "Pick Up",
-                    epair: "Epair",
+                    repair: "Repair",
+                    epair: "Repair",
                     buy: "Buy Products",
                     eye_checkup: "Eye Checkup",
                     followup: "Order Followup",

@@ -533,10 +533,10 @@ export default function Repairs({ userProfile }) {
                     </td>
                     <td className="py-4">
                       <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${
-                        repair.status === "delivered" ? "bg-green-50 text-green-700 border border-green-100" :
-                        repair.status === "ready" ? "bg-blue-50 text-blue-700 border border-blue-100" :
-                        repair.status === "in_progress" ? "bg-amber-50 text-amber-700 border border-amber-100" :
-                        "bg-gray-100 text-gray-600"
+                        repair.status === "delivered" ? "bg-black text-white" :
+                        repair.status === "ready" ? "bg-black text-white" :
+                        repair.status === "in_progress" ? "bg-gray-200 text-black" :
+                        "bg-gray-100 text-gray-400"
                       }`}>
                         {repair.status}
                       </span>

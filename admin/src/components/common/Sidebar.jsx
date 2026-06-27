@@ -19,7 +19,8 @@ import {
   ClipboardList,
   FlaskConical,
   Wrench,
-  ScanBarcode
+  ScanBarcode,
+  FileText
 } from "lucide-react";
 import { useState } from "react";
 const logoImg = '/assets/images/logo.webp';
@@ -33,6 +34,7 @@ const navItems = [
   { to: "/customers", label: "Customers", role: ["admin", "super_admin", "store_manager"], icon: Users },
   { to: "/employees", label: "Employees", role: ["admin", "super_admin"], icon: UserPlus },
   { to: "/reminders", label: "Board", role: ["admin", "super_admin", "store_manager", "employee"], icon: Layout },
+  { to: "/power", label: "Power", role: ["admin", "super_admin", "store_manager"], icon: FileText },
   { to: "/repairs", label: "Repairs", role: ["admin", "super_admin", "store_manager"], icon: Wrench },
   { to: "/analytics", label: "Analytics", role: ["admin", "super_admin", "store_manager"], icon: BarChart2 },
 ];
