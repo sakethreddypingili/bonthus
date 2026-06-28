@@ -10,7 +10,8 @@ import {
   ChevronDown,
   Activity,
   FileText,
-  Wrench
+  Wrench,
+  Sparkles
 } from "lucide-react";
 import { useState } from "react";
 const logoImg = '/assets/images/logo.webp';
@@ -22,6 +23,7 @@ const navItems = [
   { to: "/power", label: "Power", role: ["admin", "super_admin", "store_manager", "manager", "sales", "optometrist", "employee"], icon: FileText },
   { to: "/orders", label: "Orders", role: ["admin", "super_admin", "store_manager", "manager"], icon: ShoppingBag },
   { to: "/repairs", label: "Repairs", role: ["admin", "super_admin", "store_manager", "manager", "sales", "optometrist", "employee"], icon: Wrench },
+  { to: "/imagine", label: "Imagine", role: ["admin", "super_admin", "store_manager", "manager", "sales", "optometrist", "employee"], icon: Sparkles },
   { to: "/products", label: "Products", role: ["admin", "super_admin", "store_manager", "manager"], icon: Package },
   { to: "/customers", label: "Customers", role: ["admin", "super_admin", "store_manager", "manager"], icon: Users },
   { to: "/reminders", label: "Board", role: ["admin", "super_admin", "store_manager", "manager", "employee", "sales", "optometrist"], icon: Layout },
