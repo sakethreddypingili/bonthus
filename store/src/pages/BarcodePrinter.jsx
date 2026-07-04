@@ -464,8 +464,8 @@ export default function BarcodePrinter({ userProfile }) {
           </p>
           <div className="bg-white/60 p-3 rounded-lg border border-red-100 font-mono text-[10px] leading-relaxed text-red-900 space-y-1">
             <div><strong>How to fix:</strong></div>
-            <div>1. Open a new terminal in the project directory.</div>
-            <div>2. Run the print agent command: <code className="bg-red-100 px-1 py-0.5 rounded text-black font-bold">node scripts/local-print-agent.js</code></div>
+            <div>1. Open a terminal in the folder containing <code>local-print-agent.js</code> (e.g. your Downloads folder or project directory).</div>
+            <div>2. Run the print agent: <code className="bg-red-100 px-1 py-0.5 rounded text-black font-bold">node local-print-agent.js</code> (or <code className="bg-red-100 px-1 py-0.5 rounded text-black font-bold">node scripts/local-print-agent.js</code> if in project root).</div>
             <div>3. <strong>Cloudflare / HTTPS Warning:</strong> If you are accessing this site via HTTPS (e.g., Cloudflare tunnel), browsers block connections to HTTP localhost by default. You must open <a href="http://localhost:9100/ping" target="_blank" rel="noreferrer" className="underline font-bold text-blue-700">http://localhost:9100/ping</a> in a new tab and click "Proceed" / "Allow" or access the application via a non-secure local HTTP URL (e.g. your local dev server address) if possible.</div>
           </div>
         </div>

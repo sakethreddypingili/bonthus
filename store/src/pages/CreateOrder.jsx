@@ -75,6 +75,92 @@ export default function CreateOrder({ userProfile }) {
     const [isDiscountOpen, setIsDiscountOpen] = useState(false);
     const [removeConfirmItemId, setRemoveConfirmItemId] = useState(null);
 
+    const [flowCustomers, setFlowCustomers] = useState([]);
+    const [loadingFlow, setLoadingFlow] = useState(false);
+
+    const fetchFlowCustomers = async () => {
+        if (!currentStoreId) return;
+        setLoadingFlow(true);
+        try {
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            const { data, error } = await supabase
+                .from('customer_visits')
+                .select(`
+                    id,
+                    customer_id,
+                    purpose,
+                    status,
+                    customers (
+                        id,
+                        name,
+                        phone,
+                        email,
+                        street,
+                        town,
+                        district,
+                        state,
+                        postal_code,
+                        age
+                    )
+                `)
+                .eq('store_id', currentStoreId)
+                .gte('created_at', todayStart.toISOString())
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            const unique = [];
+            const seen = new Set();
+            (data || []).forEach(v => {
+                if (v.customers && !seen.has(v.customers.id)) {
+                    seen.add(v.customers.id);
+                    unique.push({
+                        ...v.customers,
+                        purpose: v.purpose,
+                        status: v.status
+                    });
+                }
+            });
+            setFlowCustomers(unique);
+        } catch (err) {
+            console.error("Error loading flow customers:", err);
+        } finally {
+            setLoadingFlow(false);
+        }
+    };
+
+    useEffect(() => {
+        if (currentStoreId && currentStep === 0) {
+            fetchFlowCustomers();
+        }
+    }, [currentStoreId, currentStep]);
+
+    const selectFlowCustomer = (c) => {
+        setCustomer({
+            id: c.id,
+            name: c.name || "",
+            phone: c.phone || "",
+            email: c.email || "",
+            street: c.street || "",
+            town: c.town || "",
+            district: c.district || "",
+            state: c.state || "",
+            postal_code: c.postal_code || "",
+            age: c.age || ""
+        });
+        setProfiles([{
+            ...c,
+            label: "Primary Profile"
+        }]);
+        setSelectedProfile({
+            ...c,
+            label: "Primary Profile"
+        });
+        setCustomerLookupStatus('found');
+    };
+
     useEffect(() => {
         if (location.state?.triggerRegisterModal && location.state?.customer?.phone) {
             setRegForm(prev => ({ ...prev, phone: location.state.customer.phone }));
@@ -1743,11 +1829,42 @@ export default function CreateOrder({ userProfile }) {
                         <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6">
                             <div>
                                 <h2 className="text-xl font-black text-black uppercase tracking-tight">Customer Lookup</h2>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Enter 10-digit mobile number to search database</p>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Select from today's flow or search database</p>
                             </div>
 
+                            {/* Today's Flow checked-in customers */}
+                            <div className="space-y-3">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Today's Checked-in (Flow) Customers</p>
+                                {loadingFlow ? (
+                                    <div className="text-[10px] text-gray-400 font-bold py-2 ml-1">Loading today's flow...</div>
+                                ) : flowCustomers.length === 0 ? (
+                                    <div className="p-4 border border-dashed border-neutral-200 rounded-2xl bg-neutral-50/50 text-[10px] font-black text-neutral-400 uppercase tracking-widest text-center">
+                                        No customer checked-in today yet
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-1 no-scrollbar">
+                                        {flowCustomers.map(p => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => selectFlowCustomer(p)}
+                                                className="w-full text-left px-5 py-3.5 border border-gray-150 hover:border-black bg-gray-50 hover:bg-white rounded-2xl transition-all flex items-center justify-between shadow-sm group"
+                                            >
+                                                <div>
+                                                    <span className="block text-[11px] font-black uppercase tracking-tight text-neutral-900 truncate max-w-[120px]">{p.name}</span>
+                                                    <span className="block text-[8px] font-bold text-gray-400 uppercase tracking-wider mt-0.5">{p.purpose || "Walk-in"}</span>
+                                                </div>
+                                                <span className="text-[10px] font-mono font-bold text-neutral-500">{p.phone}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="border-t border-gray-100 my-4" />
+
                             <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Mobile Number *</label>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Search Directory (Mobile Number) *</label>
                                 <div className="relative">
                                     <input
                                         type="tel"
