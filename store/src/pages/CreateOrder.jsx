@@ -82,14 +82,16 @@ export default function CreateOrder({ userProfile }) {
             // Clear navigation state parameter trigger so it doesn't reopen
             window.history.replaceState({}, document.title);
         }
-    }, [location.state]);
-
-
+    }, [location.state]);    const selectedProfileRef = useRef(selectedProfile);
+    useEffect(() => {
+        selectedProfileRef.current = selectedProfile;
+    }, [selectedProfile]);
 
     useEffect(() => {
         const fetchCustomerDetails = async () => {
             // Avoid refetching/resetting if switching between profiles that are already loaded in the list
-            const isExistingProfile = profiles.some(p => p.id === selectedProfile?.id);
+            const currentSelected = selectedProfileRef.current;
+            const isExistingProfile = currentSelected && profiles.some(p => p.id === currentSelected.id);
             const matchesExistingPhone = profiles.some(p => p.phone === customer.phone) || (profiles[0] && profiles[0].phone === customer.phone);
             if (isExistingProfile && matchesExistingPhone) {
                 return;
@@ -138,7 +140,7 @@ export default function CreateOrder({ userProfile }) {
                         const allProfiles = Array.from(profileMap.values());
                         setProfiles(allProfiles);
                         
-                        if (!selectedProfile) {
+                        if (!currentSelected || !allProfiles.some(p => p.id === currentSelected.id)) {
                             const initialProfileId = (customer.phone === initialCustomer.phone) ? location.state?.initialSelectedProfileId : null;
                             const targetProfile = allProfiles.find(p => p.id === initialProfileId) || allProfiles[0];
                             setSelectedProfile(targetProfile);
@@ -157,8 +159,6 @@ export default function CreateOrder({ userProfile }) {
                                 email: primary.email || "",
                                 age: targetProfile.age || ""
                             }));
-
-                            // setDependent calls removed
                         }
                     } else {
                         setProfiles([]);
@@ -182,7 +182,7 @@ export default function CreateOrder({ userProfile }) {
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [customer.phone, profiles, selectedProfile, initialCustomer.phone, location.state?.initialSelectedProfileId]);
+    }, [customer.phone, initialCustomer.phone, location.state?.initialSelectedProfileId]);
 
     useEffect(() => {
         const fetchPrescriptions = async () => {
@@ -1412,6 +1412,112 @@ export default function CreateOrder({ userProfile }) {
                 prescriptionId = preset.prescription.id;
             }
 
+            // Create catalog products on the fly for any custom frame items that lack product_id
+            const finalizedItems = [];
+            for (const item of totalLineAmounts) {
+                if (item.type === 'Frame' && !item.product_id) {
+                    try {
+                        // 1. Resolve Category hierarchy: Frames -> Eyeglasses -> [Shape]
+                        let resolvedCategoryId = null;
+                        try {
+                            const { data: rootCat } = await supabase
+                                .from('categories')
+                                .select('id')
+                                .eq('name', 'frames')
+                                .maybeSingle();
+
+                            let rootId = rootCat?.id;
+                            if (!rootId) {
+                                const { data: newRoot } = await supabase
+                                    .from('categories')
+                                    .insert([{ name: 'frames', parent_id: null }])
+                                    .select('id')
+                                    .single();
+                                rootId = newRoot.id;
+                            }
+
+                            const { data: eyeCat } = await supabase
+                                .from('categories')
+                                .select('id')
+                                .eq('name', 'Eyeglasses')
+                                .eq('parent_id', rootId)
+                                .maybeSingle();
+
+                            let eyeId = eyeCat?.id;
+                            if (!eyeId) {
+                                const { data: newEye } = await supabase
+                                    .from('categories')
+                                    .insert([{ name: 'Eyeglasses', parent_id: rootId }])
+                                    .select('id')
+                                    .single();
+                                eyeId = newEye.id;
+                            }
+
+                            const shapeName = item.custom_frame_specs?.shape || 'Other';
+                            const { data: shapeCat } = await supabase
+                                .from('categories')
+                                .select('id')
+                                .eq('name', shapeName)
+                                .eq('parent_id', eyeId)
+                                .maybeSingle();
+
+                            let shapeId = shapeCat?.id;
+                            if (!shapeId) {
+                                const { data: newShape } = await supabase
+                                    .from('categories')
+                                    .insert([{ name: shapeName, parent_id: eyeId }])
+                                    .select('id')
+                                    .single();
+                                shapeId = newShape.id;
+                            }
+                            resolvedCategoryId = shapeId;
+                        } catch (catErr) {
+                            console.error('Failed to resolve category tree for frame:', catErr);
+                        }
+
+                        // 2. Create Product
+                        const brandName = item.custom_frame_specs?.brand || item.brand || item.name || 'Custom';
+                        const frameColor = item.custom_frame_specs?.color || 'Unknown';
+                        const productName = `${brandName} - ${frameColor}`.trim();
+                        const customSku = `FRM-AUTO-${Date.now().toString().slice(-6)}`;
+
+                        const { data: newProd, error: newProdError } = await supabase
+                            .from('products')
+                            .insert([{
+                                name: productName,
+                                sku: customSku,
+                                base_price: Number(item.price || 0),
+                                category_id: resolvedCategoryId,
+                                frame_shape: item.custom_frame_specs?.shape || null,
+                                frame_type: item.custom_frame_specs?.frame_type || null
+                            }])
+                            .select('id')
+                            .single();
+
+                        if (newProdError) throw newProdError;
+
+                        // 3. Create barcode
+                        const customBarcode = '8901' + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
+                        await supabase
+                            .from('product_barcodes')
+                            .insert([{
+                                barcode: customBarcode,
+                                product_id: newProd.id
+                            }]);
+
+                        finalizedItems.push({
+                            ...item,
+                            product_id: newProd.id
+                        });
+                    } catch (err) {
+                        console.error('Failed to create frame catalog product on save:', err);
+                        throw new Error(`Failed to register custom frame product: ${err.message}`);
+                    }
+                } else {
+                    finalizedItems.push(item);
+                }
+            }
+
             const newOrderNumber = generateId(ID_RULES.ORDERS.prefix, ID_RULES.ORDERS.digits);
             const { data: orderData, error: orderError } = await supabase.from('orders').insert([{
                 order_number: newOrderNumber,
@@ -1431,7 +1537,7 @@ export default function CreateOrder({ userProfile }) {
             if (orderError) throw orderError;
             const orderId = orderData.id;
 
-            const orderItemsPayload = totalLineAmounts.map(item => ({
+            const orderItemsPayload = finalizedItems.map(item => ({
                 order_id: orderId,
                 product_id: item.product_id,
                 quantity: Number(item.qty),
@@ -1445,6 +1551,30 @@ export default function CreateOrder({ userProfile }) {
 
             const { error: itemsError } = await supabase.from('order_items').insert(orderItemsPayload);
             if (itemsError) throw itemsError;
+
+            // Insert payments log so Cash Desk can track auto cash sales
+            const paymentsPayload = payments
+                .filter(p => Number(p.amount) > 0)
+                .map(p => {
+                    let dbMethod = 'cash';
+                    const modeUpper = (p.mode || '').toUpperCase();
+                    if (modeUpper === 'CASH') dbMethod = 'cash';
+                    else if (modeUpper === 'CARD') dbMethod = 'card';
+                    else if (modeUpper === 'UPI' || modeUpper === 'GPAY' || modeUpper === 'PHONEPE') dbMethod = 'digital_wallet';
+                    else dbMethod = 'bank_transfer';
+
+                    return {
+                        order_id: orderId,
+                        amount: Number(p.amount),
+                        payment_method: dbMethod,
+                        status: 'completed'
+                    };
+                });
+
+            if (paymentsPayload.length > 0) {
+                const { error: payErr } = await supabase.from('payments').insert(paymentsPayload);
+                if (payErr) console.error('Failed to save payments record:', payErr);
+            }
 
             const orderIdForVoucher = orderId; // Local binding for voucher scope to resolve any unused variables
             const orderIdForStock = orderId;
@@ -1808,8 +1938,8 @@ export default function CreateOrder({ userProfile }) {
                                                                          }}
                                                                          className="w-full py-1.5 bg-neutral-900 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow hover:bg-neutral-800 transition-all text-center border border-white/10"
                                                                      >
-                                                                         Imagine Req
-                                                                     </button>
+                                                                          Visualise
+                                                                      </button>
                                                                  </div>
                                                              )}
                                                          </div>
@@ -2781,7 +2911,7 @@ export default function CreateOrder({ userProfile }) {
             <CommandDialog
                 isOpen={showImageRequestModal}
                 onClose={() => setShowImageRequestModal(false)}
-                title="Imagine Pool"
+                title="Visualise"
                 subtitle="Add this item config to the request pool?"
             >
                 <div className="p-8 space-y-6 text-center">
@@ -2798,16 +2928,118 @@ export default function CreateOrder({ userProfile }) {
                             onClick={async () => {
                                 try {
                                     setLoading(true);
-                                    // Submit directly to imagine_sessions (which exists in DB)
-                                    const { error } = await supabase
-                                        .from('imagine_sessions')
+
+                                    // 1. Resolve Category hierarchy: Frames -> Eyeglasses -> [Shape]
+                                    let resolvedCategoryId = null;
+                                    try {
+                                        // A. Find or create root category: frames
+                                        const { data: rootCat, error: rootErr } = await supabase
+                                            .from('categories')
+                                            .select('id')
+                                            .eq('name', 'frames')
+                                            .maybeSingle();
+
+                                        let rootId = rootCat?.id;
+                                        if (rootErr || !rootId) {
+                                            const { data: newRoot, error: newRootErr } = await supabase
+                                                .from('categories')
+                                                .insert([{ name: 'frames', parent_id: null }])
+                                                .select('id')
+                                                .single();
+                                            if (newRootErr) throw newRootErr;
+                                            rootId = newRoot.id;
+                                        }
+
+                                        // B. Find or create second-level: Eyeglasses
+                                        const { data: eyeCat, error: eyeErr } = await supabase
+                                            .from('categories')
+                                            .select('id')
+                                            .eq('name', 'Eyeglasses')
+                                            .eq('parent_id', rootId)
+                                            .maybeSingle();
+
+                                        let eyeId = eyeCat?.id;
+                                        if (eyeErr || !eyeId) {
+                                            const { data: newEye, error: newEyeErr } = await supabase
+                                                .from('categories')
+                                                .insert([{ name: 'Eyeglasses', parent_id: rootId }])
+                                                .select('id')
+                                                .single();
+                                            if (newEyeErr) throw newEyeErr;
+                                            eyeId = newEye.id;
+                                        }
+
+                                        // C. Find or create third-level matching the frame shape
+                                        const shapeName = imageRequestItem?.frameSpecs?.shape || 'Other';
+                                        const { data: shapeCat, error: shapeErr } = await supabase
+                                            .from('categories')
+                                            .select('id')
+                                            .eq('name', shapeName)
+                                            .eq('parent_id', eyeId)
+                                            .maybeSingle();
+
+                                        let shapeId = shapeCat?.id;
+                                        if (shapeErr || !shapeId) {
+                                            const { data: newShape, error: newShapeErr } = await supabase
+                                                .from('categories')
+                                                .insert([{ name: shapeName, parent_id: eyeId }])
+                                                .select('id')
+                                                .single();
+                                            if (newShapeErr) throw newShapeErr;
+                                            shapeId = newShape.id;
+                                        }
+
+                                        resolvedCategoryId = shapeId;
+                                    } catch (catErr) {
+                                        console.error('Failed to resolve category tree:', catErr);
+                                    }
+
+                                    // 2. Generate EAN-13-like barcode: 8901 + 9 random digits
+                                    const customBarcode = '8901' + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
+                                    const customSku = `IMG-REQ-${Date.now().toString().slice(-6)}`;
+
+                                    // 3. Create Product in database
+                                    const brandName = imageRequestItem?.custom_frame_specs?.brand || imageRequestItem?.brand || imageRequestItem?.name || 'Custom';
+                                    const frameColor = imageRequestItem?.custom_frame_specs?.color || 'Unknown';
+                                    const productName = `${brandName} - ${frameColor}`.trim();
+
+                                    const { data: newProd, error: newProdError } = await supabase
+                                        .from('products')
+                                        .insert([{
+                                            name: productName,
+                                            sku: customSku,
+                                            base_price: 0,
+                                            category_id: resolvedCategoryId,
+                                            frame_shape: imageRequestItem?.custom_frame_specs?.shape || null,
+                                            frame_type: imageRequestItem?.custom_frame_specs?.frame_type || null,
+                                            is_imagine_origin: true
+                                        }])
+                                        .select('id')
+                                        .single();
+
+                                    if (newProdError) throw newProdError;
+
+                                    // 4. Create and link barcode entry
+                                    const { error: barcodeError } = await supabase
+                                        .from('product_barcodes')
+                                        .insert([{
+                                            barcode: customBarcode,
+                                            product_id: newProd.id
+                                        }]);
+                                    if (barcodeError) throw barcodeError;
+
+                                    // 5. Submit to imagine_pool linked to this product (expires in 3 hours)
+                                    const { error: poolError } = await supabase
+                                        .from('imagine_pool')
                                         .insert([{
                                             store_id: currentStoreId || null,
-                                            notes: `Frame Config Request: ${imageRequestItem?.name || 'Frame'}`,
-                                            status: 'pending'
+                                            product_id: newProd.id,
+                                            status: 'pending',
+                                            expires_at: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
                                         }]);
-                                    if (error) throw error;
-                                    showAlert("Added to imagine pool successfully!");
+                                    if (poolError) throw poolError;
+
+                                    showAlert("Added to visualise pool successfully!");
                                     setShowImageRequestModal(false);
                                 } catch (err) {
                                     showAlert("Failed: " + err.message);

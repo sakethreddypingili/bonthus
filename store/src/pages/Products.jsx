@@ -461,15 +461,15 @@ export default function Products({ userProfile }) {
       <SlideDrawer
         isOpen={showAddModal || showEditModal}
         onClose={() => { setShowAddModal(false); setShowEditModal(false); setEditingItem(null); setCascadePath([]); }}
-        title={editingItem ? "Refine Product" : "Register Product"}
-        subtitle={editingItem ? "Update global and unit specifics" : "Add entity to master catalog"}
+        title={editingItem ? "Edit Product" : "Add Product"}
+        subtitle={editingItem ? "Update product details" : "Add new product"}
       >
         <div className="flex flex-col h-full">
             <form onSubmit={handleSaveProduct} className="space-y-8">
                 <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Entity Name</label>
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Name</label>
                             <input required value={productData.name} onChange={e => setProductData({...productData, name: e.target.value})} type="text" className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none" placeholder="Product Name" />
                         </div>
                         <div className="space-y-2">
@@ -576,7 +576,7 @@ export default function Products({ userProfile }) {
                 <div className="pt-8 flex items-center gap-3 border-t border-gray-50 mt-auto">
                     <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); setEditingItem(null); setCascadePath([]); }} className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black">Abort</button>
                     <button type="submit" disabled={saving} className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 disabled:opacity-50 transition-all">
-                        {saving ? "Syncing..." : (editingItem ? "Update Matrix" : "Commit Entity")}
+                        {saving ? "Syncing..." : (editingItem ? "Save Changes" : "Save Product")}
                     </button>
                 </div>
             </form>

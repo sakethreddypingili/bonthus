@@ -230,6 +230,19 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 -- -------------------------------------------------------------------------
+-- TABLE 10.5: cash_registry
+-- -------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cash_registry (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    type TEXT NOT NULL CHECK (type IN ('opening_balance', 'cash_in', 'cash_out')),
+    amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0.00),
+    reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- -------------------------------------------------------------------------
 -- TABLE 11: schedules
 -- -------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS schedules (

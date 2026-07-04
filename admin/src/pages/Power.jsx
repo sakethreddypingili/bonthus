@@ -553,11 +553,11 @@ export default function Power({ userProfile }) {
   const fetchRecentPowers = async () => {
     if (!userProfile) return;
 
-    const isAdmin = userProfile.role === 'admin' || userProfile.role === 'super_admin';
+    const isAdmin = ['admin', 'super_admin', 'md', 'agm'].includes(userProfile.role);
     const userStoreId = userProfile.store_id;
 
     if (isAdmin) {
-      console.log(`[Power Page] Authenticated User Role: ${userProfile.role} (Super/Global Admin). Showing all recent prescriptions.`);
+      console.log(`[Power Page] Authenticated User Role: ${userProfile.role} (Bypass Roles). Showing all recent prescriptions.`);
     } else {
       const storeName = userProfile.store?.name || userProfile.store_name || "Assigned Store";
       console.log(`[Power Page] Authenticated User Role: ${userProfile.role} | Store: ${storeName} (ID: ${userStoreId}). Applying 48-hour activity window.`);

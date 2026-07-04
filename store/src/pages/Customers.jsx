@@ -17,7 +17,7 @@ export default function Customers({ userProfile }) {
 
   useEffect(() => {
     if (userProfile) {
-      const isAdmin = userProfile.role === 'admin' || userProfile.role === 'super_admin';
+      const isAdmin = ['admin', 'super_admin', 'md', 'agm'].includes(userProfile.role);
       if (!isAdmin) {
         setSelectedStore(userProfile.store_id || "All");
       }
@@ -30,11 +30,11 @@ export default function Customers({ userProfile }) {
       return;
     }
 
-    const isAdmin = userProfile.role === 'admin' || userProfile.role === 'super_admin';
+    const isAdmin = ['admin', 'super_admin', 'md', 'agm'].includes(userProfile.role);
     const userStoreId = selectedStore !== "All" ? selectedStore : userProfile.store_id;
 
     if (isAdmin) {
-      console.log(`[Customers Page] Authenticated User Role: ${userProfile.role} (Super/Global Admin). Showing all-time customers.`);
+      console.log(`[Customers Page] Authenticated User Role: ${userProfile.role} (Bypass Roles). Showing all-time customers.`);
     } else {
       const storeName = userProfile.store?.name || userProfile.store_name || "Assigned Store";
       console.log(`[Customers Page] Authenticated User Role: ${userProfile.role} | Store: ${storeName} (ID: ${userStoreId}). Applying 48-hour activity window.`);
@@ -42,100 +42,126 @@ export default function Customers({ userProfile }) {
 
     setLoading(true);
     try {
-      // 1. Fetch active customer ids from orders, visits, and prescriptions matching store in the last 48 hours
-      let fortyEightHourCustomerIds = new Set();
-      if ((!isAdmin || selectedStore !== "All") && userStoreId) {
-        const thresholdDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-        
-        // A. Orders
-        const { data: recentOrders, error: orderErr } = await supabase
-          .from('orders')
-          .select('customer_id')
-          .eq('store_id', userStoreId)
-          .gte('created_at', thresholdDate)
-          .eq('disabled', false);
+      let fetchedCustomers = [];
 
-        if (orderErr) {
-          console.error("Failed to query 48-hour store orders:", orderErr);
-        } else if (recentOrders) {
-          recentOrders.forEach(o => {
-            if (o.customer_id) fortyEightHourCustomerIds.add(o.customer_id);
-          });
-        }
-
-        // B. Visits (Flow)
-        const { data: recentVisits, error: visitErr } = await supabase
-          .from('customer_visits')
-          .select('customer_id')
-          .eq('store_id', userStoreId)
-          .gte('created_at', thresholdDate);
-
-        if (visitErr) {
-          console.error("Failed to query 48-hour store visits:", visitErr);
-        } else if (recentVisits) {
-          recentVisits.forEach(v => {
-            if (v.customer_id) fortyEightHourCustomerIds.add(v.customer_id);
-          });
-        }
-
-        // C. Prescriptions (Power) - linked to store users/optometrists
-        const { data: storeUsers, error: usersErr } = await supabase
-          .from('users')
-          .select('id')
-          .eq('store_id', userStoreId);
-
-        if (usersErr) {
-          console.error("Failed to query store users:", usersErr);
-        } else if (storeUsers && storeUsers.length > 0) {
-          const storeUserIds = storeUsers.map(u => u.id);
-          const { data: recentPrescriptions, error: rxErr } = await supabase
-            .from('prescriptions')
+      if (!isAdmin) {
+        // 1. Fetch active customer ids from orders, visits, and prescriptions matching store in the last 48 hours
+        let fortyEightHourCustomerIds = new Set();
+        if (userStoreId) {
+          const thresholdDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+          
+          // A. Orders
+          const { data: recentOrders, error: orderErr } = await supabase
+            .from('orders')
             .select('customer_id')
-            .in('optometrist_id', storeUserIds)
-            .gte('prescribed_at', thresholdDate);
+            .eq('store_id', userStoreId)
+            .gte('created_at', thresholdDate)
+            .eq('disabled', false);
 
-          if (rxErr) {
-            console.error("Failed to query recent prescriptions:", rxErr);
-          } else if (recentPrescriptions) {
-            recentPrescriptions.forEach(p => {
-              if (p.customer_id) fortyEightHourCustomerIds.add(p.customer_id);
+          if (orderErr) {
+            console.error("Failed to query 48-hour store orders:", orderErr);
+          } else if (recentOrders) {
+            recentOrders.forEach(o => {
+              if (o.customer_id) fortyEightHourCustomerIds.add(o.customer_id);
             });
           }
+
+          // B. Visits (Flow)
+          const { data: recentVisits, error: visitErr } = await supabase
+            .from('customer_visits')
+            .select('customer_id')
+            .eq('store_id', userStoreId)
+            .gte('created_at', thresholdDate);
+
+          if (visitErr) {
+            console.error("Failed to query 48-hour store visits:", visitErr);
+          } else if (recentVisits) {
+            recentVisits.forEach(v => {
+              if (v.customer_id) fortyEightHourCustomerIds.add(v.customer_id);
+            });
+          }
+
+          // C. Prescriptions (Power) - linked to store users/optometrists
+          const { data: storeUsers, error: usersErr } = await supabase
+            .from('users')
+            .select('id')
+            .eq('store_id', userStoreId);
+
+          if (usersErr) {
+            console.error("Failed to query store users:", usersErr);
+          } else if (storeUsers && storeUsers.length > 0) {
+            const storeUserIds = storeUsers.map(u => u.id);
+            const { data: recentPrescriptions, error: rxErr } = await supabase
+              .from('prescriptions')
+              .select('customer_id')
+              .in('optometrist_id', storeUserIds)
+              .gte('prescribed_at', thresholdDate);
+
+            if (rxErr) {
+              console.error("Failed to query recent prescriptions:", rxErr);
+            } else if (recentPrescriptions) {
+              recentPrescriptions.forEach(p => {
+                if (p.customer_id) fortyEightHourCustomerIds.add(p.customer_id);
+              });
+            }
+          }
         }
-      }
-      setActiveStoreCustomerIds(fortyEightHourCustomerIds);
+        setActiveStoreCustomerIds(fortyEightHourCustomerIds);
 
-      // 2. Fetch all customers globally (including dependents)
-      let allCustomers = [];
-      let hasMoreCust = true;
-      let startCust = 0;
-      const step = 1000;
+        const ids = Array.from(fortyEightHourCustomerIds);
+        if (ids.length === 0) {
+          setDbCustomers([]);
+          setLoading(false);
+          return;
+        }
 
-      while (hasMoreCust) {
+        // Fetch only these active customers
+        const { data, error } = await supabase
+          .from("customers")
+          .select('id, name, phone, email, street, town, district, state, created_at, family_id, parent_id, relationship')
+          .in('id', ids)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        fetchedCustomers = data || [];
+      } else {
+        // Admin: fetch with limit and database-level search if search term is active
         let query = supabase
           .from("customers")
           .select('id, name, phone, email, street, town, district, state, created_at, family_id, parent_id, relationship')
-          .order('created_at', { ascending: false })
-          .range(startCust, startCust + step - 1);
+          .order('created_at', { ascending: false });
 
         if (selectedStore !== "All") {
           query = query.eq('store_id', selectedStore);
         }
 
-        const { data, error } = await query;
-        if (error) throw new Error(`Supabase customers query failed: ${error.message}`);
-
-        if (data && data.length > 0) {
-          allCustomers = allCustomers.concat(data);
-          startCust += step;
+        if (search && search.trim() !== "") {
+          const s = search.trim();
+          query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`);
         }
-        if (!data || data.length < step) {
-          hasMoreCust = false;
+
+        const { data, error } = await query.limit(200);
+        if (error) throw error;
+        fetchedCustomers = data || [];
+      }
+
+      // Fetch parent names for dependents in the fetched set
+      const parentIds = fetchedCustomers.map(u => u.parent_id).filter(Boolean);
+      let parentsMap = {};
+      if (parentIds.length > 0) {
+        const { data: parentsData } = await supabase
+          .from("customers")
+          .select("id, name")
+          .in("id", parentIds);
+        if (parentsData) {
+          parentsData.forEach(p => {
+            parentsMap[p.id] = p.name;
+          });
         }
       }
 
       // Combine and map defensively
-      const mappedCustomers = allCustomers.map(u => {
+      const mappedCustomers = fetchedCustomers.map(u => {
         const name = String(u.name || '').trim() || 'Anonymous';
         const email = String(u.email || '').trim() || 'N/A';
         const phone = String(u.phone || '').trim() || 'N/A';
@@ -154,8 +180,7 @@ export default function Customers({ userProfile }) {
 
         let displayName = name;
         if (u.parent_id) {
-          const parentObj = allCustomers.find(p => p.id === u.parent_id);
-          const parentName = parentObj ? String(parentObj.name || '').trim() : 'Primary';
+          const parentName = parentsMap[u.parent_id] || 'Primary';
           displayName = `${name} (${parentName})`;
         }
 
@@ -180,7 +205,7 @@ export default function Customers({ userProfile }) {
     } finally {
       setLoading(false);
     }
-  }, [userProfile, selectedStore]);
+  }, [userProfile, selectedStore, search]);
 
   useEffect(() => {
     fetchCustomers();
@@ -196,13 +221,16 @@ export default function Customers({ userProfile }) {
 
     if (!isMatchingSearch) return false;
 
-    // If searching, show all matching customers globally
+    const isAdmin = ['admin', 'super_admin', 'md', 'agm'].includes(userProfile?.role);
+
+    // If searching, show matching customers
     if (search.trim() !== "") {
-      return true;
+      if (isAdmin) {
+        return true;
+      }
+      return activeStoreCustomerIds.has(c.id);
     }
 
-    // If not searching, check filters based on role
-    const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
     if (isAdmin) {
       return true; // Show all-time customers for admin
     }
@@ -238,7 +266,7 @@ export default function Customers({ userProfile }) {
         {/* Toolbar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+            {['admin', 'super_admin', 'md', 'agm'].includes(userProfile?.role) && (
               <div className="text-[10px] font-black text-white bg-black px-4 py-2 rounded-xl uppercase tracking-widest">
                 Total: {filtered.length}
               </div>

@@ -203,11 +203,11 @@ export default function Dashboard({ userProfile }) {
     let query = supabase
       .from("customers")
       .select("id, name, orders(net_amount)")
-      .order('name');
+      .order('created_at', { ascending: false });
 
     if (sId) query = query.eq("store_id", sId);
 
-    const { data } = await query;
+    const { data } = await query.limit(100);
 
     if (data) {
       const customersWithSpent = data.map(c => ({
@@ -543,7 +543,8 @@ export default function Dashboard({ userProfile }) {
   }
 
   async function fetchStoreSales() {
-    const { data: orders } = await supabase.from("orders").select("net_amount, store_id").eq("disabled", false);
+    const thresholdDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(); // 90 days limit
+    const { data: orders } = await supabase.from("orders").select("net_amount, store_id").eq("disabled", false).gte("created_at", thresholdDate);
     const { data: storesData } = await supabase.from("store").select("id, name");
 
     if (orders && storesData) {
@@ -577,7 +578,7 @@ export default function Dashboard({ userProfile }) {
 
     if (sId) query = query.eq("store_id", sId);
 
-    const { data } = await query;
+    const { data } = await query.limit(150);
     if (data) {
       setTopProducts(data.slice(0, 5).map(p => ({
         name: p.products?.name || "Unknown",

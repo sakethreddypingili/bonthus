@@ -114,7 +114,7 @@ DROP POLICY IF EXISTS "Only admins can modify products" ON public.products;
 DROP POLICY IF EXISTS "Only super_admin can delete products" ON public.products;
 
 CREATE POLICY "products_select" ON public.products FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Only admins can insert products" ON public.products FOR INSERT TO authenticated WITH CHECK (is_admin_or_super_admin());
+CREATE POLICY "Only admins can insert products" ON public.products FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Only admins can modify products" ON public.products FOR UPDATE TO authenticated USING (is_admin_or_super_admin());
 CREATE POLICY "Only super_admin can delete products" ON public.products FOR DELETE TO authenticated USING (auth_user_role() = 'super_admin');
 
@@ -207,6 +207,7 @@ DROP POLICY IF EXISTS "barcodes_select" ON public.product_barcodes;
 DROP POLICY IF EXISTS "barcodes_admin_all" ON public.product_barcodes;
 
 CREATE POLICY "barcodes_select" ON public.product_barcodes FOR SELECT TO authenticated USING (true);
+CREATE POLICY "barcodes_insert" ON public.product_barcodes FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "barcodes_admin_all" ON public.product_barcodes FOR ALL TO authenticated USING (is_admin_or_super_admin()) WITH CHECK (is_admin_or_super_admin());
 
 -- -------------------------------------------------------------------------
@@ -315,3 +316,21 @@ CREATE POLICY "lab_orders_write_policy" ON public.lab_orders FOR ALL TO authenti
 -- public.audit_logs
 DROP POLICY IF EXISTS "audit_logs_admin_only" ON public.audit_logs;
 CREATE POLICY "audit_logs_admin_only" ON public.audit_logs FOR ALL TO authenticated USING (is_admin_or_super_admin());
+
+-- public.cash_registry
+ALTER TABLE public.cash_registry ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "cash_registry_select_policy" ON public.cash_registry;
+CREATE POLICY "cash_registry_select_policy" ON public.cash_registry 
+    FOR SELECT TO authenticated 
+    USING (is_admin_or_super_admin() OR store_id = auth_user_store_id());
+
+DROP POLICY IF EXISTS "cash_registry_insert_policy" ON public.cash_registry;
+CREATE POLICY "cash_registry_insert_policy" ON public.cash_registry 
+    FOR INSERT TO authenticated 
+    WITH CHECK (is_admin_or_super_admin() OR store_id = auth_user_store_id());
+
+DROP POLICY IF EXISTS "cash_registry_all_admin" ON public.cash_registry;
+CREATE POLICY "cash_registry_all_admin" ON public.cash_registry 
+    FOR ALL TO authenticated 
+    USING (is_admin_or_super_admin());

@@ -151,6 +151,20 @@ CREATE TABLE IF NOT EXISTS public.payments (
 );
 
 -- -------------------------------------------------------------------------
+-- Table: cash_registry
+-- -------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.cash_registry (
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES public.stores(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    type TEXT NOT NULL CHECK (type IN ('opening_balance', 'cash_in', 'cash_out')),
+    amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0.00),
+    reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    PRIMARY KEY (id)
+);
+
+-- -------------------------------------------------------------------------
 -- Table: prescriptions
 -- -------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.prescriptions (

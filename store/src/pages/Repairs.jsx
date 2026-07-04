@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../server/supabase/supabase";
-import { UserPlus, CheckCircle, Wrench, ShieldAlert, Clock, RefreshCw } from "lucide-react";
+import { UserPlus, CheckCircle, Wrench, ShieldAlert, Clock, RefreshCw, Plus, Search, Lock, AlertCircle } from "lucide-react";
+import SlideDrawer from "../components/common/SlideDrawer";
+import CommandDialog from "../components/common/CommandDialog";
 
 export default function Repairs({ userProfile }) {
   const [step, setStep] = useState(1);
@@ -12,12 +14,44 @@ export default function Repairs({ userProfile }) {
   const [repairsHistory, setRepairsHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Drawer & lookup states
+  const [showRepairDrawer, setShowRepairDrawer] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [profiles, setProfiles] = useState([]);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registrationStep, setRegistrationStep] = useState(1);
+  const [showFinalConfirm, setShowFinalConfirm] = useState(false);
+  const [registeringCustomer, setRegisteringCustomer] = useState(false);
+  const [searchAttempted, setSearchAttempted] = useState(false);
+
+  const closeRepairDrawer = () => {
+    setShowRepairDrawer(false);
+    setIsRegistering(false);
+    setRegistrationStep(1);
+    setShowFinalConfirm(false);
+    setRegisteringCustomer(false);
+    setSearchAttempted(false);
+    setPhone("");
+    setProfiles([]);
+    setSelectedProfile(null);
+    setCustomer(null);
+    setStep(1);
+    setProductName("");
+    setProductBrand("");
+    setRepairType("Frame Repair");
+    setNotes("");
+    setCost("");
+  };
+
   // Inline customer form
   const [showRegForm, setShowRegForm] = useState(false);
   const [regForm, setRegForm] = useState({
     name: "",
     phone: "",
-    email: ""
+    email: "",
+    town: "",
+    age: ""
   });
   const [registering, setRegistering] = useState(false);
 
@@ -74,7 +108,10 @@ export default function Repairs({ userProfile }) {
     if (!phone.trim()) return;
 
     setSearching(true);
+    setSearchAttempted(true);
     setCustomer(null);
+    setProfiles([]);
+    setSelectedProfile(null);
     setShowRegForm(false);
 
     try {
@@ -86,16 +123,27 @@ export default function Repairs({ userProfile }) {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        setCustomer(data[0]);
-        showNotification("Customer found!");
+        const primaryData = data.find(c => !c.parent_id) || data[0];
+        setCustomer(primaryData);
+        
+        const { data: dependentsData, error: dependentsError } = await supabase
+          .from("customers")
+          .select("*")
+          .eq("parent_id", primaryData.id);
+
+        if (dependentsError) throw dependentsError;
+
+        const allProfiles = [
+          { ...primaryData, label: "Primary Profile" },
+          ...(dependentsData || []).map((dep) => ({
+            ...dep,
+            label: `Dependent (${dep.relationship || "Family"})`,
+          })),
+        ];
+
+        setProfiles(allProfiles);
       } else {
-        setRegForm({
-          name: "",
-          phone: phone.trim(),
-          email: ""
-        });
-        setShowRegForm(true);
-        showNotification("No customer found. Please register inline.", "info");
+        setProfiles([]);
       }
     } catch (err) {
       showNotification(err.message || "Failed to search customer", "error");
@@ -104,38 +152,42 @@ export default function Repairs({ userProfile }) {
     }
   };
 
-  // Inline Register Customer
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    if (!regForm.name.trim() || !regForm.phone.trim()) {
-      showNotification("Name and phone are required", "error");
-      return;
-    }
-
-    setRegistering(true);
+  const handleRegisterRepairCustomer = async () => {
+    if (!regForm.name) return;
+    setRegisteringCustomer(true);
     try {
+      const payload = {
+        name: regForm.name.trim(),
+        phone: phone.trim(),
+        email: regForm.email.trim() || null,
+        town: regForm.town.trim() || null,
+        age: regForm.age ? Number(regForm.age) : null,
+        store_id: userProfile?.store_id || null
+      };
+
       const { data, error } = await supabase
         .from("customers")
-        .insert([
-          {
-            name: regForm.name.trim(),
-            phone: regForm.phone.trim(),
-            email: regForm.email.trim() || null,
-            store_id: userProfile?.store_id || null
-          }
-        ])
+        .insert([payload])
         .select()
         .single();
 
       if (error) throw error;
 
+      showNotification("Customer profile created!");
       setCustomer(data);
-      setShowRegForm(false);
-      showNotification("New customer registered successfully!");
+      setSelectedProfile({ ...data, label: "Primary Profile" });
+      
+      // Reset wizard lookup state to transition to repair intake forms
+      setIsRegistering(false);
+      setRegistrationStep(1);
+      setShowFinalConfirm(false);
+      setSearchAttempted(false);
+      setShowSearchModal(false);
+      setShowRepairDrawer(true);
     } catch (err) {
-      showNotification(err.message || "Registration failed", "error");
+      showNotification(err.message, "error");
     } finally {
-      setRegistering(false);
+      setRegisteringCustomer(false);
     }
   };
 
@@ -193,15 +245,7 @@ export default function Repairs({ userProfile }) {
 
       showNotification("Repair order registered successfully!");
       fetchRepairsHistory();
-      // Reset state & go to step 1
-      setCustomer(null);
-      setPhone("");
-      setProductName("");
-      setProductBrand("");
-      setRepairType("Frame Repair");
-      setNotes("");
-      setCost("");
-      setStep(1);
+      closeRepairDrawer();
     } catch (err) {
       showNotification(err.message || "Failed to create repair order", "error");
     } finally {
@@ -209,258 +253,503 @@ export default function Repairs({ userProfile }) {
     }
   };
 
+  const selectProfileFromDrawer = (p) => {
+    setSelectedProfile(p);
+    setCustomer(p);
+    setShowSearchModal(false);
+    setShowRepairDrawer(true);
+  };
+
+  const closeSearchModal = () => {
+    setShowSearchModal(false);
+    setIsRegistering(false);
+    setRegistrationStep(1);
+    setShowFinalConfirm(false);
+    setRegisteringCustomer(false);
+    setSearchAttempted(false);
+    setPhone("");
+    setProfiles([]);
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fast-slide pb-20">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-black text-black tracking-tighter uppercase mb-2 flex items-center gap-2">
-          <Wrench className="text-black" size={28} /> Repair
-        </h1>
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Process and track custom repair entities</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
+        <div>
+          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2 flex items-center gap-2">
+            <Wrench className="text-black" size={28} /> Repairs
+          </h1>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Process and track custom repair entities</p>
+        </div>
+        <button
+          onClick={() => setShowSearchModal(true)}
+          className="px-6 py-3 bg-black text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg flex items-center gap-2"
+        >
+          <Plus size={14} strokeWidth={3} /> New Repair
+        </button>
       </div>
 
-      {/* Notification banner */}
-      {notification && (
-        <div className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold uppercase tracking-wider ${
-          notification.type === "error" ? "bg-red-50 text-red-600 border border-red-100" :
-          notification.type === "info" ? "bg-gray-50 text-gray-500 border border-gray-100" :
-          "bg-black text-white"
-        }`}>
-          {notification.type === "error" ? <ShieldAlert size={16} /> : <CheckCircle size={16} />}
-          <span>{notification.message}</span>
-        </div>
-      )}
+      <CommandDialog
+        isOpen={showSearchModal}
+        onClose={closeSearchModal}
+        title="Find Customer Profile"
+      >
+        <div className="p-8 space-y-6 bg-white min-h-[400px]">
+            {isRegistering ? (
+              /* Inline Registration Wizard inside Drawer */
+              <div className="space-y-6 max-w-xl mx-auto">
+                {registrationStep === 1 ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                      <input
+                        required
+                        type="text"
+                        autoFocus
+                        value={regForm.name}
+                        onChange={e => setRegForm({ ...regForm, name: e.target.value })}
+                        className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
+                        placeholder="Customer's Full Name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile Number</label>
+                      <input
+                        disabled
+                        type="text"
+                        value={phone}
+                        className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight opacity-60 cursor-not-allowed text-gray-400"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Address (Optional)</label>
+                      <input
+                        type="email"
+                        value={regForm.email}
+                        onChange={e => setRegForm({ ...regForm, email: e.target.value })}
+                        className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">City / Town</label>
+                        <input
+                          type="text"
+                          value={regForm.town}
+                          onChange={e => setRegForm({ ...regForm, town: e.target.value })}
+                          className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
+                          placeholder="City or Town"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Age</label>
+                        <input
+                          type="number"
+                          value={regForm.age}
+                          onChange={e => setRegForm({ ...regForm, age: e.target.value })}
+                          className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
+                          placeholder="Age"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsRegistering(false);
+                          setRegistrationStep(1);
+                        }}
+                        className="flex-1 py-4 text-xs font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
+                      >
+                        Go Back
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!regForm.name}
+                        onClick={() => setRegistrationStep(2)}
+                        className="flex-1 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow-lg disabled:opacity-40"
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Step 2: Summary / Confirm */
+                  <div className="space-y-6">
+                    {!showFinalConfirm ? (
+                      <div className="space-y-6">
+                        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6 space-y-4 text-left">
+                          <div>
+                            <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Full Name</span>
+                            <span className="text-[12px] font-black text-black uppercase tracking-tight">{regForm.name}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Mobile Number</span>
+                            <span className="text-[12px] font-black text-black tracking-tight">{phone}</span>
+                          </div>
+                          {regForm.email && (
+                            <div>
+                              <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Email Address</span>
+                              <span className="text-[12px] font-bold text-black">{regForm.email}</span>
+                            </div>
+                          )}
+                          {regForm.town && (
+                            <div>
+                              <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">City / Town</span>
+                              <span className="text-[12px] font-black text-black uppercase tracking-tight">{regForm.town}</span>
+                            </div>
+                          )}
+                          {regForm.age && (
+                            <div>
+                              <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Age</span>
+                              <span className="text-[12px] font-bold text-black">{regForm.age}</span>
+                            </div>
+                          )}
+                        </div>
 
-      {/* Form Content Card */}
-      <div className="bg-white rounded-[32px] border border-gray-100 p-8 shadow-sm space-y-8">
-        
-        {/* STEP 1: CUSTOMER LOOKUP */}
-        {step === 1 && (
-          <div className="space-y-6">
-            <form onSubmit={handleSearch} className="space-y-4">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                Search Customer by Phone Number
-              </label>
-              <div className="flex gap-4">
-                <input
-                  required
-                  type="tel"
-                  placeholder="Enter Phone Number..."
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all"
-                />
-                <button
-                  type="submit"
-                  disabled={searching}
-                  className="bg-black text-white px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all"
-                >
-                  {searching ? "Searching..." : "Search"}
-                </button>
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setRegistrationStep(1)}
+                            className="flex-1 py-4 text-xs font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
+                          >
+                            Go Back
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowFinalConfirm(true)}
+                            className="flex-1 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow-lg"
+                          >
+                            Confirm
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Step 3: Small Confirmation Alert Dialog Inline */
+                      <div className="p-6 border border-dashed border-neutral-200 rounded-2xl bg-neutral-50 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="space-y-1">
+                          <p className="text-xs font-black text-neutral-900 uppercase tracking-tight">Confirm Registration?</p>
+                          <p className="text-[10px] text-neutral-500 font-medium">Create a new customer profile for this shopper?</p>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowFinalConfirm(false)}
+                            className="flex-1 py-3 text-[10px] font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={registeringCustomer}
+                            onClick={handleRegisterRepairCustomer}
+                            className="flex-1 py-3 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow animate-pulse"
+                          >
+                            {registeringCustomer ? 'Registering...' : 'Yes, Confirm'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </form>
+            ) : (
+              <div className={`transition-all duration-300 max-w-2xl mx-auto ${searchAttempted && !searching ? 'grid grid-cols-1 md:grid-cols-2 gap-8' : 'space-y-6'}`}>
+                
+                {/* Search Controls */}
+                <div className="space-y-4">
+                  <form onSubmit={handleSearch} className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center ml-1 h-6">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mobile Number</label>
+                        {searchAttempted && !searching && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSearchAttempted(false);
+                              setProfiles([]);
+                              setPhone("");
+                            }}
+                            className="text-[9px] font-black text-black border border-neutral-300 hover:border-black rounded-lg px-2.5 py-1 uppercase tracking-widest flex items-center gap-1 transition-all"
+                          >
+                            ✕ Clear Search
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          required
+                          type="tel"
+                          autoFocus
+                          disabled={searching || searchAttempted}
+                          placeholder="+91 MOBILE"
+                          value={phone}
+                          onChange={e => setPhone(e.target.value)}
+                          className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed pr-12"
+                        />
+                        {searchAttempted && !searching && (
+                          <Lock size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                        )}
+                      </div>
+                      {searchAttempted && !searching && (
+                        <p className="text-[9px] text-neutral-500 font-bold ml-1 flex items-center gap-1.5 animate-in fade-in duration-200">
+                          <Lock size={10} /> Search locked. Click "Clear Search" to modify.
+                        </p>
+                      )}
+                    </div>
 
-            {customer && (
-              <div className="bg-gray-50 border border-gray-100 rounded-3xl p-6 flex justify-between items-center shadow-sm">
-                <div>
-                  <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Selected Customer</span>
-                  <h4 className="text-base font-black uppercase tracking-tight text-black mt-1">{customer.name}</h4>
-                  <p className="text-[10px] font-mono text-gray-400 mt-1">Phone: {customer.phone} {customer.email ? `• ${customer.email}` : ''}</p>
+                    <button 
+                      type="submit" 
+                      disabled={searching || searchAttempted} 
+                      className="w-full px-6 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg hover:bg-neutral-900 active:scale-[0.98] transition-all disabled:opacity-40 disabled:hover:bg-black flex items-center justify-center gap-2"
+                    >
+                      {searching ? 'Verifying...' : (searchAttempted ? <><Lock size={13} strokeWidth={3} /> Search Locked</> : 'Search')}
+                    </button>
+                  </form>
                 </div>
-                <button
-                  onClick={() => setStep(2)}
-                  className="bg-black text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-md"
-                >
-                  Continue to Step 2
-                </button>
+
+                {/* Results Side-by-Side */}
+                {searchAttempted && !searching && (
+                  <div className="border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 md:pl-8 flex flex-col justify-center min-h-[220px]">
+                    {profiles.length > 0 ? (
+                      <div className="space-y-3 h-full flex flex-col justify-start">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">Select Profile</label>
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1 no-scrollbar flex-1">
+                          {profiles.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => selectProfileFromDrawer(p)}
+                              className="w-full text-left px-5 py-4 border border-gray-100 hover:border-black bg-gray-50 hover:bg-white rounded-2xl transition-all flex items-center justify-between shadow-sm group animate-in fade-in slide-in-from-bottom-2 duration-200"
+                            >
+                              <div>
+                                <span className="block text-xs font-black uppercase tracking-tight text-neutral-900">{p.name}</span>
+                                <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mt-0.5">{p.label}</span>
+                              </div>
+                              <span className="text-[10px] font-mono font-bold text-neutral-500">{p.phone}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-4 my-auto animate-in fade-in duration-200">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No matching customer profile found</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsRegistering(true);
+                            setRegistrationStep(1);
+                          }}
+                          className="w-full px-5 py-4 bg-white border border-neutral-200 hover:border-black text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm"
+                        >
+                          Register New Profile
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              </div>
+            )}
+          </div>
+        </CommandDialog>
+
+        {selectedProfile && (
+          <SlideDrawer
+            isOpen={showRepairDrawer}
+            onClose={closeRepairDrawer}
+            title="New Repair Order"
+            subtitle={`Process repair for ${selectedProfile.name}`}
+            width="max-w-xl"
+          >
+            <div className="p-8 space-y-6 bg-white min-h-[500px]">
+            {/* Top Step Indicators */}
+            <div className="flex items-center justify-between pb-6 border-b border-gray-100 mb-6">
+              {["Customer Details", "Product Specs", "Financials"].map((stepLabel, idx) => {
+                const stepNum = idx + 1;
+                const isCompleted = step > stepNum;
+                const isActive = step === stepNum;
+                return (
+                  <div key={stepLabel} className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black border transition-all ${
+                      isCompleted ? "bg-black border-black text-white" :
+                      isActive ? "bg-black border-black text-white ring-4 ring-neutral-100" : "bg-white border-neutral-200 text-neutral-400"
+                    }`}>
+                      {stepNum}
+                    </div>
+                    <span className={`text-[9px] font-black uppercase tracking-wider ${isActive ? "text-black" : "text-neutral-300"}`}>
+                      {stepLabel}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* STEP 1: Customer Details confirmation */}
+            {step === 1 && (
+              <div className="space-y-6">
+                <div className="bg-neutral-50 rounded-2xl p-6 border border-neutral-100 space-y-3">
+                  <div>
+                    <span className="text-[9px] text-gray-400 uppercase font-black tracking-wider block">Customer Name</span>
+                    <span className="text-sm font-black text-black uppercase">{selectedProfile.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-gray-400 uppercase font-black tracking-wider block">Phone</span>
+                    <span className="text-xs font-bold text-black font-mono">{selectedProfile.phone}</span>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProfile(null)}
+                    className="flex-1 py-4 text-xs font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
+                  >
+                    Change Customer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="flex-1 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow-lg"
+                  >
+                    Continue
+                  </button>
+                </div>
               </div>
             )}
 
-            {showRegForm && (
-              <div className="border-t border-gray-100 pt-6 space-y-6">
-                <div className="flex items-center gap-2 text-gray-800">
-                  <UserPlus size={18} />
-                  <h3 className="text-sm font-black uppercase tracking-wider">Inline Register New Customer</h3>
-                </div>
-                <form onSubmit={handleRegister} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* STEP 2: Product Specs */}
+            {step === 2 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Name</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Name</label>
                     <input
                       required
                       type="text"
-                      placeholder="Full Name"
-                      value={regForm.name}
-                      onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none"
+                      placeholder="e.g. Aviator Frame, Progressive Lens"
+                      value={productName}
+                      onChange={(e) => setProductName(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-black/5"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Phone</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Brand (Optional)</label>
                     <input
-                      required
-                      type="tel"
-                      placeholder="Phone Number"
-                      value={regForm.phone}
-                      onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none"
+                      type="text"
+                      placeholder="e.g. Ray-Ban, Oakleys"
+                      value={productBrand}
+                      onChange={(e) => setProductBrand(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-black/5"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Email (Optional)</label>
-                    <input
-                      type="email"
-                      placeholder="email@example.com"
-                      value={regForm.email}
-                      onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none"
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Repair Type</label>
+                    <select
+                      value={repairType}
+                      onChange={(e) => setRepairType(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-widest outline-none"
+                    >
+                      <option value="Frame Repair">Frame Repair</option>
+                      <option value="Lens Alignment">Lens Alignment</option>
+                      <option value="Screw Replacement">Screw Replacement</option>
+                      <option value="Cleaning & Buffing">Cleaning & Buffing</option>
+                      <option value="Nosepad Replacement">Nosepad Replacement</option>
+                      <option value="Other">Other Services</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Notes</label>
+                    <textarea
+                      rows={3}
+                      placeholder="Detail the issues, damages, or custom requests..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 text-xs font-bold outline-none resize-none focus:bg-white focus:ring-2 focus:ring-black/5"
                     />
                   </div>
+                </div>
+                <div className="flex gap-3 pt-4">
                   <button
-                    type="submit"
-                    disabled={registering}
-                    className="md:col-span-3 w-full py-4 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] transition-all"
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="flex-1 py-4 text-xs font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
                   >
-                    {registering ? "Registering..." : "Create Account & Select"}
+                    Go Back
                   </button>
-                </form>
+                  <button
+                    type="button"
+                    disabled={!productName}
+                    onClick={() => setStep(3)}
+                    className="flex-1 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow-lg disabled:opacity-50"
+                  >
+                    Continue
+                  </button>
+                </div>
               </div>
             )}
+
+            {/* STEP 3: Financials & Review */}
+            {step === 3 && (
+              <form onSubmit={handleSubmitRepair} className="space-y-6">
+                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 space-y-4 text-left">
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Review Repair Details</h3>
+                  <div className="grid grid-cols-2 gap-4 text-xs font-bold">
+                    <div>
+                      <span className="text-[9px] text-gray-400 uppercase block">Customer</span>
+                      <span className="text-black uppercase">{selectedProfile.name} ({selectedProfile.phone})</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-gray-400 uppercase block">Product</span>
+                      <span className="text-black uppercase">{productName} {productBrand ? `[${productBrand}]` : ''}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-gray-400 uppercase block">Repair Type</span>
+                      <span className="text-black uppercase">{repairType}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-gray-400 uppercase block">Notes</span>
+                      <span className="text-gray-600 font-normal italic">{notes || '—'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Total Repair Cost (₹)</label>
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="e.g. 250.00"
+                    value={cost}
+                    onChange={(e) => setCost(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 text-sm font-black focus:bg-white outline-none focus:ring-2 focus:ring-black/5"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="flex-1 py-4 text-xs font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
+                  >
+                    Go Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || cost === ""}
+                    className="flex-1 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow-lg disabled:opacity-50"
+                  >
+                    {submitting ? "Submitting..." : "Submit Repair Order"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
-        )}
-
-        {/* STEP 2: PRODUCT & REPAIR SPECIFICATIONS */}
-        {step === 2 && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Name</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="e.g. Aviator Frame, Progressive Lens"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-xs font-bold outline-none focus:bg-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Brand (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Ray-Ban, Oakleys"
-                  value={productBrand}
-                  onChange={(e) => setProductBrand(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-xs font-bold outline-none focus:bg-white"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Repair Type</label>
-              <select
-                value={repairType}
-                onChange={(e) => setRepairType(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-xs font-bold outline-none"
-              >
-                <option value="Frame Repair">Frame Repair</option>
-                <option value="Lens Alignment">Lens Alignment</option>
-                <option value="Screw Replacement">Screw Replacement</option>
-                <option value="Cleaning & Buffing">Cleaning & Buffing</option>
-                <option value="Nosepad Replacement">Nosepad Replacement</option>
-                <option value="Other">Other Services</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Notes</label>
-              <textarea
-                rows={4}
-                placeholder="Detail the issues, damages, or custom requests..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-xs font-bold outline-none resize-none focus:bg-white"
-              />
-            </div>
-
-            <div className="flex justify-between pt-4">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="px-6 py-3 border border-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                disabled={!productName}
-                onClick={() => setStep(3)}
-                className="bg-black text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-md disabled:opacity-50"
-              >
-                Continue to Step 3
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: FINANCIALS & REVIEW */}
-        {step === 3 && (
-          <form onSubmit={handleSubmitRepair} className="space-y-6">
-            <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100 space-y-4">
-              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Review Repair Details</h3>
-              <div className="grid grid-cols-2 gap-4 text-xs font-bold">
-                <div>
-                  <span className="text-[9px] text-gray-400 uppercase block">Customer</span>
-                  <span className="text-black uppercase">{customer?.name} ({customer?.phone})</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-gray-400 uppercase block">Product</span>
-                  <span className="text-black uppercase">{productName} {productBrand ? `[${productBrand}]` : ''}</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-gray-400 uppercase block">Repair Type</span>
-                  <span className="text-black uppercase">{repairType}</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-gray-400 uppercase block">Notes</span>
-                  <span className="text-gray-600 font-normal italic">{notes || '—'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Total Repair Cost (₹)</label>
-              <input
-                required
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="e.g. 250.00"
-                value={cost}
-                onChange={(e) => setCost(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-sm font-black focus:bg-white outline-none"
-              />
-            </div>
-
-            <div className="flex justify-between pt-4">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="px-6 py-3 border border-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all"
-              >
-                Back
-              </button>
-              <button
-                type="submit"
-                disabled={submitting || cost === ""}
-                className="bg-black text-white px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {submitting ? "Submitting..." : "Submit Repair Order"}
-              </button>
-            </div>
-          </form>
-        )}
-
-      </div>
+        </SlideDrawer>
+      )}
 
       {/* Repair History Section */}
       <div className="bg-white rounded-[32px] border border-gray-100 p-8 shadow-sm space-y-6">
@@ -514,8 +803,8 @@ export default function Repairs({ userProfile }) {
                       })}
                     </td>
                     <td className="py-4">
-                      <div className="text-xs font-black text-black uppercase">{repair.customer?.name || "Unknown"}</div>
-                      <div className="text-[10px] font-mono text-gray-400">{repair.customer?.phone || "—"}</div>
+                      <div className="text-xs font-black text-black uppercase">{repair.customers?.name || "Unknown"}</div>
+                      <div className="text-[10px] font-mono text-gray-400">{repair.customers?.phone || "—"}</div>
                     </td>
                     <td className="py-4">
                       <div className="text-xs font-bold text-black uppercase">{repair.product_name}</div>

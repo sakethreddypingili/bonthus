@@ -29,37 +29,26 @@ export default function Customers({ userProfile }) {
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
     try {
-      let allData = [];
-      let hasMore = true;
-      let start = 0;
-      const step = 1000;
-
-      while (hasMore) {
-        let query = supabase
-          .from("customers")
-          .select('*, orders(net_amount)')
-          .order('created_at', { ascending: false })
-          .range(start, start + step - 1);
-          
-        if (!isSuperAdmin && userProfile?.store_id && isValidUUID(userProfile.store_id)) {
-           query = query.eq('store_id', userProfile.store_id);
-        } else if (isSuperAdmin && selectedStore && selectedStore !== 'All' && isValidUUID(selectedStore)) {
-           query = query.eq('store_id', selectedStore);
-        }
-
-        const { data } = await query;
-
-        if (data && data.length > 0) {
-          allData = allData.concat(data);
-          start += step;
-        }
-
-        if (!data || data.length < step) {
-          hasMore = false;
-        }
+      let query = supabase
+        .from("customers")
+        .select('*, orders(net_amount)')
+        .order('created_at', { ascending: false });
+        
+      if (!isSuperAdmin && userProfile?.store_id && isValidUUID(userProfile.store_id)) {
+         query = query.eq('store_id', userProfile.store_id);
+      } else if (isSuperAdmin && selectedStore && selectedStore !== 'All' && isValidUUID(selectedStore)) {
+         query = query.eq('store_id', selectedStore);
       }
 
-      const mapped = allData.map(u => ({
+      if (search && search.trim() !== "") {
+        const s = search.trim();
+        query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`);
+      }
+
+      const { data, error } = await query.limit(200);
+      if (error) throw error;
+
+      const mapped = (data || []).map(u => ({
         id: u.id,
         name: u.name || 'Anonymous',
         email: u.email || 'N/A',
@@ -76,7 +65,7 @@ export default function Customers({ userProfile }) {
     } finally {
       setLoading(false);
     }
-  }, [isSuperAdmin, selectedStore, userProfile?.store_id]);
+  }, [isSuperAdmin, selectedStore, userProfile?.store_id, search]);
 
   useEffect(() => {
     fetchCustomers();

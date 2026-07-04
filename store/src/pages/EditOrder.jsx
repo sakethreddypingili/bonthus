@@ -604,7 +604,7 @@ export default function EditOrder({ userProfile }) {
                                 onClick={() => setShowDisableModal(true)} 
                                 className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${orderDisabled ? 'bg-gray-100 text-black hover:bg-black hover:text-white shadow-sm' : 'border-2 border-black text-black hover:bg-black hover:text-white shadow-lg'}`}
                             >
-                                {orderDisabled ? 'Activate Entity' : 'Archive Order'}
+                                {orderDisabled ? 'Reactivate Order' : 'Deactivate Order'}
                             </button>
                         </>
                     ) : (
@@ -617,7 +617,7 @@ export default function EditOrder({ userProfile }) {
                         disabled={saving || !isAdmin} 
                         className="bg-black text-white px-8 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-20 flex items-center gap-2"
                     >
-                        <Save size={18} strokeWidth={3} /> {saving ? "Syncing..." : "Commit Changes"}
+                        <Save size={18} strokeWidth={3} /> {saving ? "Syncing..." : "Save Changes"}
                     </button>
                 </div>
             </div>
@@ -626,26 +626,26 @@ export default function EditOrder({ userProfile }) {
             <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm p-8 space-y-8">
                 <div className="flex items-center justify-between border-b border-gray-50 pb-6">
                     <div>
-                        <h3 className="text-lg font-black text-black uppercase tracking-tight">Customer Identity</h3>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Entity Information Profile</p>
+                        <h3 className="text-lg font-black text-black uppercase tracking-tight">Customer Details</h3>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Profile Information</p>
                     </div>
                     {!isAdmin && <span className="text-[9px] font-black text-black uppercase tracking-widest px-3 py-1 bg-gray-50 rounded-full border border-gray-100">Immutable State</span>}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     <div className="space-y-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Legal Name</label>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Full Name</label>
                         <input type="text" value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} disabled={!isAdmin} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all disabled:opacity-50" />
                     </div>
                     <div className="space-y-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Contact Link</label>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Mobile Number</label>
                         <input type="tel" value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} disabled={!isAdmin} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all disabled:opacity-50" />
                     </div>
                     <div className="space-y-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Primary Zone</label>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">City/Town</label>
                         <input type="text" value={customer.town} onChange={e => setCustomer({ ...customer, town: e.target.value })} disabled={!isAdmin} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all disabled:opacity-50" />
                     </div>
                     <div className="space-y-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Administrative District</label>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">District</label>
                         <input type="text" value={customer.district} onChange={e => setCustomer({ ...customer, district: e.target.value })} disabled={!isAdmin} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all disabled:opacity-50" />
                     </div>
                 </div>
@@ -657,7 +657,7 @@ export default function EditOrder({ userProfile }) {
                     <thead>
                         <tr className="bg-black text-white">
                             <th className="py-5 px-6 text-left text-[9px] font-black uppercase tracking-widest">#</th>
-                            <th className="py-5 px-6 text-left text-[9px] font-black uppercase tracking-widest">Inventory Entity</th>
+                            <th className="py-5 px-6 text-left text-[9px] font-black uppercase tracking-widest">Product Name</th>
                             <th className="py-5 px-6 text-left text-[9px] font-black uppercase tracking-widest">Category</th>
                             <th className="py-5 px-6 text-center text-[9px] font-black uppercase tracking-widest">Qty</th>
                             <th className="py-5 px-6 text-right text-[9px] font-black uppercase tracking-widest">Unit Value</th>
@@ -699,7 +699,7 @@ export default function EditOrder({ userProfile }) {
                                                 </div>
                                             ) : item.name.trim() && (
                                                 <div className="p-6 text-center">
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">No matching entity</p>
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">No matching product</p>
                                                     <button
                                                         onClick={() => {
                                                             setNewProduct({ ...newProduct, name: item.name });
@@ -708,7 +708,7 @@ export default function EditOrder({ userProfile }) {
                                                         }}
                                                         className="px-4 py-2 bg-black text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all"
                                                     >
-                                                        + Register New
+                                                        + Add New Product
                                                     </button>
                                                 </div>
                                             )}
@@ -1198,11 +1198,11 @@ export default function EditOrder({ userProfile }) {
                 isOpen={showDisableModal}
                 onClose={() => setShowDisableModal(false)}
                 onConfirm={handleDisableOrder}
-                title={orderDisabled ? 'Activate Entity?' : 'Archive Record?'}
+                title={orderDisabled ? 'Reactivate Order?' : 'Deactivate Order?'}
                 description={orderDisabled 
-                    ? 'Restoring technical visibility and metric inclusion for this operational unit.' 
-                    : 'Hidden from operational flows and analytical indices. Entity remains in cold storage.'}
-                confirmText={orderDisabled ? 'Confirm' : 'Archive'}
+                    ? 'This will reactivate the order and restore it to reports.' 
+                    : 'This will deactivate the order and hide it from reports.'}
+                confirmText={orderDisabled ? 'Reactivate' : 'Deactivate'}
                 isDanger={!orderDisabled}
                 loading={disablingOrder}
             />
@@ -1211,19 +1211,19 @@ export default function EditOrder({ userProfile }) {
             <SlideDrawer
                 isOpen={showAddProductModal}
                 onClose={() => setShowAddProductModal(false)}
-                title="Register Item"
-                subtitle="Append New Inventory Entity"
+                title="Add Product"
+                subtitle="Add New Product"
             >
                 <form onSubmit={handleAddProduct} className="space-y-8 flex flex-col h-full">
                     <div className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Entity Designation</label>
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Product Name</label>
                             <input
                                 type="text"
                                 value={newProduct.name}
                                 onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all"
-                                placeholder="Identification Name..."
+                                placeholder="Product Name..."
                                 required
                             />
                         </div>
@@ -1280,7 +1280,7 @@ export default function EditOrder({ userProfile }) {
                             disabled={addingProduct || !newProduct.category_id}
                             className="w-full py-5 bg-black text-white rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20 flex items-center justify-center"
                         >
-                            {addingProduct ? 'Syncing...' : 'Register Entity'}
+                            {addingProduct ? 'Syncing...' : 'Save Product'}
                         </button>
                     </div>
                 </form>

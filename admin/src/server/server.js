@@ -143,7 +143,27 @@ app.get('/api/categories', async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`🚀 Express backend server running on port ${PORT}`);
-});
+function startServer(port, maxAttempts = 5) {
+    const server = app.listen(port, () => {
+        console.log(`🚀 Express backend server running on http://localhost:${port}`);
+    });
+    server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            const nextPort = port + 1;
+            const remaining = maxAttempts - 1;
+            if (remaining > 0) {
+                console.log(`  Port ${port} in use, trying ${nextPort}...`);
+                startServer(nextPort, remaining);
+            } else {
+                console.error(`  No available port found starting from ${process.env.PORT || 5000}`);
+                process.exit(1);
+            }
+        } else {
+            console.error('  Server error:', err.message);
+            process.exit(1);
+        }
+    });
+}
+
+const PORT = parseInt(process.env.PORT, 10) || 5000;
+startServer(PORT);

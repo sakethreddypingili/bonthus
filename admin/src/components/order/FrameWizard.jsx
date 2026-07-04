@@ -183,6 +183,7 @@ export default function FrameWizard({
                       <span className="bg-black text-white border border-black text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full inline-flex items-center gap-1.5">
                         <Gift size={12} /> BUY 1 GET 1
                       </span>
+                    )}
                   </div>
                 </div>
 

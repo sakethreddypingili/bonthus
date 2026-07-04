@@ -22,7 +22,8 @@ import BarcodePrinter from "./pages/BarcodePrinter";
 import Flow from "./pages/Flow";
 import Power from "./pages/Power";
 import Repairs from "./pages/Repairs";
-import Imagine from "./pages/Imagine";
+import Visualise from "./pages/Visualise";
+import Cash from "./pages/Cash";
 import { PROFILE_CACHE_KEY, logout } from "./utils/auth";
 
 function App() {
@@ -363,7 +364,8 @@ function App() {
       <Route path="/invoice/:id" element={<InvoiceView userProfile={userProfile} />} />
       <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
       <Route path="/repairs" element={<Repairs userProfile={userProfile} />} />
-      <Route path="/imagine" element={<Imagine userProfile={userProfile} />} />
+      <Route path="/visualise" element={<Visualise userProfile={userProfile} />} />
+      <Route path="/cash" element={<Cash userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/attendance" replace />} />
     </Routes>
   );
@@ -387,7 +389,8 @@ function App() {
       <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
       <Route path="/invoice/:id" element={<InvoiceView userProfile={userProfile} />} />
       <Route path="/repairs" element={<Repairs userProfile={userProfile} />} />
-      <Route path="/imagine" element={<Imagine userProfile={userProfile} />} />
+      <Route path="/visualise" element={<Visualise userProfile={userProfile} />} />
+      <Route path="/cash" element={<Cash userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, LayoutGrid, List, MoreVertical, ChevronDown, Check, Database, ChevronRight } from "lucide-react";
+import { Search, Plus, LayoutGrid, List, MoreVertical, ChevronDown, Check, Database, ChevronRight, X, ImageIcon, Package, Tag, Layers } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import SlideDrawer from "../components/common/SlideDrawer";
 
@@ -10,6 +10,182 @@ const generateSKU = () => {
   const rand = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
   return `AST-${rand}`;
 };
+
+// ─── Product Detail Popup ────────────────────────────────────────────────────
+function ProductDetailPopup({ product, onClose }) {
+  const [images, setImages] = useState([]);
+  const [loadingImages, setLoadingImages] = useState(true);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    const fetchImages = async () => {
+      setLoadingImages(true);
+      try {
+        const { data, error } = await supabase
+          .from('product_images')
+          .select('image_url, position')
+          .eq('product_id', product.id);
+        if (!error) setImages(data || []);
+      } catch (err) {
+        console.error("Error fetching product images:", err);
+      } finally {
+        setLoadingImages(false);
+      }
+    };
+    fetchImages();
+  }, [product?.id]);
+
+  const getImage = (position) => images.find(img => img.position === position)?.image_url || null;
+
+  const POSITIONS = [
+    { key: 'cover', label: 'Cover' },
+    { key: 'front', label: 'Front' },
+    { key: 'side', label: 'Side' },
+  ];
+
+  const statusMap = {
+    "Active": "bg-black text-white",
+    "Low Stock": "border border-black text-black",
+    "Out of Stock": "bg-gray-200 text-gray-500 line-through",
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* Modal */}
+      <div className="relative bg-white rounded-[32px] shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-5 right-5 z-10 w-8 h-8 rounded-full bg-gray-100 hover:bg-black hover:text-white flex items-center justify-center transition-all"
+        >
+          <X size={14} />
+        </button>
+
+        <div className="p-6 md:p-8 space-y-6">
+          {/* Header */}
+          <div className="pr-10">
+            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Product Detail</p>
+            <h2 className="text-2xl font-black text-black uppercase tracking-tighter leading-tight">
+              {product.name}
+            </h2>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <span className="text-[9px] font-mono font-black text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full border border-gray-100 uppercase tracking-wider">
+                {product.sku}
+              </span>
+              {product.brand && (
+                <span className="text-[9px] font-black text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full border border-gray-100 uppercase tracking-wider">
+                  {product.brand}
+                </span>
+              )}
+              <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${statusMap[product.status] || 'bg-gray-100 text-gray-500'}`}>
+                {product.status}
+              </span>
+            </div>
+          </div>
+
+          {/* Images */}
+          <div>
+            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <ImageIcon size={11} /> Images
+            </p>
+            {loadingImages ? (
+              <div className="grid grid-cols-3 gap-3">
+                {POSITIONS.map(p => (
+                  <div key={p.key} className="aspect-square rounded-2xl bg-gray-50 border border-gray-100 animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                {POSITIONS.map(({ key, label }) => {
+                  const url = getImage(key);
+                  return (
+                    <div key={key} className="space-y-1.5">
+                      <div className="aspect-square rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center relative group">
+                        {url ? (
+                          <>
+                            <img
+                              src={url}
+                              alt={`${product.name} — ${label}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all" />
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5">
+                            <ImageIcon size={20} className="text-gray-200" />
+                            <span className="text-[7px] font-black text-gray-300 uppercase tracking-widest">No Image</span>
+                          </div>
+                        )}
+                        {/* Position badge */}
+                        <div className="absolute bottom-1.5 left-1.5 bg-black/70 text-[7px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          {label}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {!loadingImages && images.length === 0 && (
+              <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest text-center py-2">
+                No images uploaded yet — use Visualise to add images.
+              </p>
+            )}
+          </div>
+
+          {/* Product Info */}
+          <div className="bg-gray-50 rounded-[24px] border border-gray-100 p-5 space-y-4">
+            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Package size={11} /> Product Information
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-0.5">
+                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Unit Price</p>
+                <p className="text-lg font-black text-black tracking-tight">₹{Number(product.price || 0).toLocaleString()}</p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Stock</p>
+                <p className="text-lg font-black text-black tracking-tight">
+                  {product.stock}
+                  <span className="text-[10px] text-gray-400 ml-1">/ min {product.minStock}</span>
+                </p>
+              </div>
+            </div>
+
+            {product.category && (
+              <div className="space-y-0.5">
+                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                  <Layers size={9} /> Category
+                </p>
+                <p className="text-[11px] font-black text-black uppercase tracking-tight">{product.category}</p>
+              </div>
+            )}
+
+            {product.description && (
+              <div className="space-y-0.5">
+                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                  <Tag size={9} /> Description
+                </p>
+                <p className="text-[11px] font-bold text-gray-600 leading-relaxed">{product.description}</p>
+              </div>
+            )}
+          </div>
+
+          {/* ID */}
+          <p className="text-[8px] font-mono text-gray-300 uppercase tracking-widest text-center">
+            Product ID: {product.id}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ProductList({ userProfile }) {
   const navigate = useNavigate();
@@ -34,6 +210,9 @@ export default function ProductList({ userProfile }) {
   });
 
   const [editingItem, setEditingItem] = useState(null);
+
+  // ─── Product Detail Popup State ─────────────────────────────────────────────
+  const [selectedProductPopup, setSelectedProductPopup] = useState(null);
 
   const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
 
@@ -126,6 +305,7 @@ export default function ProductList({ userProfile }) {
             brand,
             base_price,
             description,
+            image_url,
             category:categories(id, name, parent_id)
           )
         `)
@@ -140,6 +320,7 @@ export default function ProductList({ userProfile }) {
         sku: item.product?.sku,
         brand: item.product?.brand,
         description: item.product?.description,
+        image_url: item.product?.image_url,
         category: item.product?.category ? categoryPaths[item.product.category.id] || item.product.category.name : "",
         category_id: item.product?.category?.id,
         price: item.unit_price || item.product?.base_price || 0,
@@ -259,7 +440,8 @@ export default function ProductList({ userProfile }) {
     setCascadePath(path);
   }, [categories]);
 
-  const handleEditClick = (item) => {
+  const handleEditClick = (e, item) => {
+    e.stopPropagation(); // prevent popup from opening
     setEditingItem(item);
     setProductData({
       name: item.name,
@@ -298,6 +480,11 @@ export default function ProductList({ userProfile }) {
     setProductData(prev => ({ ...prev, category_id: selectedId }));
   };
 
+  // Open product detail popup
+  const handleOpenProductPopup = (product) => {
+    setSelectedProductPopup(product);
+  };
+
   const filtered = inventory.filter(p => {
     return !search || 
       p.name?.toLowerCase().includes(search.toLowerCase()) || 
@@ -319,6 +506,14 @@ export default function ProductList({ userProfile }) {
 
   return (
     <div className="space-y-8 animate-fast-slide pb-20">
+      {/* Product Detail Popup */}
+      {selectedProductPopup && (
+        <ProductDetailPopup
+          product={selectedProductPopup}
+          onClose={() => setSelectedProductPopup(null)}
+        />
+      )}
+
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
         <div>
           <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Inventory Registry</h1>
@@ -393,11 +588,30 @@ export default function ProductList({ userProfile }) {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filtered.map(p => (
-                    <tr key={p.inventory_id} className="hover:bg-gray-50 group">
+                    <tr
+                      key={p.inventory_id}
+                      className="hover:bg-gray-50 group cursor-pointer"
+                      onClick={() => handleOpenProductPopup(p)}
+                    >
                       <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-black text-black uppercase tracking-tight">{p.name}</span>
-                          <span className="text-[9px] font-black text-gray-400 uppercase font-mono">{p.sku}</span>
+                        <div className="flex items-center gap-3">
+                          {/* Product thumbnail */}
+                          <div className="w-9 h-9 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                            {p.image_url ? (
+                              <img
+                                src={p.image_url}
+                                alt={p.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <ImageIcon size={14} className="text-gray-300" />
+                            )}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-black text-black uppercase tracking-tight hover:underline">{p.name}</span>
+                            <span className="text-[9px] font-black text-gray-400 uppercase font-mono">{p.sku}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -413,10 +627,10 @@ export default function ProductList({ userProfile }) {
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditClick(p)} className="p-2 rounded-lg hover:bg-black hover:text-white text-gray-400">
+                            <button onClick={(e) => handleEditClick(e, p)} className="p-2 rounded-lg hover:bg-black hover:text-white text-gray-400">
                                 <Plus size={16} />
                             </button>
-                            <button onClick={() => navigate(`/inventory-entities/${p.id}`)} className="p-2 rounded-lg hover:bg-black hover:text-white text-gray-400">
+                            <button onClick={(e) => { e.stopPropagation(); navigate(`/inventory-entities/${p.id}`); }} className="p-2 rounded-lg hover:bg-black hover:text-white text-gray-400">
                                 <MoreVertical size={16} />
                             </button>
                         </div>
@@ -430,24 +644,47 @@ export default function ProductList({ userProfile }) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filtered.map(p => (
-              <div key={p.inventory_id} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 hover:shadow-xl hover:border-black/5 group cursor-pointer">
-                <div className="flex items-start justify-between mb-4">
-                  <div onClick={() => navigate(`/inventory-entities/${p.id}`)}>
-                    <p className="text-[11px] font-black text-black uppercase tracking-tight group-hover:text-black">{p.name}</p>
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">{p.sku}</p>
-                  </div>
-                  <button onClick={() => handleEditClick(p)} className="p-1 rounded-lg hover:bg-black hover:text-white text-gray-300">
-                      <Plus size={14} />
+              <div
+                key={p.inventory_id}
+                className="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-black/10 group cursor-pointer transition-all hover:-translate-y-0.5"
+                onClick={() => handleOpenProductPopup(p)}
+              >
+                {/* Product image hero */}
+                <div className="aspect-square rounded-t-3xl overflow-hidden bg-gray-50 border-b border-gray-100 flex items-center justify-center relative">
+                  {p.image_url ? (
+                    <img
+                      src={p.image_url}
+                      alt={p.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <ImageIcon size={28} className="text-gray-200" />
+                      <span className="text-[7px] font-black text-gray-300 uppercase tracking-widest">No Image</span>
+                    </div>
+                  )}
+                  {/* Edit button overlay */}
+                  <button
+                    onClick={(e) => handleEditClick(e, p)}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/90 hover:bg-black hover:text-white text-gray-400 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                  >
+                    <Plus size={12} />
                   </button>
                 </div>
-                <div className="space-y-3" onClick={() => navigate(`/inventory-entities/${p.id}`)}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">Cost Basis</span>
-                    <span className="text-[12px] font-black text-black tracking-tight">₹{p.price.toLocaleString()}</span>
+                <div className="p-5">
+                  <div className="mb-3">
+                    <p className="text-[11px] font-black text-black uppercase tracking-tight group-hover:text-black">{p.name}</p>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{p.sku}</p>
                   </div>
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-50">
-                    {statusBadge(p)}
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Stock: {p.stock}</span>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">Cost Basis</span>
+                      <span className="text-[12px] font-black text-black tracking-tight">₹{p.price.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                      {statusBadge(p)}
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Stock: {p.stock}</span>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../server/supabase/supabase';
 import SlideDrawer from '../common/SlideDrawer';
-import { Eye, ShieldAlert, Sparkles, Layers, ChevronRight, Check, Gift } from 'lucide-react';
+import { Eye, ShieldAlert, Sparkles, Layers, ChevronRight, Check, Gift, X } from 'lucide-react';
 
 export default function LensWizard({
   isOpen,

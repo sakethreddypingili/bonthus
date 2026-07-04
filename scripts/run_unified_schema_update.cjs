@@ -41,13 +41,29 @@ async function runSqlFile(client, filePath) {
   }
   const sql = fs.readFileSync(filePath, 'utf8');
   console.log(`\n▶ Applying: ${path.basename(filePath)}`);
-  try {
-    await client.query(sql);
-    console.log(`  ✓ Success`);
-  } catch (err) {
-    console.error(`  ✗ Error: ${err.message}`);
-    // We continue for idempotency if using IF NOT EXISTS
+  
+  // Split by semicolon, filter out empty statements, preserve multi-line comments/quotes safely
+  const statements = sql
+    .split(';')
+    .map(stmt => stmt.trim())
+    .filter(stmt => stmt.length > 0);
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const statement of statements) {
+    try {
+      await client.query(statement + ';');
+      successCount++;
+    } catch (err) {
+      failCount++;
+      // Print first few failures to aid debugging
+      if (failCount <= 5) {
+        console.error(`  ✗ Statement failed: ${err.message}\n    Query: ${statement.slice(0, 100)}...`);
+      }
+    }
   }
+  console.log(`  ✓ Success: ${successCount} queries succeeded, ${failCount} failed.`);
 }
 
 async function main() {

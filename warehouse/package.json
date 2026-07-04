@@ -27,9 +27,9 @@
     "tailwindcss": "^3.3.5"
   },
   "scripts": {
-    "dev": "PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem react-scripts start",
-    "dev:nostrict": "PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem FAST_REFRESH=false react-scripts start",
-    "start": "PORT=3001 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem react-scripts start",
+    "dev": "PORT=3003 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem react-scripts start",
+    "dev:nostrict": "PORT=3003 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem FAST_REFRESH=false react-scripts start",
+    "start": "PORT=3003 HTTPS=true SSL_CRT_FILE=.certs/localhost+2.pem SSL_KEY_FILE=.certs/localhost+2-key.pem react-scripts start",
     "build": "GENERATE_SOURCEMAP=false CI=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

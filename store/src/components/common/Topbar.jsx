@@ -54,17 +54,6 @@ export default function Topbar({ onToggleSidebar, userProfile, onLogout }) {
 
       {/* Right */}
       <div className="flex items-center gap-3">
-        {/* Search */}
-        <div className="relative hidden md:block group">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-black transition-colors" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search…"
-            className="pl-9 pr-4 py-2 text-[11px] font-bold uppercase tracking-widest border border-gray-100 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white w-52 transition-all placeholder:text-gray-300"
-          />
-        </div>
 
         {/* Notifications */}
         <div className="relative" ref={notificationsRef}>

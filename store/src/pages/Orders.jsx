@@ -30,13 +30,30 @@ export default function Orders({ userProfile }) {
   const [customerMobile, setCustomerMobile] = useState('');
   const [loadingCustomer, setLoadingCustomer] = useState(false);
   const [searchedProfiles, setSearchedProfiles] = useState([]);
+  const [showRegisterConfirm, setShowRegisterConfirm] = useState(false);
   const [searchAttempted, setSearchAttempted] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registrationStep, setRegistrationStep] = useState(1);
+  const [regForm, setRegForm] = useState({
+    name: "",
+    email: "",
+    town: "",
+    age: ""
+  });
+  const [registeringCustomer, setRegisteringCustomer] = useState(false);
+  const [showFinalConfirm, setShowFinalConfirm] = useState(false);
 
   const closeCustomerModal = () => {
     setShowCustomerModal(false);
     setCustomerMobile('');
     setSearchedProfiles([]);
     setSearchAttempted(false);
+    setShowRegisterConfirm(false);
+    setIsRegistering(false);
+    setRegistrationStep(1);
+    setRegForm({ name: "", email: "", town: "", age: "" });
+    setRegisteringCustomer(false);
+    setShowFinalConfirm(false);
   };
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [payments, setPayments] = useState([{ id: Date.now(), mode: 'Cash', amount: '' }]);
@@ -93,9 +110,8 @@ export default function Orders({ userProfile }) {
           due_amount,
           store_id,
           disabled,
-          customers ( * ),
-          order_items ( id, quantity, unit_price, discount_amount, total_price, products ( name ) ),
-          prescriptions ( * )
+          customers ( name ),
+          order_items ( id, quantity, unit_price, discount_amount, total_price, products ( name ) )
         `)
         .order('created_at', { ascending: false });
 
@@ -106,7 +122,7 @@ export default function Orders({ userProfile }) {
         query = query.or(`store_id.eq.${selectedStore},store_id.is.null`);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.limit(200);
 
       if (error) throw error;
 
@@ -240,6 +256,37 @@ export default function Orders({ userProfile }) {
       showAlert("Error looking up customer: " + err.message);
     } finally {
       setLoadingCustomer(false);
+    }
+  };
+
+  const handleRegisterCustomer = async () => {
+    if (!regForm.name) return;
+    setRegisteringCustomer(true);
+    try {
+      const payload = {
+        name: regForm.name.trim(),
+        phone: customerMobile.trim(),
+        email: regForm.email.trim() || null,
+        town: regForm.town.trim() || null,
+        age: regForm.age ? Number(regForm.age) : null
+      };
+
+      const { data, error } = await supabase
+        .from('customers')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Navigate and close
+      navigate('/orders/new', { state: { customer: data } });
+      closeCustomerModal();
+    } catch (err) {
+      console.error("Error registering customer:", err.message);
+      showAlert("Error registering customer: " + err.message);
+    } finally {
+      setRegisteringCustomer(false);
     }
   };
 
@@ -384,7 +431,7 @@ export default function Orders({ userProfile }) {
             <thead>
               <tr className="bg-gray-50/50">
                 <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Reference</th>
-                <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Entity</th>
+                <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Customer</th>
                 <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Inventory</th>
                 <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Timeline</th>
                 <th className="px-6 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Value</th>
@@ -492,7 +539,7 @@ export default function Orders({ userProfile }) {
         {editingOrder && (
             <form onSubmit={handleSaveEdit} className="p-6 space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer Entity</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer Name</label>
                 <input 
                   disabled={!isAdmin || editingOrder.disabled} 
                   required 
@@ -685,6 +732,30 @@ export default function Orders({ userProfile }) {
                         })
                         .eq('id', editingOrder.id);
                       if (error) throw error;
+
+                      // Insert payment records for cleared balance
+                      const paymentsPayload = payments
+                          .filter(p => Number(p.amount) > 0 && p.mode !== 'Due')
+                          .map(p => {
+                              let dbMethod = 'cash';
+                              const modeUpper = (p.mode || '').toUpperCase();
+                              if (modeUpper === 'CASH') dbMethod = 'cash';
+                              else if (modeUpper === 'CARD') dbMethod = 'card';
+                              else if (modeUpper === 'UPI' || modeUpper === 'GPAY' || modeUpper === 'PHONEPE') dbMethod = 'digital_wallet';
+                              else dbMethod = 'bank_transfer';
+
+                              return {
+                                  order_id: editingOrder.id,
+                                  amount: Number(p.amount),
+                                  payment_method: dbMethod,
+                                  status: 'completed'
+                              };
+                          });
+
+                      if (paymentsPayload.length > 0) {
+                          const { error: payErr } = await supabase.from('payments').insert(paymentsPayload);
+                          if (payErr) console.error('Failed to save payments record:', payErr);
+                      }
                       setEditingOrder({ ...editingOrder, due_amount: newDue, status: newStatus });
                       setShowPaymentModal(false);
                       fetchOrders();
@@ -719,8 +790,8 @@ export default function Orders({ userProfile }) {
                     onChange={(e) => setDisableAction(e.target.value)}
                     className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none transition-all cursor-pointer pr-12"
                   >
-                    <option value="disable">Archive Entity</option>
-                    <option value="enable">Activate Entity</option>
+                    <option value="disable">Deactivate Order</option>
+                    <option value="enable">Reactivate Order</option>
                   </select>
                   <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-black pointer-events-none" strokeWidth={3} />
                 </div>
@@ -728,13 +799,13 @@ export default function Orders({ userProfile }) {
 
               {disableAction === 'disable' && (
                 <div className="bg-gray-100 rounded-2xl p-6 border border-gray-200 mt-4">
-                  <p className="text-[10px] text-black font-black uppercase tracking-widest leading-relaxed">System Note: Entity will be hidden from operational metrics and counts.</p>
+                  <p className="text-[10px] text-black font-black uppercase tracking-widest leading-relaxed">System Note: This order will be deactivated and hidden.</p>
                 </div>
               )}
 
               {disableAction === 'enable' && (
                 <div className="bg-black rounded-2xl p-6 shadow-xl mt-4">
-                  <p className="text-[10px] text-white font-black uppercase tracking-widest leading-relaxed">System Note: Entity will be restored to full operational visibility.</p>
+                  <p className="text-[10px] text-white font-black uppercase tracking-widest leading-relaxed">System Note: This order will be reactivated.</p>
                 </div>
               )}
 
@@ -799,14 +870,14 @@ export default function Orders({ userProfile }) {
               : 'text-white'
           }`}>
             {disableAction === 'disable' 
-              ? `Entity will be suspended from operational vectors until explicit reactivation.`
-              : `Entity will be restored to all operational vectors immediately.`
+              ? `This order will be deactivated.`
+              : `This order will be reactivated.`
             }
           </p>
         </div>
 
         <div className="mb-8 p-4 border border-gray-100 rounded-2xl bg-gray-50">
-          <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Target Entity</span>
+          <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Customer</span>
           <span className="text-[12px] font-black text-black uppercase tracking-tight">{selectedOrderForAction?.customer_name}</span>
         </div>
       </ConfirmSheet>
@@ -814,86 +885,272 @@ export default function Orders({ userProfile }) {
       <CommandDialog
         isOpen={showCustomerModal}
         onClose={closeCustomerModal}
-        title="Initiate Order"
-        subtitle="Identify Customer Entity"
+        title="Create Order"
+        subtitle={isRegistering ? (registrationStep === 1 ? "Register New Profile" : "Verify Profile Details") : "Find Customer"}
+        maxWidth={isRegistering ? "max-w-xl" : (searchAttempted && !loadingCustomer ? "max-w-3xl" : "max-w-md")}
       >
-        <div className="p-8">
-          <form onSubmit={handleLookupCustomer} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contact Link</label>
-              <input
-                required
-                type="tel"
-                autoFocus
-                placeholder="+91 MOBILE"
-                value={customerMobile}
-                onChange={e => setCustomerMobile(e.target.value)}
-                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-3xl text-lg font-black tracking-tighter focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-200"
-              />
-            </div>
-
-            <div className="pt-4 flex flex-col gap-2">
-              <button 
-                type="submit" 
-                disabled={loadingCustomer} 
-                className="w-full px-6 py-4 bg-black text-white rounded-[24px] text-xs font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
-              >
-                {loadingCustomer ? 'Verifying...' : 'Search'}
-              </button>
-            </div>
-          </form>
-
-          {searchAttempted && !loadingCustomer && (
-            <>
-              {searchedProfiles.length > 0 ? (
-                <div className="space-y-3 mt-6 border-t border-gray-100 pt-6 max-h-60 overflow-y-auto no-scrollbar">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Select Profile</label>
-                  {searchedProfiles.map(p => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        navigate('/orders/new', { state: { customer: p } });
-                        closeCustomerModal();
-                      }}
-                      className="w-full text-left px-5 py-4 border border-gray-100 hover:border-black bg-gray-50 hover:bg-black hover:text-white rounded-2xl transition-all flex items-center justify-between group"
-                    >
-                      <div>
-                        <span className="block text-xs font-black uppercase tracking-tight text-black group-hover:text-white">{p.name}</span>
-                        <span className="block text-[9px] font-bold text-gray-400 group-hover:text-gray-300 uppercase tracking-wider mt-0.5">{p.label}</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-gray-400 group-hover:text-white">{p.phone}</span>
-                    </button>
-                  ))}
+        {isRegistering ? (
+          <div className="space-y-6">
+            {registrationStep === 1 ? (
+              /* Step 1: Form */
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                  <input
+                    required
+                    type="text"
+                    autoFocus
+                    value={regForm.name}
+                    onChange={e => setRegForm({ ...regForm, name: e.target.value })}
+                    className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
+                    placeholder="Customer's Full Name"
+                  />
                 </div>
-              ) : (
-                <div className="mt-6 border-t border-gray-100 pt-6 text-center space-y-4">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No matching customer profile found</p>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile Number</label>
+                  <input
+                    disabled
+                    type="text"
+                    value={customerMobile}
+                    className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight opacity-60 cursor-not-allowed text-gray-400"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Address (Optional)</label>
+                  <input
+                    type="email"
+                    value={regForm.email}
+                    onChange={e => setRegForm({ ...regForm, email: e.target.value })}
+                    className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
+                    placeholder="email@example.com"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">City / Town</label>
+                    <input
+                      type="text"
+                      value={regForm.town}
+                      onChange={e => setRegForm({ ...regForm, town: e.target.value })}
+                      className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
+                      placeholder="City or Town"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Age</label>
+                    <input
+                      type="number"
+                      value={regForm.age}
+                      onChange={e => setRegForm({ ...regForm, age: e.target.value })}
+                      className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
+                      placeholder="Age"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex gap-3 pt-4">
                   <button
                     type="button"
                     onClick={() => {
-                      navigate('/orders/new', { state: { customer: { phone: customerMobile } } });
-                      closeCustomerModal();
+                      setIsRegistering(false);
+                      setRegistrationStep(1);
                     }}
-                    className="w-full px-5 py-4 border border-dashed border-gray-200 hover:border-black hover:bg-gray-50 text-[10px] font-black uppercase tracking-widest text-black rounded-2xl transition-all"
+                    className="flex-1 py-4 text-xs font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
                   >
-                    Register New Profile (+91 {customerMobile})
+                    Go Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!regForm.name}
+                    onClick={() => setRegistrationStep(2)}
+                    className="flex-1 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow-lg disabled:opacity-40"
+                  >
+                    Continue
                   </button>
                 </div>
-              )}
-            </>
-          )}
+              </div>
+            ) : (
+              /* Step 2: Summary / Confirm */
+              <div className="space-y-6">
+                {!showFinalConfirm ? (
+                  <div className="space-y-6">
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6 space-y-4 text-left">
+                      <div>
+                        <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Full Name</span>
+                        <span className="text-[12px] font-black text-black uppercase tracking-tight">{regForm.name}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Mobile Number</span>
+                        <span className="text-[12px] font-black text-black tracking-tight">{customerMobile}</span>
+                      </div>
+                      {regForm.email && (
+                        <div>
+                          <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Email Address</span>
+                          <span className="text-[12px] font-bold text-black">{regForm.email}</span>
+                        </div>
+                      )}
+                      {regForm.town && (
+                        <div>
+                          <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">City / Town</span>
+                          <span className="text-[12px] font-black text-black uppercase tracking-tight">{regForm.town}</span>
+                        </div>
+                      )}
+                      {regForm.age && (
+                        <div>
+                          <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Age</span>
+                          <span className="text-[12px] font-bold text-black">{regForm.age}</span>
+                        </div>
+                      )}
+                    </div>
 
-          <div className="mt-4 text-center">
-            <button 
-              type="button" 
-              onClick={closeCustomerModal} 
-              className="w-full py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-black transition-colors"
-            >
-              Cancel Operation
-            </button>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setRegistrationStep(1)}
+                        className="flex-1 py-4 text-xs font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
+                      >
+                        Go Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowFinalConfirm(true)}
+                        className="flex-1 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow-lg"
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Step 3: Small Confirmation Alert Dialog Inline */
+                  <div className="p-6 border border-dashed border-neutral-200 rounded-2xl bg-neutral-50 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="space-y-1">
+                      <p className="text-xs font-black text-neutral-900 uppercase tracking-tight">Confirm Registration?</p>
+                      <p className="text-[10px] text-neutral-500 font-medium">Create a new customer profile for this shopper?</p>
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowFinalConfirm(false)}
+                        className="flex-1 py-3 text-[10px] font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={registeringCustomer}
+                        onClick={handleRegisterCustomer}
+                        className="flex-1 py-3 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow"
+                      >
+                        {registeringCustomer ? 'Registering...' : 'Yes, Confirm'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
+        ) : (
+          <div className={`transition-all duration-300 ${searchAttempted && !loadingCustomer ? 'grid grid-cols-1 md:grid-cols-2 gap-8' : 'space-y-6'}`}>
+            
+            {/* Search Controls */}
+            <div className="space-y-4">
+              <form onSubmit={handleLookupCustomer} className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center ml-1 h-6">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mobile Number</label>
+                    {searchAttempted && !loadingCustomer && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchAttempted(false);
+                          setSearchedProfiles([]);
+                          setCustomerMobile("");
+                          setShowRegisterConfirm(false);
+                        }}
+                        className="text-[9px] font-black text-black border border-neutral-300 hover:border-black rounded-lg px-2.5 py-1 uppercase tracking-widest flex items-center gap-1 transition-all"
+                      >
+                        ✕ Clear Search
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      required
+                      type="tel"
+                      autoFocus
+                      disabled={loadingCustomer || searchAttempted}
+                      placeholder="+91 MOBILE"
+                      value={customerMobile}
+                      onChange={e => setCustomerMobile(e.target.value)}
+                      className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed pr-12"
+                    />
+                    {searchAttempted && !loadingCustomer && (
+                      <Lock size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                    )}
+                  </div>
+                  {searchAttempted && !loadingCustomer && (
+                    <p className="text-[9px] text-neutral-500 font-bold ml-1 flex items-center gap-1.5 animate-in fade-in duration-200">
+                      <Lock size={10} /> Search locked. Click "Clear Search" to modify.
+                    </p>
+                  )}
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={loadingCustomer || searchAttempted} 
+                  className="w-full px-6 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg hover:bg-neutral-900 active:scale-[0.98] transition-all disabled:opacity-40 disabled:hover:bg-black flex items-center justify-center gap-2"
+                >
+                  {loadingCustomer ? 'Verifying...' : (searchAttempted ? <><Lock size={13} strokeWidth={3} /> Search Locked</> : 'Search')}
+                </button>
+              </form>
+            </div>
+
+            {/* Results Side-by-Side */}
+            {searchAttempted && !loadingCustomer && (
+              <div className="border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 md:pl-8 flex flex-col justify-center min-h-[220px]">
+                {searchedProfiles.length > 0 ? (
+                  <div className="space-y-3 h-full flex flex-col justify-start">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">Select Profile</label>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1 no-scrollbar flex-1">
+                      {searchedProfiles.map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            navigate('/orders/new', { state: { customer: p } });
+                            closeCustomerModal();
+                          }}
+                          className="w-full text-left px-5 py-4 border border-gray-100 hover:border-black bg-gray-50 hover:bg-white rounded-2xl transition-all flex items-center justify-between shadow-sm group animate-in fade-in slide-in-from-bottom-2 duration-200"
+                        >
+                          <div>
+                            <span className="block text-xs font-black uppercase tracking-tight text-neutral-900">{p.name}</span>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mt-0.5">{p.label}</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-neutral-500">{p.phone}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center space-y-4 my-auto animate-in fade-in duration-200">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No matching customer profile found</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRegistering(true);
+                        setRegistrationStep(1);
+                      }}
+                      className="w-full px-5 py-4 bg-white border border-neutral-200 hover:border-black text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm"
+                    >
+                      Register New Profile
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
+        )}
       </CommandDialog>
 
     </div>
