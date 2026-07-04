@@ -660,12 +660,34 @@ export default function Power({ userProfile }) {
         .from("prescriptions")
         .select(`
           *,
-          customers!inner ( id, name, phone, store_id )
+          customers ( id, name, phone )
         `)
         .order("prescribed_at", { ascending: false });
 
       if (!isAdmin && userStoreId) {
-        query = query.eq("customers.store_id", userStoreId);
+        const { data: visits } = await supabase
+          .from('customer_visits')
+          .select('customer_id')
+          .eq('store_id', userStoreId);
+
+        const { data: orders } = await supabase
+          .from('orders')
+          .select('customer_id')
+          .eq('store_id', userStoreId)
+          .eq('disabled', false);
+
+        const customerIds = Array.from(new Set([
+          ...(visits || []).map(v => v.customer_id),
+          ...(orders || []).map(o => o.customer_id)
+        ].filter(Boolean)));
+
+        if (customerIds.length > 0) {
+          query = query.in("customer_id", customerIds);
+        } else {
+          setRecentPowers([]);
+          setLoadingRecent(false);
+          return;
+        }
       }
 
       const { data, error } = await query.limit(15);

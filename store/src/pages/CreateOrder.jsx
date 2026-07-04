@@ -15,8 +15,15 @@ export default function CreateOrder({ userProfile }) {
     const navigate = useNavigate();
     const location = useLocation();
     const { showAlert } = usePopup();
-    const initialCustomer = location.state?.customer || {};
 
+    const roleLower = userProfile?.role?.toLowerCase();
+    const isAdmin = roleLower === 'admin' || roleLower === 'super_admin';
+    const [selectedStore, setSelectedStore] = useState("");
+    const [stores, setStores] = useState([]);
+    const [storeCategories, setStoreCategories] = useState([]);
+    const currentStoreId = selectedStore || userProfile?.store_id || "";
+
+    const initialCustomer = location.state?.customer || {};
     const isCustomerLocked = !!location.state?.customer;
     const [profiles, setProfiles] = useState([]);
     const [selectedProfile, setSelectedProfile] = useState(null);
@@ -408,13 +415,6 @@ export default function CreateOrder({ userProfile }) {
     const [showConfirmSave, setShowConfirmSave] = useState(false);
     const [payments, setPayments] = useState([{ id: Date.now(), mode: 'Cash', amount: '' }]);
 
-    const roleLower = userProfile?.role?.toLowerCase();
-    const isAdmin = roleLower === 'admin' || roleLower === 'super_admin';
-    const [selectedStore, setSelectedStore] = useState("");
-    const [stores, setStores] = useState([]);
-    const [storeCategories, setStoreCategories] = useState([]);
-
-    const currentStoreId = selectedStore || userProfile?.store_id || "";
     const storeSelectionRequired = isAdmin && !selectedStore;
     const typeOptions = storeCategories.length > 0
         ? Array.from(new Set(storeCategories.map(c => c.name).filter(Boolean)))
