@@ -210,27 +210,26 @@ DROP POLICY IF EXISTS "Users can insert customers" ON public.customers;
 CREATE POLICY "Users can insert customers" ON public.customers
   FOR INSERT
   TO authenticated
-  WITH CHECK (((store_id = auth_user_store_id()) OR is_admin_or_super_admin()));
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can update customers" ON public.customers;
 CREATE POLICY "Users can update customers" ON public.customers
   FOR UPDATE
   TO authenticated
-  USING (((store_id = auth_user_store_id()) OR is_admin_or_super_admin()));
+  USING (true);
 
 DROP POLICY IF EXISTS "Users can view and manage store customers" ON public.customers;
 CREATE POLICY "Users can view and manage store customers" ON public.customers
   FOR ALL
   TO authenticated
-  USING (((store_id = ( SELECT users.store_id
-   FROM users
-  WHERE (users.id = auth.uid()))) OR is_admin_or_super_admin()));
+  USING (true)
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can view customers" ON public.customers;
 CREATE POLICY "Users can view customers" ON public.customers
   FOR SELECT
   TO authenticated
-  USING (((store_id = auth_user_store_id()) OR is_admin_or_super_admin()));
+  USING (true);
 
 -- -------------------------------------------------------------------------
 -- Policies for table: prescriptions
@@ -247,35 +246,26 @@ DROP POLICY IF EXISTS "Users can insert prescriptions" ON public.prescriptions;
 CREATE POLICY "Users can insert prescriptions" ON public.prescriptions
   FOR INSERT
   TO authenticated
-  WITH CHECK ((EXISTS ( SELECT 1
-   FROM customers c
-  WHERE ((c.id = prescriptions.customer_id) AND ((c.store_id = auth_user_store_id()) OR is_admin_or_super_admin())))));
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can manage prescriptions in store" ON public.prescriptions;
 CREATE POLICY "Users can manage prescriptions in store" ON public.prescriptions
   FOR ALL
   TO authenticated
-  USING (((customer_id IN ( SELECT customers.id
-   FROM customers
-  WHERE (customers.store_id = ( SELECT users.store_id
-           FROM users
-          WHERE (users.id = auth.uid()))))) OR is_admin_or_super_admin()));
+  USING (true)
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can update prescriptions" ON public.prescriptions;
 CREATE POLICY "Users can update prescriptions" ON public.prescriptions
   FOR UPDATE
   TO authenticated
-  USING ((EXISTS ( SELECT 1
-   FROM customers c
-  WHERE ((c.id = prescriptions.customer_id) AND ((c.store_id = auth_user_store_id()) OR is_admin_or_super_admin())))));
+  USING (true);
 
 DROP POLICY IF EXISTS "Users can view prescriptions" ON public.prescriptions;
 CREATE POLICY "Users can view prescriptions" ON public.prescriptions
   FOR SELECT
   TO authenticated
-  USING ((EXISTS ( SELECT 1
-   FROM customers c
-  WHERE ((c.id = prescriptions.customer_id) AND ((c.store_id = auth_user_store_id()) OR is_admin_or_super_admin())))));
+  USING (true);
 
 -- -------------------------------------------------------------------------
 -- Policies for table: products

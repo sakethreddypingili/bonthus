@@ -87,9 +87,9 @@ DROP POLICY IF EXISTS "Users can insert customers" ON public.customers;
 DROP POLICY IF EXISTS "Users can update customers" ON public.customers;
 DROP POLICY IF EXISTS "Users can delete customers" ON public.customers;
 
-CREATE POLICY "Users can view customers" ON public.customers FOR SELECT TO authenticated USING (store_id = auth_user_store_id() OR is_admin_or_super_admin());
-CREATE POLICY "Users can insert customers" ON public.customers FOR INSERT TO authenticated WITH CHECK (store_id = auth_user_store_id() OR is_admin_or_super_admin());
-CREATE POLICY "Users can update customers" ON public.customers FOR UPDATE TO authenticated USING (store_id = auth_user_store_id() OR is_admin_or_super_admin());
+CREATE POLICY "Users can view customers" ON public.customers FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Users can insert customers" ON public.customers FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Users can update customers" ON public.customers FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "Users can delete customers" ON public.customers FOR DELETE TO authenticated USING (is_admin_or_super_admin());
 
 -- -------------------------------------------------------------------------
@@ -100,9 +100,9 @@ DROP POLICY IF EXISTS "Users can view prescriptions" ON public.prescriptions;
 DROP POLICY IF EXISTS "Users can insert prescriptions" ON public.prescriptions;
 DROP POLICY IF EXISTS "Users can update prescriptions" ON public.prescriptions;
 
-CREATE POLICY "Users can view prescriptions" ON public.prescriptions FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.customers c WHERE c.id = prescriptions.customer_id AND (c.store_id = auth_user_store_id() OR is_admin_or_super_admin())));
-CREATE POLICY "Users can insert prescriptions" ON public.prescriptions FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM public.customers c WHERE c.id = customer_id AND (c.store_id = auth_user_store_id() OR is_admin_or_super_admin())));
-CREATE POLICY "Users can update prescriptions" ON public.prescriptions FOR UPDATE TO authenticated USING (EXISTS (SELECT 1 FROM public.customers c WHERE c.id = prescriptions.customer_id AND (c.store_id = auth_user_store_id() OR is_admin_or_super_admin())));
+CREATE POLICY "Users can view prescriptions" ON public.prescriptions FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Users can insert prescriptions" ON public.prescriptions FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Users can update prescriptions" ON public.prescriptions FOR UPDATE TO authenticated USING (true);
 
 -- -------------------------------------------------------------------------
 -- 6. PRODUCTS & CATEGORIES (Catalog)
