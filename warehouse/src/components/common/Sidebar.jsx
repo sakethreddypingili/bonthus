@@ -20,7 +20,8 @@ import {
   Printer,
   FolderSync,
   FilePlus,
-  PackagePlus
+  PackagePlus,
+  FlaskConical
 } from"lucide-react";
 import { useState } from"react";
 const logoImg = '/assets/images/logo.webp';
@@ -34,6 +35,7 @@ const navItems = [
   { to:"/visualise", label:"Visualise", role: ["admin","super_admin","store_manager","employee"], icon: Sparkles },
   { to:"/barcode-printer", label:"Barcode Printer", role: ["admin","super_admin","store_manager","employee"], icon: Printer },
   { to:"/shipments", label:"Shipments", role: ["admin","super_admin","store_manager"], icon: Truck },
+  { to:"/labs", label:"Labs", role: ["admin","super_admin","store_manager","employee"], icon: FlaskConical },
   { to:"/reminders", label:"Board", role: ["admin","super_admin","store_manager","employee"], icon: Layout },
   { to:"/store-intelligence", label:"Store Intelligence", role: ["admin","super_admin","store_manager"], icon: Store },
   { to:"/analytics", label:"Analytics", role: ["admin","super_admin","store_manager"], icon: BarChart2 },
@@ -78,7 +80,10 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                             ? ((location.pathname ==="/products" && (!location.search || location.search.includes("stock") || !location.search.includes("tab="))) || location.pathname ==="/categories")
                             : (to ==="/shipments"
                                 ? (location.pathname ==="/shipments" || location.pathname ==="/shipment-overview" || location.pathname ==="/vendors" || location.pathname ==="/provisioning")
-                                : location.pathname.startsWith(to)
+                                : (to ==="/labs"
+                                    ? location.pathname ==="/labs"
+                                    : location.pathname.startsWith(to)
+                                  )
                               )
                           )
                       )
@@ -221,6 +226,41 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                           }
                           ${collapsed ?"justify-center" :""}
 `}
+                        title={collapsed ? sub.label : undefined}
+                      >
+                        <SubIcon size={15} className="flex-shrink-0" />
+                        {!collapsed && <span>{sub.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Sub-menu for Labs */}
+              {label ==="Labs" && isActive && (
+                <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
+                  {[
+                    { to:"/labs", label:"Packing Requests", icon: ClipboardList },
+                    { to:"/labs?tab=stock", label:"Stock", icon: Package },
+                    { to:"/labs?tab=analytics", label:"Analytics", icon: BarChart2 },
+                  ].map((sub) => {
+                    const isSubActive = location.pathname === "/labs" && (
+                      sub.to === "/labs" ? !location.search || !location.search.includes("tab=")
+                      : location.search.includes(sub.to.split("=")[1])
+                    );
+                    const SubIcon = sub.icon;
+                    return (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={`
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold w-full
+                          ${isSubActive
+                            ?"bg-black text-white shadow-sm"
+                            :"text-gray-500 hover:text-black hover:bg-gray-50"
+                          }
+                          ${collapsed ?"justify-center" :""}
+                        `}
                         title={collapsed ? sub.label : undefined}
                       >
                         <SubIcon size={15} className="flex-shrink-0" />

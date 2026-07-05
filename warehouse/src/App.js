@@ -25,6 +25,7 @@ import { PROFILE_CACHE_KEY, logout } from"./utils/auth";
 import BarcodePrinter from "./pages/BarcodePrinter";
 import Visualise from "./pages/Visualise";
 import VisualIngest from "./pages/VisualIngest";
+import Labs from "./pages/Labs";
 
 function App() {
   const location = useLocation();
@@ -321,6 +322,7 @@ function App() {
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
       <Route path="/visualise" element={<Visualise userProfile={userProfile} />} />
+      <Route path="/labs" element={<Labs userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/attendance" replace />} />
     </Routes>
   );
@@ -341,6 +343,7 @@ function App() {
       <Route path="/categories" element={<Categories userProfile={userProfile} />} />
       <Route path="/barcodes" element={<Barcodes userProfile={userProfile} />} />
       <Route path="/visual-ingest" element={<VisualIngest userProfile={userProfile} />} />
+      <Route path="/labs" element={<Labs userProfile={userProfile} />} />
       <Route path="/attendance" element={<Attendance userProfile={userProfile} />} />
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
