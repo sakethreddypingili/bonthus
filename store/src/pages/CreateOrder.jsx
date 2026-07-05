@@ -86,19 +86,19 @@ export default function CreateOrder({ userProfile }) {
     const [loadingFlow, setLoadingFlow] = useState(false);
 
     const fetchFlowCustomers = async () => {
-        if (!currentStoreId) return;
         setLoadingFlow(true);
         try {
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
 
-            const { data, error } = await supabase
+            let query = supabase
                 .from('customer_visits')
                 .select(`
                     id,
                     customer_id,
                     purpose,
                     status,
+                    created_at,
                     customers (
                         id,
                         name,
@@ -112,10 +112,15 @@ export default function CreateOrder({ userProfile }) {
                         age
                     )
                 `)
-                .eq('store_id', currentStoreId)
                 .gte('created_at', todayStart.toISOString())
                 .order('created_at', { ascending: false });
 
+            // Only filter by store_id when the user actually has one (admins may have null)
+            if (currentStoreId) {
+                query = query.eq('store_id', currentStoreId);
+            }
+
+            const { data, error } = await query;
             if (error) throw error;
 
             const unique = [];

@@ -588,10 +588,10 @@ export default function Power({ userProfile }) {
   const [loadingFlow, setLoadingFlow] = useState(false);
 
   const fetchFlowCustomers = async () => {
-    if (!userProfile?.store_id) return;
+    if (!userProfile) return;
     setLoadingFlow(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('customer_visits')
         .select(`
           id,
@@ -608,10 +608,15 @@ export default function Power({ userProfile }) {
             age
           )
         `)
-        .eq('store_id', userProfile.store_id)
         .order('created_at', { ascending: false })
         .limit(50);
 
+      // Only filter by store_id when the user actually has one (admins may have null)
+      if (userProfile.store_id) {
+        query = query.eq('store_id', userProfile.store_id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       
       const unique = [];

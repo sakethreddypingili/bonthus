@@ -257,19 +257,17 @@ export default function Repairs({ userProfile }) {
   const [loadingFlow, setLoadingFlow] = useState(false);
 
   const fetchFlowCustomers = async () => {
-    if (!userProfile?.store_id) return;
+    if (!userProfile) return;
     setLoadingFlow(true);
     try {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
-      const { data, error } = await supabase
+      let query = supabase
         .from('customer_visits')
         .select(`
           id,
           customer_id,
           purpose,
           status,
+          created_at,
           customers (
             id,
             name,
@@ -279,10 +277,15 @@ export default function Repairs({ userProfile }) {
             age
           )
         `)
-        .eq('store_id', userProfile.store_id)
-        .gte('created_at', todayStart.toISOString())
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
+      // Only filter by store_id when the user actually has one (admins may have null)
+      if (userProfile.store_id) {
+        query = query.eq('store_id', userProfile.store_id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       
       const unique = [];
@@ -293,7 +296,8 @@ export default function Repairs({ userProfile }) {
           unique.push({
             ...v.customers,
             purpose: v.purpose,
-            status: v.status
+            status: v.status,
+            created_at: v.created_at
           });
         }
       });
