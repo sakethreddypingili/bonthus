@@ -288,11 +288,6 @@ function App() {
     );
   }
 
-  // Mandatory Password Reset
-  if (userProfile?.must_reset_password === true) {
-    return <PasswordReset userProfile={userProfile} onPasswordReset={() => fetchProfile(session)} />;
-  }
-
   const role = userProfile?.role;
   const isEmployee = role === "sales" || role === "optometrist" || role === "employee";
   const isAdminOrManager = role === "admin" || role === "manager" || role === "super_admin" || role === "store_manager";
