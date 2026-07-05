@@ -17,8 +17,33 @@ export default function BarcodeCreator() {
     try {
       const { data, error } = await supabase.from('products').select('id, name, sku').order('name');
       if (error) throw error;
+      
+      let dummyProd = data?.find(p => p.sku === "BLANK-VECTOR");
+      if (!dummyProd) {
+        const { data: newDummy, error: dummyErr } = await supabase
+          .from("products")
+          .insert([{
+            name: "Unassigned Barcode Vector (BLANK)",
+            sku: "BLANK-VECTOR",
+            brand: "System",
+            base_price: 0,
+            description: "System placeholder for pre-printed blank barcode labels"
+          }])
+          .select()
+          .single();
+
+        if (dummyErr) throw dummyErr;
+        dummyProd = newDummy;
+        if (data) {
+          data.unshift(dummyProd);
+        } else {
+          data = [dummyProd];
+        }
+      }
+      
       setProducts(data || []);
-      if (data?.length > 0) setSelectedProductId(data[0].id);
+      if (dummyProd) setSelectedProductId(dummyProd.id);
+      else if (data?.length > 0) setSelectedProductId(data[0].id);
     } catch (err) {
       console.error("Error fetching products:", err.message);
     } finally {

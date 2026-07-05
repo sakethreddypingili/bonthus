@@ -18,11 +18,9 @@ import EditOrder from "./pages/EditOrder";
 import PasswordReset from "./pages/PasswordReset";
 import Reminders from "./pages/Reminders";
 import Notifications from "./pages/Notifications";
-import BarcodePrinter from "./pages/BarcodePrinter";
 import Flow from "./pages/Flow";
 import Power from "./pages/Power";
 import Repairs from "./pages/Repairs";
-import Visualise from "./pages/Visualise";
 import Cash from "./pages/Cash";
 import { PROFILE_CACHE_KEY, logout } from "./utils/auth";
 
@@ -265,17 +263,6 @@ function App() {
     await logout();
   }, [clearCachedProfile]);
 
-  // Completely isolated route for barcode printer (bypasses auth loading, login checks, and sidebar/topbar shell layout)
-  if (location.pathname === '/barcode-printer') {
-    return (
-      <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-6">
-        <Routes>
-          <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
-        </Routes>
-      </div>
-    );
-  }
-
   if (authLoading || (session && !profileResolved)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
@@ -287,12 +274,11 @@ function App() {
     );
   }
 
-  // Public invoice and barcode printer routes (accessible without login)
-  if (!session && (window.location.pathname.startsWith('/invoice/') || window.location.pathname === '/barcode-printer')) {
+  // Public invoice routes (accessible without login)
+  if (!session && window.location.pathname.startsWith('/invoice/')) {
     return (
       <Routes>
         <Route path="/invoice/:id" element={<InvoiceView userProfile={null} />} />
-        <Route path="/barcode-printer" element={<BarcodePrinter userProfile={null} />} />
       </Routes>
     );
   }
@@ -362,9 +348,7 @@ function App() {
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/invoice/:id" element={<InvoiceView userProfile={userProfile} />} />
-      <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
       <Route path="/repairs" element={<Repairs userProfile={userProfile} />} />
-      <Route path="/visualise" element={<Visualise userProfile={userProfile} />} />
       <Route path="/cash" element={<Cash userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/attendance" replace />} />
     </Routes>
@@ -386,10 +370,8 @@ function App() {
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
-      <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
       <Route path="/invoice/:id" element={<InvoiceView userProfile={userProfile} />} />
       <Route path="/repairs" element={<Repairs userProfile={userProfile} />} />
-      <Route path="/visualise" element={<Visualise userProfile={userProfile} />} />
       <Route path="/cash" element={<Cash userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

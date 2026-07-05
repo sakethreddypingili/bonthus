@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from"react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, ShoppingBag, Package, Users,
   BarChart2, Settings, ChevronLeft, ChevronRight, LogOut,
@@ -15,7 +15,12 @@ import {
   List,
   Truck,
   ClipboardList,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Sparkles,
+  Printer,
+  FolderSync,
+  FilePlus,
+  PackagePlus
 } from"lucide-react";
 import { useState } from"react";
 const logoImg = '/assets/images/logo.webp';
@@ -24,6 +29,10 @@ const iconImg = '/assets/images/icon.webp';
 const navItems = [
   { to:"/", label:"Overview", role: ["admin","super_admin","store_manager"], icon: LayoutDashboard },
   { to:"/products", label:"Products", role: ["admin","super_admin","store_manager"], icon: Package },
+  { to:"/products?tab=quick-add", label:"Intake", role: ["admin","super_admin","store_manager"], icon: FolderSync },
+  { to:"/barcode-creator", label:"Labels", role: ["admin","super_admin","store_manager"], icon: QrCode },
+  { to:"/visualise", label:"Visualise", role: ["admin","super_admin","store_manager","employee"], icon: Sparkles },
+  { to:"/barcode-printer", label:"Barcode Printer", role: ["admin","super_admin","store_manager","employee"], icon: Printer },
   { to:"/shipments", label:"Shipments", role: ["admin","super_admin","store_manager"], icon: Truck },
   { to:"/reminders", label:"Board", role: ["admin","super_admin","store_manager","employee"], icon: Layout },
   { to:"/store-intelligence", label:"Store Intelligence", role: ["admin","super_admin","store_manager"], icon: Store },
@@ -61,11 +70,17 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
             ? location.pathname ==="/"
             : (to ==="/reminders" 
                 ? (location.pathname ==="/reminders" || location.pathname ==="/notifications")
-                : (to ==="/products"
-                    ? (location.pathname ==="/products" || location.pathname ==="/categories" || location.pathname ==="/barcodes" || location.pathname ==="/barcode-creator")
-                    : (to ==="/shipments"
-                        ? (location.pathname ==="/shipments" || location.pathname ==="/shipment-overview" || location.pathname ==="/vendors" || location.pathname ==="/provisioning")
-                        : location.pathname.startsWith(to)
+                : (label ==="Intake"
+                    ? (location.pathname ==="/products" && (location.search.includes("quick-add") || location.search.includes("batch-load") || location.search.includes("review-queue")))
+                    : (label ==="Labels"
+                        ? (location.pathname ==="/visual-ingest" || location.pathname ==="/barcode-creator" || location.pathname ==="/barcodes")
+                        : (to ==="/products"
+                            ? ((location.pathname ==="/products" && (!location.search || location.search.includes("stock") || !location.search.includes("tab="))) || location.pathname ==="/categories")
+                            : (to ==="/shipments"
+                                ? (location.pathname ==="/shipments" || location.pathname ==="/shipment-overview" || location.pathname ==="/vendors" || location.pathname ==="/provisioning")
+                                : location.pathname.startsWith(to)
+                              )
+                          )
                       )
                   )
               );
@@ -87,6 +102,70 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 <Icon size={18} className="flex-shrink-0" />
                 {!collapsed && <span>{label}</span>}
               </NavLink>
+
+              {/* Sub-menu for Intake */}
+              {label ==="Intake" && isActive && (
+                <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
+                  {[
+                    { to:"/products?tab=quick-add", label:"Quick Add", icon: FilePlus },
+                    { to:"/products?tab=batch-load", label:"Batch Load", icon: PackagePlus },
+                    { to:"/products?tab=review-queue", label:"Review Queue", icon: ClipboardList }
+                  ].map((sub) => {
+                    const isSubActive = location.pathname === "/products" && location.search.includes(sub.to.split("=")[1]);
+                    const SubIcon = sub.icon;
+                    return (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={`
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold w-full
+                          ${isSubActive
+                            ?"bg-black text-white shadow-sm"
+                            :"text-gray-500 hover:text-black hover:bg-gray-50"
+                          }
+                          ${collapsed ?"justify-center" :""}
+                        `}
+                        title={collapsed ? sub.label : undefined}
+                      >
+                        <SubIcon size={15} className="flex-shrink-0" />
+                        {!collapsed && <span>{sub.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Sub-menu for Labels */}
+              {label ==="Labels" && isActive && (
+                <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
+                  {[
+                    { to:"/barcode-creator", label:"Barcode Creator", icon: Plus },
+                    { to:"/visual-ingest", label:"Visual Ingest", icon: Sparkles },
+                    { to:"/barcodes", label:"Barcode Studio", icon: QrCode }
+                  ].map((sub) => {
+                    const isSubActive = location.pathname === sub.to;
+                    const SubIcon = sub.icon;
+                    return (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={`
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold  w-full
+                          ${isSubActive
+                            ?"bg-black text-white shadow-sm"
+                            :"text-gray-500 hover:text-black hover:bg-gray-50"
+                          }
+                          ${collapsed ?"justify-center" :""}
+                        `}
+                        title={collapsed ? sub.label : undefined}
+                      >
+                        <SubIcon size={15} className="flex-shrink-0" />
+                        {!collapsed && <span>{sub.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Sub-menu for Shipments */}
               {label ==="Shipments" && isActive && (
@@ -126,11 +205,9 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
                   {[
                     { to:"/products", label:"Product List", icon: List },
-                    { to:"/categories", label:"Categories", icon: Tags },
-                    { to:"/barcode-creator", label:"Barcode Creator", icon: Plus },
-                    { to:"/barcodes", label:"Barcode Studio", icon: QrCode }
+                    { to:"/categories", label:"Categories", icon: Tags }
                   ].map((sub) => {
-                    const isSubActive = location.pathname === sub.to;
+                    const isSubActive = (location.pathname === sub.to) && (!location.search || !location.search.includes("tab="));
                     const SubIcon = sub.icon;
                     return (
                       <NavLink

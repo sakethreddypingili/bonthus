@@ -23,6 +23,8 @@ import Vendors from"./pages/Vendors";
 import Provisioning from"./pages/Provisioning";
 import { PROFILE_CACHE_KEY, logout } from"./utils/auth";
 import BarcodePrinter from "./pages/BarcodePrinter";
+import Visualise from "./pages/Visualise";
+import VisualIngest from "./pages/VisualIngest";
 
 function App() {
   const location = useLocation();
@@ -245,16 +247,6 @@ function App() {
     await logout();
   }, [clearCachedProfile]);
 
-  // Completely isolated route for barcode printer (bypasses auth loading, login checks, and sidebar/topbar shell layout)
-  if (location.pathname === '/barcode-printer') {
-    return (
-      <div className="min-h-screen bg-[#F8F9FB] p-4 md:p-6">
-        <Routes>
-          <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
-        </Routes>
-      </div>
-    );
-  }
 
   if (authLoading || (session && !profileResolved)) {
     return (
@@ -333,6 +325,7 @@ function App() {
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
+      <Route path="/visualise" element={<Visualise userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/attendance" replace />} />
     </Routes>
   );
@@ -352,11 +345,13 @@ function App() {
       <Route path="/barcode-creator" element={<BarcodeCreator userProfile={userProfile} />} />
       <Route path="/categories" element={<Categories userProfile={userProfile} />} />
       <Route path="/barcodes" element={<Barcodes userProfile={userProfile} />} />
+      <Route path="/visual-ingest" element={<VisualIngest userProfile={userProfile} />} />
       <Route path="/attendance" element={<Attendance userProfile={userProfile} />} />
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
       <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
+      <Route path="/visualise" element={<Visualise userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

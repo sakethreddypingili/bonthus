@@ -103,36 +103,40 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center p-4">
-            <div className="max-w-md w-full bg-white rounded-[40px] shadow-2xl border border-gray-100 overflow-hidden animate-fast-slide">
+        <div className="min-h-screen bg-[#E2E8F0] bg-[radial-gradient(#64748b_1.5px,transparent_1.5px)] [background-size:24px_24px] flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-white rounded-2xl sm:rounded-[24px] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] sm:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] border-2 border-black overflow-hidden transition-all duration-300 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] sm:hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 animate-fast-slide">
                 {/* Header */}
-                <div className="px-10 py-12 flex flex-col items-center justify-center relative overflow-hidden text-center border-b border-gray-50">
-                    <div className="mb-6 px-6 py-2 bg-black text-white rounded-full shadow-xl select-none">
-                        <span className="text-[10px] font-black uppercase tracking-[0.3em] block leading-none">Warehouse Portal</span>
+                <div className="bg-gradient-to-b from-gray-50 to-white px-6 py-8 sm:px-8 sm:py-10 flex flex-col items-center justify-center relative overflow-hidden text-center border-b-2 border-black">
+                    {/* Decorative subtle dot grid inside header for premium depth */}
+                    <div className="absolute inset-0 bg-[radial-gradient(#000000_1px,transparent_1px)] [background-size:16px_16px] opacity-[0.08] pointer-events-none" />
+
+                    {/* Glassy Neo-Brutalist badge */}
+                    <div className="mb-5 px-5 py-2 bg-white/80 border-2 border-black text-black rounded-full backdrop-blur-md shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] select-none">
+                        <span className="text-[10px] font-black uppercase tracking-[0.25em] block leading-none">Warehouse</span>
                     </div>
 
-                    <div className="relative mb-6">
-                        <img src={logoImg} alt="LensCare Logo" className="h-20 relative z-10" />
+                    <div className="relative mb-5">
+                        <img src={logoImg} alt="LensCare Logo" className="h-16 sm:h-20 relative z-10" />
                     </div>
-                    <h2 className="text-black text-3xl font-black tracking-tighter uppercase relative z-10">Access Hub</h2>
-                    <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-2 relative z-10">Authentication Required</p>
+                    <h2 className="text-black text-xl sm:text-2xl font-black tracking-tight relative z-10">Warehouse Portal Access</h2>
+                    <p className="text-black/60 text-xs sm:text-sm font-semibold mt-1.5 relative z-10">Sign in to manage your inventory</p>
                 </div>
 
                 {/* Form */}
-                <div className="p-10">
+                <div className="p-6 sm:p-8">
                     {error && (
-                        <div className="mb-8 p-5 bg-black text-white text-[10px] uppercase tracking-widest font-black rounded-[20px] shadow-2xl text-center flex items-center justify-center gap-3 animate-fast-zoom">
-                            <AlertCircle size={16} strokeWidth={3} className="shrink-0" />
+                        <div className="mb-6 p-4 bg-red-50 border-2 border-black text-red-700 text-xs font-bold rounded-xl flex items-start gap-2.5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-slideDown">
+                            <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
                             <span>{error}</span>
                         </div>
                     )}
 
                     <form onSubmit={handleLogin} autoComplete="off" className="space-y-6">
                         <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Operator Identity</label>
+                            <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">Email, Phone, or Employee ID</label>
                             <div className="relative group">
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-6 text-gray-300 group-focus-within:text-black transition-colors">
-                                    <User size={18} strokeWidth={3} />
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-black group-focus-within:scale-110 transition-transform duration-150">
+                                    <User size={18} strokeWidth={2.5} />
                                 </span>
                                 <input
                                     ref={inputRef}
@@ -142,17 +146,17 @@ export default function Login() {
                                     value={identifier}
                                     onChange={(e) => setIdentifier(e.target.value)}
                                     onFocus={() => setShowSuggestions(true)}
-                                    placeholder="EMAIL, PHONE, OR ID..."
-                                    className="w-full pl-14 pr-6 py-5 bg-gray-50 border border-gray-100 rounded-3xl text-[12px] font-black tracking-widest focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-200"
+                                    placeholder="email, phone, or id..."
+                                    className="w-full pl-12 pr-4 py-4 bg-white border-2 border-black rounded-xl text-sm font-bold tracking-tight focus:outline-none focus:ring-4 focus:ring-black/5 focus:border-black transition-all placeholder:text-gray-400"
                                     required
                                 />
 
                                 {showSuggestions && suggestions.length > 0 && (
                                     <div
                                         ref={dropdownRef}
-                                        className="absolute top-full left-0 right-0 mt-3 bg-white border border-gray-100 rounded-[32px] shadow-2xl z-30 overflow-hidden divide-y divide-gray-50 animate-fast-zoom"
+                                        className="absolute top-full left-0 right-0 mt-3 bg-white border-2 border-black rounded-2xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-30 overflow-hidden divide-y divide-gray-100"
                                     >
-                                        <div className="px-6 py-3 bg-gray-50 text-[9px] font-black uppercase tracking-widest text-gray-400 select-none border-b border-gray-100">
+                                        <div className="px-5 py-2.5 bg-gray-50 text-[9px] font-black uppercase tracking-widest text-gray-400 select-none border-b-2 border-black">
                                             Vault Cache
                                         </div>
                                         <div className="max-h-56 overflow-y-auto no-scrollbar">
@@ -161,14 +165,14 @@ export default function Login() {
                                                     key={index}
                                                     type="button"
                                                     onClick={() => selectSuggestion(item)}
-                                                    className="w-full px-6 py-4 flex items-center gap-4 hover:bg-black hover:text-white transition-all text-left group"
+                                                    className="w-full px-5 py-3 flex items-center gap-3 hover:bg-black hover:text-white transition-all text-left group"
                                                 >
-                                                    <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-white/10 shrink-0">
-                                                        <User size={16} className="text-black group-hover:text-white" strokeWidth={3} />
+                                                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-white/10 shrink-0">
+                                                        <User size={14} className="text-black group-hover:text-white" strokeWidth={2.5} />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="text-[11px] font-black uppercase tracking-tight truncate">{item.identifier}</p>
-                                                        <p className="text-[9px] font-bold text-gray-400 group-hover:text-gray-300 leading-none mt-1 uppercase tracking-widest">
+                                                        <p className="text-xs font-bold truncate">{item.identifier}</p>
+                                                        <p className="text-[9px] text-gray-400 group-hover:text-gray-300 leading-none mt-1 uppercase font-black tracking-widest">
                                                             {item.password ? "Credentials Linked" : "No saved vector"}
                                                         </p>
                                                     </div>
@@ -181,10 +185,10 @@ export default function Login() {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Security Vector</label>
+                            <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">Password</label>
                             <div className="relative group">
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-6 text-gray-300 group-focus-within:text-black transition-colors">
-                                    <Lock size={18} strokeWidth={3} />
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-black group-focus-within:scale-110 transition-transform duration-150">
+                                    <Lock size={18} strokeWidth={2.5} />
                                 </span>
                                 <input
                                     type={showPassword ? "text" : "password"}
@@ -194,15 +198,15 @@ export default function Login() {
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
                                     style={{ WebkitTextSecurity: showPassword ? 'none' : 'disc' }}
-                                    className="w-full pl-14 pr-14 py-5 bg-gray-50 border border-gray-100 rounded-3xl text-[12px] font-black tracking-widest focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-200"
+                                    className="w-full pl-12 pr-12 py-4 bg-white border-2 border-black rounded-xl text-sm font-bold tracking-tight focus:outline-none focus:ring-4 focus:ring-black/5 focus:border-black transition-all placeholder:text-gray-400"
                                     required
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 flex items-center pr-6 text-gray-300 hover:text-black transition-colors focus:outline-none"
+                                    className="absolute inset-y-0 right-0 flex items-center pr-4 text-black hover:scale-110 transition-transform duration-150 focus:outline-none"
                                 >
-                                    {showPassword ? <EyeOff size={18} strokeWidth={3} /> : <Eye size={18} strokeWidth={3} />}
+                                    {showPassword ? <EyeOff size={18} strokeWidth={2} /> : <Eye size={18} strokeWidth={2} />}
                                 </button>
                             </div>
                         </div>
@@ -210,16 +214,16 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-black text-white py-5 rounded-[24px] text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20 flex justify-center items-center h-[72px] mt-4"
+                            className="w-full bg-black text-white py-4.5 border-2 border-black rounded-xl text-xs font-black uppercase tracking-[0.2em] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-0 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all disabled:opacity-20 flex justify-center items-center h-[56px] mt-4"
                         >
                             {loading ? (
-                                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : "Commit Authorization"}
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : "Sign In"}
                         </button>
                     </form>
 
-                    <div className="mt-10 text-center">
-                        <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em] leading-relaxed">
+                    <div className="mt-8 text-center">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] leading-relaxed">
                             Security Identity verified. Encrypted connection active.
                         </p>
                     </div>
