@@ -106,9 +106,9 @@ git commit -m "📋 Docs: Add comprehensive security audit documentation
 ```bash
 # Create .env in project root (git ignored automatically)
 cat > .env << 'EOF'
-REACT_APP_SUPABASE_URL=https://hqnsmlgccspyyreqjwva.supabase.co
-REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxbnNtbGdjY3NweXlyZXFqd3ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzNDEzMjUsImV4cCI6MjA4NjkxNzMyNX0.KjHprVVxOl8yUUfYP2Pfqe8T0I7ghLiPGOC-rL7amVA
-REACT_APP_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxbnNtbGdjY3NweXlyZXFqd3ZhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM0MTMyNSwiZXhwIjoyMDg2OTE3MzI1fQ.mJdkX8w5d5Z1QpL1x9Y8qR2vN4tS7uV3wX6yZ9aB0cD
+REACT_APP_SUPABASE_URL=https://dnjarwvhyqyjxunelexs.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuamFyd3ZoeXF5anh1bmVsZXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MjQ5OTYsImV4cCI6MjA5MDEwMDk5Nn0.N7DFFOtNd5sQC8hMMDkMsaLAt0z2G-lT6j4QugT4lQU
+REACT_APP_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuamFyd3ZoeXF5anh1bmVsZXhzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDUxNDk5NiwiZXhwIjoyMDkwMTAwOTk2fQ.JqSLIaSbakYn3JHvOU1n7LFPcc_WCldPoBad7SNFrfU
 
 REACT_APP_WA_PHONE_NUMBER_ID=1082709141587210
 REACT_APP_WA_ACCESS_TOKEN=EAAdKXknFU2oBRBdFdpobjXsdarW1gSpBTIgHXO1xbwksE0vwN1LkCVl9VwnXCNuEovab90ZByCbEgd9wuaf6ZAB5G4vCPUUgFMMYQ6TZC4yM228QJ0I5CjWOj1tZCrZAbX1SbnDZA2ZCLYYMm0XLcJQkyBdq935b2sTIh6sBSHrcrGtu27o05sGw9OyzgAVGwZDZD
@@ -124,8 +124,8 @@ git status | grep ".env" || echo "✅ .env correctly ignored by git"
 Go to https://vercel.com/dashboard → Your Project → Settings → Environment Variables
 
 Add:
-- REACT_APP_SUPABASE_URL = https://hqnsmlgccspyyreqjwva.supabase.co
-- REACT_APP_SUPABASE_ANON_KEY = eyJhbGci...
+- REACT_APP_SUPABASE_URL = https://dnjarwvhyqyjxunelexs.supabase.co
+- REACT_APP_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuamFyd3ZoeXF5anh1bmVsZXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MjQ5OTYsImV4cCI6MjA5MDEwMDk5Nn0.N7DFFOtNd5sQC8hMMDkMsaLAt0z2G-lT6j4QugT4lQU
 - REACT_APP_WA_PHONE_NUMBER_ID = 1082709141587210  
 - REACT_APP_WA_ACCESS_TOKEN = EAAd...
 
