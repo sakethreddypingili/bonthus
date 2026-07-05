@@ -66,13 +66,9 @@ export default function Barcodes() {
   });
 
   return (
-    <div className="space-y-8 pb-20 animate-fast-slide">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Barcode Studio</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Operational Vector Audit & Analytics</p>
-        </div>
-        <button onClick={fetchBarcodes} className="p-3 border border-gray-100 rounded-2xl hover:bg-black hover:text-white transition-all">
+    <div className="space-y-6 pb-20 animate-fast-slide">
+      <div className="flex justify-end mb-4">
+        <button onClick={fetchBarcodes} className="p-3 border border-gray-100 rounded-2xl hover:bg-black hover:text-white transition-all shadow-sm bg-white">
             <Settings2 size={18} strokeWidth={3} />
         </button>
       </div>

@@ -4,11 +4,9 @@ import { Search, Plus, LayoutGrid, List, X, MoreVertical, ChevronDown, Check, Ta
 import { supabase } from "../server/supabase/supabase";
 import SlideDrawer from "../components/common/SlideDrawer";
 
-// Auto-generate a unique SKU like AST-782341
+// Auto-generate a unique numeric barcode (12 digits)
 const generateSKU = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const rand = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  return `AST-${rand}`;
+  return Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join('');
 };
 
 export default function ProductList({ userProfile }) {
@@ -52,9 +50,14 @@ export default function ProductList({ userProfile }) {
   
   // Batch Load state
   const [bulkCheckpointName, setBulkCheckpointName] = useState("");
+  const [bulkCategoryId, setBulkCategoryId] = useState("");
+  const [bulkCascadePath, setBulkCascadePath] = useState([]);
   const [bulkRows, setBulkRows] = useState([
-    { name: '', brand: '', base_price: '', sku: generateSKU(), category_id: '', stock_quantity: '1', low_stock_threshold: '5' }
+    { name: '', brand: '', base_price: '', sku: generateSKU(), stock_quantity: '1', low_stock_threshold: '5' }
   ]);
+  const [batchStage, setBatchStage] = useState('details'); // 'details' | 'products' | 'review'
+  const [showEditDetailsPopup, setShowEditDetailsPopup] = useState(false);
+  const [showConfirmEditDetailsPopup, setShowConfirmEditDetailsPopup] = useState(false);
 
   const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
 
@@ -104,6 +107,55 @@ export default function ProductList({ userProfile }) {
     return paths;
   }, [categories]);
 
+  const [frameFields, setFrameFields] = useState({
+    modelNo: '',
+    color: '',
+    frameType: '',
+    frameShape: '',
+    sizeA: '',
+    sizeB: '',
+    templeLength: '',
+    dbl: ''
+  });
+
+  const [lensFields, setLensFields] = useState({
+    lensType: '',
+    index: '',
+    material: '',
+    coating: '',
+    sph: '',
+    cyl: '',
+    axis: '',
+    add: ''
+  });
+
+  const getCategoryType = useCallback((categoryId) => {
+    if (!categoryId) return null;
+    const path = (categoryPaths[categoryId] || "").toLowerCase();
+    if (path.includes("frame")) return "frame";
+    if (path.includes("lens")) return "lens";
+    return null;
+  }, [categoryPaths]);
+
+  const renderProductDescription = useCallback((desc) => {
+    if (!desc) return "";
+    if (desc.startsWith("{")) {
+      try {
+        const data = JSON.parse(desc);
+        if (data.type === 'frame') {
+          return `Frame: Model: ${data.modelNo || 'N/A'} | Color: ${data.color || 'N/A'} | Type: ${data.frameType || 'N/A'} | Shape: ${data.frameShape || 'N/A'} | Size: ${data.sizeA || 'N/A'}-${data.sizeB || 'N/A'}-${data.templeLength || 'N/A'}-${data.dbl || 'N/A'}`;
+        } else if (data.type === 'lens') {
+          return `Lens: Type: ${data.lensType || 'N/A'} | Index: ${data.index || 'N/A'} | Material: ${data.material || 'N/A'} | Coating: ${data.coating || 'N/A'} | SPH: ${data.sph || 'N/A'} | CYL: ${data.cyl || 'N/A'} | Axis: ${data.axis || 'N/A'} | ADD: ${data.add || 'N/A'}`;
+        }
+        return data.rawDescription || desc;
+      } catch (e) {
+        return desc;
+      }
+    }
+    return desc;
+  }, []);
+
+
   const categoryChildMap = useMemo(() => {
     const map = {};
     categories.forEach(c => {
@@ -143,6 +195,18 @@ export default function ProductList({ userProfile }) {
     const newPath = [...cascadePath.slice(0, depth), selectedId];
     setCascadePath(newPath);
     setProductData(prev => ({ ...prev, category_id: selectedId }));
+  };
+
+  const handleBulkCategoryLevelSelect = (depth, selectedId) => {
+    if (!selectedId) {
+      const newPath = bulkCascadePath.slice(0, depth);
+      setBulkCascadePath(newPath);
+      setBulkCategoryId(newPath[newPath.length - 1] || '');
+      return;
+    }
+    const newPath = [...bulkCascadePath.slice(0, depth), selectedId];
+    setBulkCascadePath(newPath);
+    setBulkCategoryId(selectedId);
   };
 
   const fetchInventory = useCallback(async () => {
@@ -213,7 +277,6 @@ export default function ProductList({ userProfile }) {
             name
           )
         `)
-        .eq("status", "pending")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -240,11 +303,75 @@ export default function ProductList({ userProfile }) {
     return groups;
   }, [pendingItems]);
 
+  const reviewStats = useMemo(() => {
+    const batches = new Set();
+    let pendingCount = 0;
+    let confirmedCount = 0;
+    const batchMap = {};
+
+    pendingItems.forEach(item => {
+      const cp = item.checkpoint_name || "Uncategorized Batch";
+      batches.add(cp);
+      if (item.status === 'pending') {
+        pendingCount++;
+      } else if (item.status === 'confirmed') {
+        confirmedCount++;
+      }
+
+      if (!batchMap[cp]) {
+        batchMap[cp] = { pending: 0, confirmed: 0, total: 0 };
+      }
+      batchMap[cp].total++;
+      if (item.status === 'pending') batchMap[cp].pending++;
+      if (item.status === 'confirmed') batchMap[cp].confirmed++;
+    });
+
+    return {
+      totalBatches: batches.size,
+      pendingCount,
+      confirmedCount,
+      batchBreakdown: Object.entries(batchMap).map(([name, counts]) => ({
+        name,
+        ...counts
+      }))
+    };
+  }, [pendingItems]);
+
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     setSaving(true);
     setSuccessMessage("");
     try {
+      const catType = getCategoryType(productData.category_id);
+      let finalDesc = productData.description;
+      if (catType === 'frame') {
+        finalDesc = JSON.stringify({
+          type: 'frame',
+          modelNo: frameFields.modelNo,
+          color: frameFields.color,
+          frameType: frameFields.frameType,
+          frameShape: frameFields.frameShape,
+          sizeA: frameFields.sizeA,
+          sizeB: frameFields.sizeB,
+          templeLength: frameFields.templeLength,
+          dbl: frameFields.dbl,
+          rawDescription: productData.description
+        });
+      } else if (catType === 'lens') {
+        finalDesc = JSON.stringify({
+          type: 'lens',
+          lensType: lensFields.lensType,
+          index: lensFields.index,
+          material: lensFields.material,
+          coating: lensFields.coating,
+          sph: lensFields.sph,
+          cyl: lensFields.cyl,
+          axis: lensFields.axis,
+          add: lensFields.add,
+          rawDescription: productData.description
+        });
+      }
+
       if (editingItem) {
         // 1. Update Product
         const { error: pError } = await supabase
@@ -255,7 +382,7 @@ export default function ProductList({ userProfile }) {
             brand: productData.brand,
             base_price: Number(productData.base_price),
             category_id: productData.category_id || null,
-            description: productData.description
+            description: finalDesc
           })
           .eq('id', editingItem.id);
         
@@ -292,7 +419,7 @@ export default function ProductList({ userProfile }) {
             brand: productData.brand || null,
             base_price: Number(productData.base_price || 0),
             category_id: productData.category_id || null,
-            description: productData.description || null,
+            description: finalDesc || null,
             stock_quantity: Number(productData.stock_quantity || 0),
             low_stock_threshold: Number(productData.low_stock_threshold || 5),
             unit_price: Number(productData.unit_price || productData.base_price || 0),
@@ -339,7 +466,7 @@ export default function ProductList({ userProfile }) {
 
   // Bulk Load Row utilities
   const handleAddBulkRow = () => {
-    setBulkRows(prev => [...prev, { name: '', brand: '', base_price: '', sku: generateSKU(), category_id: '', stock_quantity: '1', low_stock_threshold: '5' }]);
+    setBulkRows(prev => [...prev, { name: '', brand: '', base_price: '', sku: generateSKU(), stock_quantity: '1', low_stock_threshold: '5' }]);
   };
 
   const handleRemoveBulkRow = (index) => {
@@ -357,30 +484,74 @@ export default function ProductList({ userProfile }) {
       alert("Please provide a checkpoint name.");
       return;
     }
+    if (!bulkCategoryId) {
+      alert("Please select a category hierarchy first.");
+      return;
+    }
     setSaving(true);
     setSuccessMessage("");
     try {
-      const records = bulkRows.map(row => ({
-        checkpoint_name: bulkCheckpointName.trim(),
-        name: row.name,
-        sku: row.sku || generateSKU(),
-        brand: row.brand || null,
-        base_price: Number(row.base_price || 0),
-        category_id: row.category_id || null,
-        description: row.description || null,
-        stock_quantity: Number(row.stock_quantity || 1),
-        low_stock_threshold: Number(row.low_stock_threshold || 5),
-        unit_price: Number(row.base_price || 0),
-        store_id: selectedStore,
-        status: 'pending'
-      }));
+      const records = [];
+      for (const row of bulkRows) {
+        const catType = getCategoryType(bulkCategoryId);
+        const qty = Math.max(1, Number(row.stock_quantity || 1));
+        
+        let finalDesc = row.description || null;
+        if (catType === 'frame') {
+          finalDesc = JSON.stringify({
+            type: 'frame',
+            modelNo: row.frame_model_no || '',
+            color: row.frame_color || '',
+            frameType: row.frame_type || '',
+            frameShape: row.frame_shape || '',
+            sizeA: row.frame_size_a || '',
+            sizeB: row.frame_size_b || '',
+            templeLength: row.frame_temple_length || '',
+            dbl: row.frame_dbl || '',
+            rawDescription: row.description || ''
+          });
+        } else if (catType === 'lens') {
+          finalDesc = JSON.stringify({
+            type: 'lens',
+            lensType: row.lens_type || '',
+            index: row.lens_index || '',
+            material: row.lens_material || '',
+            coating: row.lens_coating || '',
+            sph: row.lens_sph || '',
+            cyl: row.lens_cyl || '',
+            axis: row.lens_axis || '',
+            add: row.lens_add || '',
+            rawDescription: row.description || ''
+          });
+        }
+
+        for (let i = 0; i < qty; i++) {
+          records.push({
+            checkpoint_name: bulkCheckpointName.trim(),
+            name: row.name,
+            sku: generateSKU(),
+            brand: row.brand || null,
+            base_price: Number(row.base_price || 0),
+            category_id: bulkCategoryId,
+            description: finalDesc,
+            stock_quantity: 1,
+            low_stock_threshold: Number(row.low_stock_threshold || 5),
+            unit_price: Number(row.base_price || 0),
+            store_id: selectedStore,
+            status: 'pending'
+          });
+        }
+      }
 
       const { error } = await supabase.from("pending_products").insert(records);
       if (error) throw error;
 
       setSuccessMessage(`Bulk batch containing ${bulkRows.length} items added to Review Queue!`);
       setBulkCheckpointName("");
-      setBulkRows([{ name: '', brand: '', base_price: '', sku: generateSKU(), category_id: '', stock_quantity: '1', low_stock_threshold: '5' }]);
+      setBulkCategoryId("");
+      setBulkCascadePath([]);
+      setBulkRows([{ name: '', brand: '', base_price: '', sku: generateSKU(), stock_quantity: '1', low_stock_threshold: '5' }]);
+      setBatchStage('details');
       await fetchPendingQueue();
       setActiveTab("review-queue");
     } catch (err) {
@@ -390,14 +561,16 @@ export default function ProductList({ userProfile }) {
     }
   };
 
-  // Confirm pending products
-  const handleConfirmSelected = async () => {
-    if (selectedPendingIds.size === 0) return;
+  // Ingest selected confirmed products
+  const handleIngestSelectedConfirmed = async () => {
+    const toIngest = pendingItems.filter(item => selectedPendingIds.has(item.id) && item.status === 'confirmed');
+    if (toIngest.length === 0) {
+      alert("No confirmed products selected for ingestion.");
+      return;
+    }
     setSaving(true);
     try {
-      const toConfirm = pendingItems.filter(item => selectedPendingIds.has(item.id));
-      
-      for (const item of toConfirm) {
+      for (const item of toIngest) {
         // 1. Insert into products
         const { data: pData, error: pError } = await supabase
           .from("products")
@@ -427,22 +600,68 @@ export default function ProductList({ userProfile }) {
 
         if (iError) throw iError;
 
-        // 3. Mark pending as confirmed
-        const { error: uError } = await supabase
+        // 3. Delete from pending_products
+        const { error: dError } = await supabase
           .from("pending_products")
-          .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
+          .delete()
           .eq('id', item.id);
 
-        if (uError) throw uError;
+        if (dError) throw dError;
       }
 
       setSelectedPendingIds(new Set());
-      setSuccessMessage(`Successfully confirmed and updated catalog with ${toConfirm.length} items.`);
+      setSuccessMessage(`Successfully ingested ${toIngest.length} confirmed products to catalog.`);
       await fetchInventory();
       await fetchPendingQueue();
-      setActiveTab("stock");
     } catch (err) {
-      alert("Confirmation failed: " + err.message);
+      alert("Ingestion failed: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleIngestConfirmedProduct = async (item) => {
+    setSaving(true);
+    try {
+      const { data: pData, error: pError } = await supabase
+        .from("products")
+        .insert([{
+          name: item.name,
+          sku: item.sku,
+          brand: item.brand,
+          base_price: Number(item.base_price),
+          category_id: item.category_id,
+          description: item.description
+        }])
+        .select()
+        .single();
+
+      if (pError) throw pError;
+
+      const { error: iError } = await supabase
+        .from("store_inventory")
+        .insert([{
+          store_id: item.store_id || selectedStore,
+          product_id: pData.id,
+          stock_quantity: Number(item.stock_quantity),
+          unit_price: Number(item.unit_price || item.base_price),
+          low_stock_threshold: Number(item.low_stock_threshold)
+        }]);
+
+      if (iError) throw iError;
+
+      const { error: dError } = await supabase
+        .from("pending_products")
+        .delete()
+        .eq('id', item.id);
+
+      if (dError) throw dError;
+
+      setSuccessMessage(`Successfully ingested confirmed product ${item.name} to live catalog.`);
+      await fetchInventory();
+      await fetchPendingQueue();
+    } catch (err) {
+      alert("Ingestion failed: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -468,6 +687,8 @@ export default function ProductList({ userProfile }) {
   };
 
   const toggleSelectPending = (id) => {
+    const item = pendingItems.find(i => i.id === id);
+    if (!item || item.status !== 'confirmed') return;
     const next = new Set(selectedPendingIds);
     if (next.has(id)) {
       next.delete(id);
@@ -480,10 +701,12 @@ export default function ProductList({ userProfile }) {
   const toggleSelectCheckpoint = (checkpointItems, selectAll) => {
     const next = new Set(selectedPendingIds);
     checkpointItems.forEach(item => {
-      if (selectAll) {
-        next.add(item.id);
-      } else {
-        next.delete(item.id);
+      if (item.status === 'confirmed') {
+        if (selectAll) {
+          next.add(item.id);
+        } else {
+          next.delete(item.id);
+        }
       }
     });
     setSelectedPendingIds(next);
@@ -514,29 +737,7 @@ export default function ProductList({ userProfile }) {
   }[activeTab] || { title: "Inventory Matrix", subtitle: "Manage catalog stock levels and ingestion channels" };
 
   return (
-    <div className="space-y-8 animate-fast-slide pb-20">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">{headerDetails.title}</h1>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">{headerDetails.subtitle}</p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-sm">
-            <Database size={14} className="text-black" />
-            <select
-              value={selectedStore}
-              onChange={e => setSelectedStore(e.target.value)}
-              disabled={!isSuperAdmin}
-              className="appearance-none bg-transparent text-xs font-black text-black uppercase focus:outline-none cursor-pointer pr-8 py-1 disabled:opacity-50"
-            >
-              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            {isSuperAdmin && <ChevronDown size={14} className="text-black -ml-6" />}
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6 animate-fast-slide pb-20">
 
       {/* Status Toasts/Alerts */}
       {successMessage && (
@@ -554,6 +755,19 @@ export default function ProductList({ userProfile }) {
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Showing Active Catalog Products</span>
             
             <div className="flex flex-wrap items-center gap-3">
+              {/* Store Selection Dropdown */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-sm">
+                <Database size={14} className="text-gray-400" />
+                <select
+                  value={selectedStore}
+                  onChange={e => setSelectedStore(e.target.value)}
+                  disabled={!isSuperAdmin}
+                  className="appearance-none bg-transparent text-[11px] font-bold text-black uppercase focus:outline-none cursor-pointer pr-6 py-0.5 disabled:opacity-50"
+                >
+                  {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
               {/* Category Filter Dropdown */}
               <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-sm">
                 <Tags size={14} className="text-gray-400" />
@@ -599,7 +813,7 @@ export default function ProductList({ userProfile }) {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Identify</th>
-                      <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">SKU</th>
+                      <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">BARCODE</th>
                       <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Brand</th>
                       <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Classification</th>
                       <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Price</th>
@@ -613,7 +827,7 @@ export default function ProductList({ userProfile }) {
                       <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-6 py-4">
                           <p className="text-xs font-black text-black uppercase tracking-tight">{item.name}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide truncate max-w-xs">{item.description}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide truncate max-w-xs">{renderProductDescription(item.description)}</p>
                         </td>
                         <td className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{item.sku}</td>
                         <td className="px-6 py-4 text-xs font-bold text-black uppercase tracking-widest">{item.brand || "Generic"}</td>
@@ -649,7 +863,7 @@ export default function ProductList({ userProfile }) {
                       {statusBadge(item)}
                     </div>
                     <h3 className="text-sm font-black text-black uppercase tracking-tight mt-4">{item.name}</h3>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 tracking-wider leading-relaxed line-clamp-2">{item.description}</p>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 tracking-wider leading-relaxed line-clamp-2">{renderProductDescription(item.description)}</p>
                   </div>
                   <div className="flex items-center justify-between border-t border-gray-50 mt-6 pt-4">
                     <div>
@@ -669,10 +883,24 @@ export default function ProductList({ userProfile }) {
 
       {/* -------------------- 2. QUICK ADD TAB -------------------- */}
       {activeTab === "quick-add" && (
-        <div className="max-w-3xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm p-8 animate-fast-zoom">
-          <div className="mb-6">
-            <h3 className="text-lg font-black text-black uppercase tracking-wider">Quick Ingestion Form</h3>
-            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-1">Register a single product entity to active stock or queue</p>
+        <div className="w-full bg-white rounded-3xl border border-gray-100 shadow-sm p-8 animate-fast-zoom">
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-black text-black uppercase tracking-wider">Quick Ingestion Form</h3>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-1">Register a single product entity to active stock or queue</p>
+            </div>
+            {productData.category_id && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  setCascadePath([]);
+                  setProductData(prev => ({ ...prev, category_id: '' }));
+                }}
+                className="text-[9px] font-black uppercase tracking-widest bg-gray-50 border border-gray-100 px-3.5 py-2 rounded-xl text-gray-400 hover:text-black hover:bg-gray-100 transition-all self-start"
+              >
+                Change Category
+              </button>
+            )}
           </div>
 
           <form onSubmit={handleSaveProduct} className="space-y-6">
@@ -684,28 +912,7 @@ export default function ProductList({ userProfile }) {
               </p>
             </div>
 
-            {/* Identifiers */}
-            <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
-              <h4 className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-1.5"><Tags size={12} /> Product Identifiers</h4>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Title *</label>
-                  <input required value={productData.name} onChange={e => setProductData({...productData, name: e.target.value})} type="text" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Brand Name</label>
-                    <input value={productData.brand} onChange={e => setProductData({...productData, brand: e.target.value})} type="text" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SKU Code *</label>
-                    <input required value={productData.sku} onChange={e => setProductData({...productData, sku: e.target.value})} type="text" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Classification */}
+            {/* Classification (Always Shown First) */}
             <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
               <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Classification Hierarchy</h4>
               <div className="space-y-4">
@@ -731,175 +938,822 @@ export default function ProductList({ userProfile }) {
               </div>
             </div>
 
-            <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
-              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>
-              <textarea value={productData.description} onChange={e => setProductData({...productData, description: e.target.value})} className="w-full min-h-[80px] p-4 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none resize-none" />
-            </div>
+            {/* Proceed Further only if Category is Selected */}
+            {productData.category_id ? (
+              <div className="space-y-6 animate-fast-zoom">
+                {/* Identifiers */}
+                <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                  <h4 className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-1.5"><Tags size={12} /> Product Identifiers</h4>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Title *</label>
+                      <input required value={productData.name} onChange={e => setProductData({...productData, name: e.target.value})} type="text" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Brand Name</label>
+                        <input value={productData.brand} onChange={e => setProductData({...productData, brand: e.target.value})} type="text" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SKU Code *</label>
+                        <input required value={productData.sku} onChange={e => setProductData({...productData, sku: e.target.value})} type="text" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Stock details */}
-            <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
-              <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Warehouse Stock levels</h4>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Current Stock</label>
-                  <input required value={productData.stock_quantity} onChange={e => setProductData({...productData, stock_quantity: e.target.value})} type="number" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" />
+                {/* Conditional Custom Fields for Frame */}
+                {getCategoryType(productData.category_id) === 'frame' && (
+                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                    <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Frame Specifications</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Model No *</label>
+                        <input required type="text" value={frameFields.modelNo} onChange={e => setFrameFields({...frameFields, modelNo: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 78005" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Color *</label>
+                        <input required type="text" value={frameFields.color} onChange={e => setFrameFields({...frameFields, color: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. Black" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Frame Type *</label>
+                        <select required value={frameFields.frameType} onChange={e => setFrameFields({...frameFields, frameType: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-black outline-none cursor-pointer focus:border-black">
+                          <option value="">— Select —</option>
+                          <option value="Full Rim">Full Rim</option>
+                          <option value="Half Rim">Half Rim</option>
+                          <option value="Rimless">Rimless</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Frame Shape *</label>
+                        <select required value={frameFields.frameShape} onChange={e => setFrameFields({...frameFields, frameShape: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-black outline-none cursor-pointer focus:border-black">
+                          <option value="">— Select —</option>
+                          <option value="Square">Square</option>
+                          <option value="Rectangle">Rectangle</option>
+                          <option value="Round">Round</option>
+                          <option value="Oval">Oval</option>
+                          <option value="Aviator">Aviator</option>
+                          <option value="Wayfarer">Wayfarer</option>
+                          <option value="Clubmaster">Clubmaster</option>
+                          <option value="Cat Eye">Cat Eye</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">A Size (Lens Width)</label>
+                        <input type="text" value={frameFields.sizeA} onChange={e => setFrameFields({...frameFields, sizeA: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 52" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">B Size (Lens Height)</label>
+                        <input type="text" value={frameFields.sizeB} onChange={e => setFrameFields({...frameFields, sizeB: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 38" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Temple Length</label>
+                        <input type="text" value={frameFields.templeLength} onChange={e => setFrameFields({...frameFields, templeLength: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 140" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">DBL (Bridge Size)</label>
+                        <input type="text" value={frameFields.dbl} onChange={e => setFrameFields({...frameFields, dbl: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 18" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Conditional Custom Fields for Lens */}
+                {getCategoryType(productData.category_id) === 'lens' && (
+                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                    <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Lens Specifications</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Lens Type *</label>
+                        <select required value={lensFields.lensType} onChange={e => setLensFields({...lensFields, lensType: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-black outline-none cursor-pointer focus:border-black">
+                          <option value="">— Select —</option>
+                          <option value="Single Vision">Single Vision</option>
+                          <option value="Bifocal">Bifocal</option>
+                          <option value="Progressive">Progressive</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Index *</label>
+                        <input required type="text" value={lensFields.index} onChange={e => setLensFields({...lensFields, index: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 1.56, 1.61" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Material *</label>
+                        <input required type="text" value={lensFields.material} onChange={e => setLensFields({...lensFields, material: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. CR-39, Poly" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Coating *</label>
+                        <input required type="text" value={lensFields.coating} onChange={e => setLensFields({...lensFields, coating: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. ARC, Blue Cut" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH Power</label>
+                        <input type="text" value={lensFields.sph} onChange={e => setLensFields({...lensFields, sph: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. -2.00" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL Power</label>
+                        <input type="text" value={lensFields.cyl} onChange={e => setLensFields({...lensFields, cyl: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. -0.50" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
+                        <input type="text" value={lensFields.axis} onChange={e => setLensFields({...lensFields, axis: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 180" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">ADD Power</label>
+                        <input type="text" value={lensFields.add} onChange={e => setLensFields({...lensFields, add: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. +2.00" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
+                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>
+                  <textarea value={productData.description} onChange={e => setProductData({...productData, description: e.target.value})} className="w-full min-h-[80px] p-4 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none resize-none" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Threshold</label>
-                  <input required value={productData.low_stock_threshold} onChange={e => setProductData({...productData, low_stock_threshold: e.target.value})} type="number" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" />
+
+                {/* Stock details */}
+                <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                  <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Warehouse Stock levels</h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Current Stock</label>
+                      <input required value={productData.stock_quantity} onChange={e => setProductData({...productData, stock_quantity: e.target.value})} type="number" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Threshold</label>
+                      <input required value={productData.low_stock_threshold} onChange={e => setProductData({...productData, low_stock_threshold: e.target.value})} type="number" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Unit Price</label>
+                      <input required value={productData.base_price} onChange={e => setProductData({...productData, base_price: e.target.value})} type="number" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" placeholder="₹" />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Unit Price</label>
-                  <input required value={productData.base_price} onChange={e => setProductData({...productData, base_price: e.target.value})} type="number" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none" placeholder="₹" />
-                </div>
+
+                <button type="submit" disabled={saving} className="w-full py-4.5 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 h-[56px] flex justify-center items-center">
+                  {saving ? "Ingesting Product..." : "Commit Entity"}
+                </button>
               </div>
-            </div>
-
-            <button type="submit" disabled={saving} className="w-full py-4.5 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 h-[56px] flex justify-center items-center">
-              {saving ? "Ingesting Product..." : "Commit Entity"}
-            </button>
+            ) : null}
           </form>
         </div>
       )}
 
       {/* -------------------- 3. BATCH LOAD TAB -------------------- */}
       {activeTab === "batch-load" && (
-        <div className="max-w-4xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm p-8 animate-fast-zoom">
-          <div className="mb-6 flex justify-between items-center">
-            <div>
+        <div className="space-y-4">
+          {/* Header Row above the card container */}
+          {(batchStage === 'products' || batchStage === 'review') && (
+            <div className="flex justify-end">
+              {batchStage === 'products' && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    let valid = true;
+                    for (const row of bulkRows) {
+                      if (!row.name || !row.stock_quantity || !row.base_price) {
+                        valid = false;
+                      }
+                      const catType = getCategoryType(bulkCategoryId);
+                      if (catType === 'frame') {
+                        if (!row.frame_model_no || !row.frame_color || !row.frame_type || !row.frame_shape || !row.brand) {
+                          valid = false;
+                        }
+                      } else if (catType === 'lens') {
+                        if (!row.lens_type || !row.lens_index || !row.lens_material || !row.lens_coating) {
+                          valid = false;
+                        }
+                      }
+                    }
+                    if (!valid) {
+                      alert("Please fill in all required product fields (including brand name).");
+                      return;
+                    }
+                    setBatchStage('review');
+                  }}
+                  className="px-6 py-3 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,0.15)]"
+                >
+                  Confirm
+                </button>
+              )}
+              {batchStage === 'review' && (
+                <button 
+                  type="button"
+                  onClick={handleSaveBulk}
+                  disabled={saving}
+                  className="px-6 py-3 bg-black hover:bg-neutral-805 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,0.15)] disabled:opacity-50"
+                >
+                  {saving ? "Confirming..." : "Confirm"}
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="w-full bg-white rounded-3xl border border-gray-100 shadow-sm p-8 animate-fast-zoom">
+            <div className="mb-6">
               <h3 className="text-lg font-black text-black uppercase tracking-wider">Batch Ingest load</h3>
               <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-1">Ingest multiple product entities under a single checkpoint batch</p>
             </div>
-            <button 
-              type="button" 
-              onClick={handleAddBulkRow}
-              className="text-[10px] font-black bg-black text-white px-4 py-2.5 rounded-xl uppercase tracking-widest hover:scale-105 transition-all shadow-md"
-            >
-              + Add Row
-            </button>
-          </div>
 
-          <form onSubmit={handleSaveBulk} className="space-y-6">
-            {/* Checkpoint Name */}
-            <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
-              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Checkpoint / Batch Tag *</label>
-              <input 
-                required 
-                value={bulkCheckpointName} 
-                onChange={e => setBulkCheckpointName(e.target.value)} 
-                type="text" 
-                placeholder="e.g. CONTAINER SHIPMENT JULY-A" 
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none placeholder:text-gray-200" 
-              />
-            </div>
+            <div className="space-y-6">
+              {/* Screen 1: Details (Batch Tag & Category) */}
+              {batchStage === 'details' && (
+                <div className="space-y-6 animate-fast-zoom">
+                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Checkpoint / Batch Tag *</label>
+                      <input 
+                        required 
+                        value={bulkCheckpointName} 
+                        onChange={e => setBulkCheckpointName(e.target.value)} 
+                        type="text" 
+                        placeholder="e.g. CONTAINER SHIPMENT JULY-A" 
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none placeholder:text-gray-200 focus:border-black" 
+                      />
+                    </div>
 
-            {/* Bulk items rows */}
-            <div className="space-y-4">
-              {bulkRows.map((row, idx) => (
-                <div key={idx} className="p-5 border-2 border-black rounded-2xl relative bg-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-                  {bulkRows.length > 1 && (
+                    <div className="space-y-2 pt-2">
+                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Batch Category Classification Hierarchy *</label>
+                      <div className="space-y-4">
+                        <ProductCascadeLevel
+                          depth={0}
+                          options={categoryChildMap['__root__'] || []}
+                          selectedId={bulkCascadePath[0] || ''}
+                          onSelect={id => handleBulkCategoryLevelSelect(0, id)}
+                        />
+                        {bulkCascadePath.map((selectedId, idx) => {
+                          const children = categoryChildMap[selectedId] || [];
+                          if (children.length === 0) return null;
+                          return (
+                            <ProductCascadeLevel
+                              key={selectedId}
+                              depth={idx + 1}
+                              options={children}
+                              selectedId={bulkCascadePath[idx + 1] || ''}
+                              onSelect={id => handleBulkCategoryLevelSelect(idx + 1, id)}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (!bulkCheckpointName.trim()) {
+                        alert("Please enter a Batch Tag/Checkpoint name.");
+                        return;
+                      }
+                      if (!bulkCategoryId) {
+                        alert("Please select a Category.");
+                        return;
+                      }
+                      setBatchStage('products');
+                    }}
+                    className="w-full py-4.5 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-[1.01] transition-all h-[56px] flex justify-center items-center"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              )}
+
+              {/* Screen 2: Add Products */}
+              {batchStage === 'products' && (
+                <div className="space-y-6 animate-fast-zoom">
+                  {/* Clean Horizontal Active Info Border */}
+                  <div className="flex items-center justify-between py-2.5 border-b border-gray-100 gap-3">
+                    <div className="flex flex-col gap-1 text-[11px] font-black uppercase text-black">
+                      <div>
+                        <span className="text-gray-400 font-bold">Batch:</span>
+                        <span className="text-black ml-1">{bulkCheckpointName}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 font-bold">Category:</span>
+                        <span className="text-black ml-1">{categoryPaths[bulkCategoryId] || 'N/A'}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmEditDetailsPopup(true)}
+                      className="text-[9px] font-black uppercase tracking-widest bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3.5 py-2 rounded-xl text-gray-500 hover:text-black transition-all shrink-0"
+                    >
+                      Edit
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {bulkRows.map((row, idx) => (
+                      <div key={idx} className="p-5 border border-gray-150 rounded-2xl relative bg-white shadow-sm">
+                        {bulkRows.length > 1 && (
+                          <button 
+                            type="button" 
+                            onClick={() => handleRemoveBulkRow(idx)}
+                            className="absolute top-4 right-4 text-red-500 hover:scale-110 transition-transform"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                        <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest block mb-3">Ingest Row #{idx + 1}</span>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-1 md:col-span-2">
+                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Name *</label>
+                            <input 
+                              required 
+                              value={row.name} 
+                              onChange={e => handleBulkRowChange(idx, 'name', e.target.value)} 
+                              type="text" 
+                              placeholder="Product Name" 
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Brand *</label>
+                            {getCategoryType(bulkCategoryId) === 'frame' ? (
+                              <div className="space-y-1.5">
+                                <select
+                                  value={['Bonthus', 'Jas Harlon'].includes(row.brand) ? row.brand : (row.brand ? 'Custom' : '')}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    if (val === 'Custom') {
+                                      handleBulkRowChange(idx, '_brand_is_custom', true);
+                                      handleBulkRowChange(idx, 'brand', '');
+                                    } else {
+                                      handleBulkRowChange(idx, '_brand_is_custom', false);
+                                      handleBulkRowChange(idx, 'brand', val);
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black bg-white cursor-pointer"
+                                >
+                                  <option value="">— Select —</option>
+                                  <option value="Bonthus">Bonthus</option>
+                                  <option value="Jas Harlon">Jas Harlon</option>
+                                  <option value="Custom">Custom...</option>
+                                </select>
+                                {(row._brand_is_custom || (!['Bonthus', 'Jas Harlon', ''].includes(row.brand))) && (
+                                  <input 
+                                    required
+                                    value={row.brand === 'Custom' ? '' : row.brand} 
+                                    onChange={e => handleBulkRowChange(idx, 'brand', e.target.value)} 
+                                    type="text" 
+                                    placeholder="Enter Custom Brand" 
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black animate-fast-slide" 
+                                  />
+                                )}
+                              </div>
+                            ) : (
+                              <input 
+                                value={row.brand} 
+                                onChange={e => handleBulkRowChange(idx, 'brand', e.target.value)} 
+                                type="text" 
+                                placeholder="Brand Name" 
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                              />
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mt-3">
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Stock Qty *</label>
+                            <input 
+                              required 
+                              value={row.stock_quantity} 
+                              onChange={e => handleBulkRowChange(idx, 'stock_quantity', e.target.value)} 
+                              type="number" 
+                              min="1"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Base Price (₹) *</label>
+                            <input 
+                              required 
+                              value={row.base_price} 
+                              onChange={e => handleBulkRowChange(idx, 'base_price', e.target.value)} 
+                              type="number" 
+                              placeholder="₹" 
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                            />
+                          </div>
+                        </div>
+
+                        {/* Conditional Batch Row Custom Fields for Frame */}
+                        {getCategoryType(bulkCategoryId) === 'frame' && (
+                          <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 animate-fast-zoom">
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Model No *</label>
+                              <input required value={row.frame_model_no || ''} onChange={e => handleBulkRowChange(idx, 'frame_model_no', e.target.value)} type="text" placeholder="e.g. 78005" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Color *</label>
+                              <input required value={row.frame_color || ''} onChange={e => handleBulkRowChange(idx, 'frame_color', e.target.value)} type="text" placeholder="e.g. Black" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Type *</label>
+                              <select required value={row.frame_type || ''} onChange={e => handleBulkRowChange(idx, 'frame_type', e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black">
+                                <option value="">— Select —</option>
+                                <option value="Full Rim">Full Rim</option>
+                                <option value="Half Rim">Half Rim</option>
+                                <option value="Rimless">Rimless</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Shape *</label>
+                              <select required value={row.frame_shape || ''} onChange={e => handleBulkRowChange(idx, 'frame_shape', e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black">
+                                <option value="">— Select —</option>
+                                <option value="Square">Square</option>
+                                <option value="Rectangle">Rectangle</option>
+                                <option value="Round">Round</option>
+                                <option value="Oval">Oval</option>
+                                <option value="Aviator">Aviator</option>
+                                <option value="Wayfarer">Wayfarer</option>
+                                <option value="Clubmaster">Clubmaster</option>
+                                <option value="Cat Eye">Cat Eye</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">A Size</label>
+                              <input value={row.frame_size_a || ''} onChange={e => handleBulkRowChange(idx, 'frame_size_a', e.target.value)} type="text" placeholder="e.g. 52" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">B Size</label>
+                              <input value={row.frame_size_b || ''} onChange={e => handleBulkRowChange(idx, 'frame_size_b', e.target.value)} type="text" placeholder="e.g. 38" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Temple</label>
+                              <input value={row.frame_temple_length || ''} onChange={e => handleBulkRowChange(idx, 'frame_temple_length', e.target.value)} type="text" placeholder="e.g. 140" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">DBL</label>
+                              <input value={row.frame_dbl || ''} onChange={e => handleBulkRowChange(idx, 'frame_dbl', e.target.value)} type="text" placeholder="e.g. 18" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Conditional Batch Row Custom Fields for Lens */}
+                        {getCategoryType(bulkCategoryId) === 'lens' && (
+                          <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 animate-fast-zoom">
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Lens Type *</label>
+                              <select required value={row.lens_type || ''} onChange={e => handleBulkRowChange(idx, 'lens_type', e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black">
+                                <option value="">— Select —</option>
+                                <option value="Single Vision">Single Vision</option>
+                                <option value="Bifocal">Bifocal</option>
+                                <option value="Progressive">Progressive</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Index *</label>
+                              <input required value={row.lens_index || ''} onChange={e => handleBulkRowChange(idx, 'lens_index', e.target.value)} type="text" placeholder="e.g. 1.56" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Material *</label>
+                              <input required value={row.lens_material || ''} onChange={e => handleBulkRowChange(idx, 'lens_material', e.target.value)} type="text" placeholder="e.g. CR-39" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Coating *</label>
+                              <input required value={row.lens_coating || ''} onChange={e => handleBulkRowChange(idx, 'lens_coating', e.target.value)} type="text" placeholder="e.g. ARC" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH</label>
+                              <input value={row.lens_sph || ''} onChange={e => handleBulkRowChange(idx, 'lens_sph', e.target.value)} type="text" placeholder="e.g. -2.00" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
+                              <input value={row.lens_cyl || ''} onChange={e => handleBulkRowChange(idx, 'lens_cyl', e.target.value)} type="text" placeholder="e.g. -0.50" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
+                              <input value={row.lens_axis || ''} onChange={e => handleBulkRowChange(idx, 'lens_axis', e.target.value)} type="text" placeholder="e.g. 180" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">ADD</label>
+                              <input value={row.lens_add || ''} onChange={e => handleBulkRowChange(idx, 'lens_add', e.target.value)} type="text" placeholder="e.g. +2.00" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add Row Button at the bottom of the card list, aligned right */}
+                  <div className="flex justify-end pt-2">
                     <button 
                       type="button" 
-                      onClick={() => handleRemoveBulkRow(idx)}
-                      className="absolute top-4 right-4 text-red-500 hover:scale-110 transition-transform"
+                      onClick={handleAddBulkRow}
+                      className="text-[10px] font-black bg-black text-white px-5 py-3 rounded-xl uppercase tracking-widest hover:scale-105 transition-all shadow-md flex items-center gap-2"
                     >
-                      <Trash2 size={16} />
+                      + Add Row
                     </button>
-                  )}
-                  <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest block mb-3">Ingest Row #{idx + 1}</span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Name *</label>
-                      <input 
-                        required 
-                        value={row.name} 
-                        onChange={e => handleBulkRowChange(idx, 'name', e.target.value)} 
-                        type="text" 
-                        placeholder="Product Name" 
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none" 
-                      />
+                  </div>
+                </div>
+              )}
+
+              {/* Screen 3: Review & Submit */}
+              {batchStage === 'review' && (
+                <div className="space-y-6 animate-fast-zoom">
+                  <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                    <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Review Batch Details</h4>
+                    <div className="grid grid-cols-2 gap-4 text-xs font-bold">
+                      <div>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Batch/Checkpoint Tag</p>
+                        <p className="text-black uppercase">{bulkCheckpointName}</p>
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Category Classification</p>
+                        <p className="text-black uppercase">{categoryPaths[bulkCategoryId] || 'N/A'}</p>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Brand</label>
-                      <input 
-                        value={row.brand} 
-                        onChange={e => handleBulkRowChange(idx, 'brand', e.target.value)} 
-                        type="text" 
-                        placeholder="Brand Name" 
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SKU *</label>
-                      <input 
-                        required 
-                        value={row.sku} 
-                        onChange={e => handleBulkRowChange(idx, 'sku', e.target.value)} 
-                        type="text" 
-                        placeholder="SKU" 
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Category (Classification)</label>
-                      <select 
-                        value={row.category_id} 
-                        onChange={e => handleBulkRowChange(idx, 'category_id', e.target.value)} 
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none bg-white cursor-pointer"
-                      >
-                        <option value="">— Select —</option>
-                        {categories.map(c => (
-                          <option key={c.id} value={c.id}>{categoryPaths[c.id] || c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Stock Qty *</label>
-                      <input 
-                        required 
-                        value={row.stock_quantity} 
-                        onChange={e => handleBulkRowChange(idx, 'stock_quantity', e.target.value)} 
-                        type="number" 
-                        min="1"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Base Price (₹) *</label>
-                      <input 
-                        required 
-                        value={row.base_price} 
-                        onChange={e => handleBulkRowChange(idx, 'base_price', e.target.value)} 
-                        type="number" 
-                        placeholder="₹" 
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none" 
-                      />
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Products Summary ({bulkRows.length})</h4>
+                    <div className="border border-gray-150 rounded-2xl overflow-hidden divide-y divide-gray-100 bg-white">
+                      {bulkRows.map((row, idx) => {
+                        const catType = getCategoryType(bulkCategoryId);
+                        return (
+                          <div key={idx} className="p-5 flex flex-col gap-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-xs font-black text-black uppercase">{row.name || 'Unnamed Product'}</p>
+                                <p className="text-[9px] text-gray-455 font-bold uppercase tracking-wider mt-0.5">
+                                  Brand: {row.brand || 'N/A'} | Qty: {row.stock_quantity}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs font-black text-black">₹{row.base_price}</p>
+                              </div>
+                            </div>
+                            
+                            {catType === 'frame' && (
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">Model No</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.frame_model_no || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">Color</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.frame_color || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">Type</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.frame_type || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">Shape</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.frame_shape || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">A Size</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.frame_size_a || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">B Size</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.frame_size_b || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">Temple</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.frame_temple_length || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">DBL</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.frame_dbl || '—'}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {catType === 'lens' && (
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">Lens Type</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.lens_type || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">Index</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.lens_index || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">Material</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.lens_material || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">Coating</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.lens_coating || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">SPH</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.lens_sph || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">CYL</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.lens_cyl || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">AXIS</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.lens_axis || '—'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-gray-400 block uppercase tracking-wider">ADD</span>
+                                  <span className="text-[10px] font-bold text-black uppercase">{row.lens_add || '—'}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
-              ))}
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Details Editing Modal */}
+      {showEditDetailsPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowEditDetailsPopup(false)} />
+          <div className="relative bg-white border-2 border-black rounded-[24px] p-6 shadow-2xl max-w-lg w-full space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div>
+              <h3 className="text-base font-black text-black uppercase tracking-tight">Edit Batch Details</h3>
+              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1">Update batch metadata without losing product row values</p>
             </div>
 
-            <button type="submit" disabled={saving} className="w-full py-4.5 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-[1.01] transition-all disabled:opacity-50 h-[56px] flex justify-center items-center">
-              {saving ? "Commiting Batch..." : "Commit Batch Drafts to Queue"}
-            </button>
-          </form>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Checkpoint / Batch Tag *</label>
+                <input 
+                  required 
+                  value={bulkCheckpointName} 
+                  onChange={e => setBulkCheckpointName(e.target.value)} 
+                  type="text" 
+                  placeholder="e.g. CONTAINER SHIPMENT JULY-A" 
+                  className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-150 rounded-xl text-[12px] font-bold text-black outline-none placeholder:text-gray-200 focus:border-black" 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Batch Category Classification Hierarchy *</label>
+                <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                  <ProductCascadeLevel
+                    depth={0}
+                    options={categoryChildMap['__root__'] || []}
+                    selectedId={bulkCascadePath[0] || ''}
+                    onSelect={id => handleBulkCategoryLevelSelect(0, id)}
+                  />
+                  {bulkCascadePath.map((selectedId, idx) => {
+                    const children = categoryChildMap[selectedId] || [];
+                    if (children.length === 0) return null;
+                    return (
+                      <ProductCascadeLevel
+                        key={selectedId}
+                        depth={idx + 1}
+                        options={children}
+                        selectedId={bulkCascadePath[idx + 1] || ''}
+                        onSelect={id => handleBulkCategoryLevelSelect(idx + 1, id)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowEditDetailsPopup(false)}
+                className="flex-1 py-3 text-[10px] font-black uppercase border border-neutral-200 rounded-xl hover:bg-neutral-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!bulkCheckpointName.trim()) {
+                    alert("Please enter a Batch Tag/Checkpoint name.");
+                    return;
+                  }
+                  if (!bulkCategoryId) {
+                    alert("Please select a Category.");
+                    return;
+                  }
+                  setShowEditDetailsPopup(false);
+                }}
+                className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase rounded-xl hover:bg-neutral-800"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation of Editing active batch details */}
+      {showConfirmEditDetailsPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowConfirmEditDetailsPopup(false)} />
+          <div className="relative bg-white border-2 border-black rounded-[24px] p-6 shadow-2xl max-w-sm w-full space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div>
+              <h3 className="text-base font-black text-black uppercase tracking-tight">Confirm Edit</h3>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">
+                Are you sure you want to edit batch details?
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowConfirmEditDetailsPopup(false)}
+                className="flex-1 py-3 text-[10px] font-black uppercase border border-neutral-200 rounded-xl hover:bg-neutral-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmEditDetailsPopup(false);
+                  setShowEditDetailsPopup(true);
+                }}
+                className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase rounded-xl hover:bg-neutral-800"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* -------------------- 4. REVIEW QUEUE TAB -------------------- */}
       {activeTab === "review-queue" && (
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Select and Confirm Ingested checkpoint batches</span>
+          {/* Analysis View cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-3xl border border-gray-150 p-6 flex items-center justify-between shadow-sm">
+              <div>
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Total Batches</span>
+                <span className="text-2xl font-black text-black block mt-1">{reviewStats.totalBatches}</span>
+              </div>
+              <div className="p-3 bg-neutral-50 rounded-2xl border border-neutral-100">
+                <ClipboardList className="text-black" size={24} />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-gray-150 p-6 flex items-center justify-between shadow-sm">
+              <div>
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Pending Products</span>
+                <span className="text-2xl font-black text-amber-500 block mt-1">{reviewStats.pendingCount}</span>
+              </div>
+              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-100">
+                <FolderSync className="text-amber-500" size={24} />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-gray-150 p-6 flex items-center justify-between shadow-sm">
+              <div>
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Confirmed Products</span>
+                <span className="text-2xl font-black text-green-500 block mt-1">{reviewStats.confirmedCount}</span>
+              </div>
+              <div className="p-3 bg-green-50 rounded-2xl border border-green-100">
+                <CheckCircle2 className="text-green-500" size={24} />
+              </div>
+            </div>
+          </div>
+
+          {/* Batch Breakdown Boxes */}
+          {reviewStats.batchBreakdown.length > 0 && (
+            <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4">
+              <h4 className="text-[10px] font-black text-black uppercase tracking-widest font-black">Batch / Box Breakdown</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {reviewStats.batchBreakdown.map((b, idx) => (
+                  <div key={idx} className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center space-y-1">
+                    <p className="text-[9px] font-black text-black uppercase truncate">{b.name}</p>
+                    <div className="flex justify-center gap-1.5 text-[9px] font-bold">
+                      <span className="text-amber-500">{b.pending} P</span>
+                      <span className="text-gray-300">|</span>
+                      <span className="text-green-500">{b.confirmed} C</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Ingestion Controls */}
+          <div className="bg-white rounded-3xl border border-gray-105 shadow-sm p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+              Select and Confirm Ingested checkpoint batches
+            </span>
             {selectedPendingIds.size > 0 && (
               <div className="flex items-center gap-2 animate-fast-zoom">
                 <button 
-                  onClick={handleConfirmSelected}
+                  onClick={handleIngestSelectedConfirmed}
                   disabled={saving}
                   className="text-[10px] font-black bg-black text-white uppercase tracking-widest px-4 py-2.5 rounded-xl hover:scale-105 transition-all flex items-center gap-1.5 shadow-md animate-pulse"
                 >
-                  <CheckCircle2 size={12} /> Confirm Selected ({selectedPendingIds.size})
+                  <CheckCircle2 size={12} /> Ingest Selected Confirmed ({selectedPendingIds.size})
                 </button>
                 <button 
                   onClick={handleDeleteSelectedPending}
@@ -912,10 +1766,12 @@ export default function ProductList({ userProfile }) {
             )}
           </div>
 
+          {/* Accordion / Groups */}
           <div className="space-y-6">
             {Object.entries(pendingByCheckpoint).map(([checkpoint, items]) => {
-              const hasCheckedAll = items.every(i => selectedPendingIds.has(i.id));
-              const hasCheckedSome = items.some(i => selectedPendingIds.has(i.id)) && !hasCheckedAll;
+              const confirmedItems = items.filter(i => i.status === 'confirmed');
+              const hasCheckedAll = confirmedItems.length > 0 && confirmedItems.every(i => selectedPendingIds.has(i.id));
+              const hasCheckedSome = confirmedItems.some(i => selectedPendingIds.has(i.id)) && !hasCheckedAll;
 
               return (
                 <div key={checkpoint} className="bg-white rounded-3xl border-2 border-black overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
@@ -925,21 +1781,22 @@ export default function ProductList({ userProfile }) {
                       <input 
                         type="checkbox"
                         checked={hasCheckedAll}
+                        disabled={confirmedItems.length === 0}
                         ref={el => {
                           if (el) el.indeterminate = hasCheckedSome;
                         }}
                         onChange={e => toggleSelectCheckpoint(items, e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
+                        className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                       <div>
                         <h3 className="text-sm font-black text-black uppercase tracking-wider">{checkpoint}</h3>
                         <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
-                          {items.length} Pending entities in queue
+                          {items.length} entities ({items.filter(i => i.status === 'pending').length} Pending, {items.filter(i => i.status === 'confirmed').length} Confirmed)
                         </p>
                       </div>
                     </div>
-                    <span className="text-[9px] font-black bg-white border border-gray-200 text-gray-400 px-3 py-1 rounded-full uppercase tracking-wider">
-                      Batch Pending
+                    <span className="text-[9px] font-black bg-white border border-gray-200 text-gray-500 px-3 py-1 rounded-full uppercase tracking-wider">
+                      Batch Ingest
                     </span>
                   </div>
 
@@ -950,12 +1807,13 @@ export default function ProductList({ userProfile }) {
                         <tr className="bg-white border-b border-gray-100">
                           <th className="w-12 px-6 py-3"></th>
                           <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Name</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">SKU</th>
+                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">BARCODE</th>
                           <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Brand</th>
                           <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Category</th>
                           <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Price</th>
                           <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Qty</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Destination Store</th>
+                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 bg-white">
@@ -965,8 +1823,9 @@ export default function ProductList({ userProfile }) {
                               <input 
                                 type="checkbox"
                                 checked={selectedPendingIds.has(item.id)}
+                                disabled={item.status !== 'confirmed'}
                                 onChange={() => toggleSelectPending(item.id)}
-                                className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
+                                className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                               />
                             </td>
                             <td className="px-6 py-3 text-xs font-black text-black uppercase tracking-tight">{item.name}</td>
@@ -977,8 +1836,25 @@ export default function ProductList({ userProfile }) {
                             </td>
                             <td className="px-6 py-3 text-xs font-bold text-black">₹{item.base_price}</td>
                             <td className="px-6 py-3 text-xs font-black text-black">{item.stock_quantity} units</td>
-                            <td className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                              {item.store?.name || "Global / Warehouse"}
+                            <td className="px-6 py-3">
+                              {item.status === 'confirmed' ? (
+                                <span className="text-[8px] font-black bg-green-50 text-green-700 border border-green-150 px-2 py-0.5 rounded-full uppercase tracking-wider font-black">Confirmed</span>
+                              ) : (
+                                <span className="text-[8px] font-black bg-amber-50 text-amber-700 border border-amber-150 px-2 py-0.5 rounded-full uppercase tracking-wider font-black">Pending</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-3">
+                              {item.status === 'confirmed' ? (
+                                <button
+                                  onClick={() => handleIngestConfirmedProduct(item)}
+                                  disabled={saving}
+                                  className="text-[9px] font-black bg-black text-white px-3 py-1.5 rounded-lg uppercase tracking-widest hover:scale-105 transition-all shadow-sm"
+                                >
+                                  Add to Products
+                                </button>
+                              ) : (
+                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Requires Scan</span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -994,7 +1870,7 @@ export default function ProductList({ userProfile }) {
                 <FolderSync size={32} className="text-gray-300 animate-pulse" />
                 <div>
                   <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Ingestion queue empty</p>
-                  <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider mt-1">No pending checkpoint batches saved currently</p>
+                  <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider mt-1">No pending or confirmed checkpoint batches currently</p>
                 </div>
               </div>
             )}
@@ -1052,6 +1928,112 @@ export default function ProductList({ userProfile }) {
                         })}
                     </div>
                 </div>
+
+                {/* Conditional Custom Fields for Frame */}
+                {getCategoryType(productData.category_id) === 'frame' && (
+                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                    <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Frame Specifications</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Model No *</label>
+                        <input required type="text" value={frameFields.modelNo} onChange={e => setFrameFields({...frameFields, modelNo: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 78005" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Color *</label>
+                        <input required type="text" value={frameFields.color} onChange={e => setFrameFields({...frameFields, color: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. Black" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Frame Type *</label>
+                        <select required value={frameFields.frameType} onChange={e => setFrameFields({...frameFields, frameType: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-black outline-none cursor-pointer focus:border-black">
+                          <option value="">— Select —</option>
+                          <option value="Full Rim">Full Rim</option>
+                          <option value="Half Rim">Half Rim</option>
+                          <option value="Rimless">Rimless</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Frame Shape *</label>
+                        <select required value={frameFields.frameShape} onChange={e => setFrameFields({...frameFields, frameShape: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-black outline-none cursor-pointer focus:border-black">
+                          <option value="">— Select —</option>
+                          <option value="Square">Square</option>
+                          <option value="Rectangle">Rectangle</option>
+                          <option value="Round">Round</option>
+                          <option value="Oval">Oval</option>
+                          <option value="Aviator">Aviator</option>
+                          <option value="Wayfarer">Wayfarer</option>
+                          <option value="Clubmaster">Clubmaster</option>
+                          <option value="Cat Eye">Cat Eye</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">A Size (Lens Width)</label>
+                        <input type="text" value={frameFields.sizeA} onChange={e => setFrameFields({...frameFields, sizeA: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 52" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">B Size (Lens Height)</label>
+                        <input type="text" value={frameFields.sizeB} onChange={e => setFrameFields({...frameFields, sizeB: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 38" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Temple Length</label>
+                        <input type="text" value={frameFields.templeLength} onChange={e => setFrameFields({...frameFields, templeLength: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 140" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">DBL (Bridge Size)</label>
+                        <input type="text" value={frameFields.dbl} onChange={e => setFrameFields({...frameFields, dbl: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 18" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Conditional Custom Fields for Lens */}
+                {getCategoryType(productData.category_id) === 'lens' && (
+                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                    <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Lens Specifications</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Lens Type *</label>
+                        <select required value={lensFields.lensType} onChange={e => setLensFields({...lensFields, lensType: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-black outline-none cursor-pointer focus:border-black">
+                          <option value="">— Select —</option>
+                          <option value="Single Vision">Single Vision</option>
+                          <option value="Bifocal">Bifocal</option>
+                          <option value="Progressive">Progressive</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Index *</label>
+                        <input required type="text" value={lensFields.index} onChange={e => setLensFields({...lensFields, index: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 1.56, 1.61" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Material *</label>
+                        <input required type="text" value={lensFields.material} onChange={e => setLensFields({...lensFields, material: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. CR-39, Poly" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Coating *</label>
+                        <input required type="text" value={lensFields.coating} onChange={e => setLensFields({...lensFields, coating: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. ARC, Blue Cut" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH Power</label>
+                        <input type="text" value={lensFields.sph} onChange={e => setLensFields({...lensFields, sph: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. -2.00" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL Power</label>
+                        <input type="text" value={lensFields.cyl} onChange={e => setLensFields({...lensFields, cyl: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. -0.50" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
+                        <input type="text" value={lensFields.axis} onChange={e => setLensFields({...lensFields, axis: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 180" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">ADD Power</label>
+                        <input type="text" value={lensFields.add} onChange={e => setLensFields({...lensFields, add: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. +2.00" />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Detail Description */}
                 <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">

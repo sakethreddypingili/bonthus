@@ -103,13 +103,7 @@ export default function BarcodeCreator() {
   };
 
   return (
-    <div className="space-y-8 pb-20 animate-fast-slide">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Barcode Creator</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Deploy new operational barcode vectors</p>
-        </div>
-      </div>
+    <div className="space-y-6 pb-20 animate-fast-slide">
 
       <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-10 items-start">
         {/* Configuration Panel */}

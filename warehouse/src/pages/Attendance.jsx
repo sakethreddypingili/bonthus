@@ -260,28 +260,7 @@ export default function Attendance({ userProfile }) {
   };
 
   return (
-    <div className="space-y-8 animate-fast-slide pb-20">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Attendance</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Operational Pulse & Workforce Ledger</p>
-        </div>
-
-        {isAdminOrManager && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-2xl border border-gray-100">
-            <Building2 size={16} className="text-black" />
-            <select 
-              value={selectedStoreId} 
-              onChange={(e) => setSelectedStoreId(e.target.value)}
-              className="bg-transparent text-[10px] font-black uppercase text-black focus:outline-none cursor-pointer"
-            >
-              {isSuperAdmin && <option value="All">All Clusters</option>}
-              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-        )}
-      </div>
+    <div className="space-y-6 animate-fast-slide pb-20">
 
       {notice.message && (
         <div className={`p-6 rounded-[2rem] border text-[11px] font-black uppercase tracking-widest flex items-center gap-4 animate-in slide-in-from-top-4 ${notice.type === "error" ? "bg-red-50 text-red-600 border-red-100" : "bg-black text-white border-black"}`}>
@@ -291,14 +270,30 @@ export default function Attendance({ userProfile }) {
       )}
 
       {/* Navigation */}
-      <div className="flex items-center bg-gray-50 border border-gray-100 p-1.5 rounded-[2rem] w-full md:w-max">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center bg-gray-50 border border-gray-100 p-1.5 rounded-[2rem] w-full md:w-max">
+          {isAdminOrManager && (
+            <button onClick={() => setActiveTab("users")} className={`flex-1 md:px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "users" ? "bg-black text-white shadow-xl" : "text-gray-400 hover:text-black"}`}>Staff</button>
+          )}
+          <button onClick={() => setActiveTab("scan")} className={`flex-1 md:px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "scan" ? "bg-black text-white shadow-xl" : "text-gray-400 hover:text-black"}`}>Scanner</button>
+          <button onClick={() => setActiveTab("history")} className={`flex-1 md:px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "history" ? "bg-black text-white shadow-xl" : "text-gray-400 hover:text-black"}`}>Ledger</button>
+          {isAdminOrManager && (
+            <button onClick={() => setActiveTab("qr")} className={`flex-1 md:px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "qr" ? "bg-black text-white shadow-xl" : "text-gray-400 hover:text-black"}`}>Gen QR</button>
+          )}
+        </div>
+
         {isAdminOrManager && (
-          <button onClick={() => setActiveTab("users")} className={`flex-1 md:px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "users" ? "bg-black text-white shadow-xl" : "text-gray-400 hover:text-black"}`}>Staff</button>
-        )}
-        <button onClick={() => setActiveTab("scan")} className={`flex-1 md:px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "scan" ? "bg-black text-white shadow-xl" : "text-gray-400 hover:text-black"}`}>Scanner</button>
-        <button onClick={() => setActiveTab("history")} className={`flex-1 md:px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "history" ? "bg-black text-white shadow-xl" : "text-gray-400 hover:text-black"}`}>Ledger</button>
-        {isAdminOrManager && (
-          <button onClick={() => setActiveTab("qr")} className={`flex-1 md:px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "qr" ? "bg-black text-white shadow-xl" : "text-gray-400 hover:text-black"}`}>Gen QR</button>
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-2xl border border-gray-100 shadow-sm w-fit">
+            <Building2 size={16} className="text-gray-400" />
+            <select 
+              value={selectedStoreId} 
+              onChange={(e) => setSelectedStoreId(e.target.value)}
+              className="bg-transparent text-[10px] font-black uppercase text-black focus:outline-none cursor-pointer pr-4"
+            >
+              {isSuperAdmin && <option value="All">All Clusters</option>}
+              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
         )}
       </div>
 

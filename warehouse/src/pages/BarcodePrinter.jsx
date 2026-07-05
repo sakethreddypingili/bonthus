@@ -430,19 +430,9 @@ export default function BarcodePrinter({ userProfile }) {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5 p-2 sm:p-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-black uppercase tracking-tight flex items-center gap-2">
-            <Printer className="w-6 h-6 sm:w-7 sm:h-7 text-black" />
-            Barcode Printer Manager
-          </h1>
-          <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-widest mt-0.5">
-            TSC TE244 Layout Spooler & Hardware Manager
-          </p>
-        </div>
-        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5 self-start sm:self-center">
+    <div className="w-full space-y-5 p-2 sm:p-4">
+      <div className="flex justify-end mb-2">
+        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5 shadow-sm">
           <span className={`w-2 h-2 rounded-full ${
             agentStatus === "ONLINE" ? "bg-green-500 animate-pulse" :
             agentStatus === "OFFLINE" ? "bg-red-500 animate-pulse" : "bg-yellow-500"

@@ -241,6 +241,7 @@ export default function Power({ userProfile }) {
     age: ""
   });
   const [notification, setNotification] = useState(null);
+  const [viewFlowList, setViewFlowList] = useState(false);
 
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -590,9 +591,6 @@ export default function Power({ userProfile }) {
     if (!userProfile?.store_id) return;
     setLoadingFlow(true);
     try {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
       const { data, error } = await supabase
         .from('customer_visits')
         .select(`
@@ -600,6 +598,7 @@ export default function Power({ userProfile }) {
           customer_id,
           purpose,
           status,
+          created_at,
           customers (
             id,
             name,
@@ -610,8 +609,8 @@ export default function Power({ userProfile }) {
           )
         `)
         .eq('store_id', userProfile.store_id)
-        .gte('created_at', todayStart.toISOString())
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
       
@@ -623,7 +622,8 @@ export default function Power({ userProfile }) {
           unique.push({
             ...v.customers,
             purpose: v.purpose,
-            status: v.status
+            status: v.status,
+            created_at: v.created_at
           });
         }
       });
@@ -1033,27 +1033,395 @@ export default function Power({ userProfile }) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fast-slide pb-20">
+    <div className="max-w-6xl mx-auto space-y-8 animate-fast-slide pb-20">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-100 pb-6">
         <div>
           <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Power Records</h1>
           <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Add & View customer prescriptions</p>
         </div>
-        <button
-          onClick={handleOpenAddModal}
-          className="px-6 py-3 bg-black text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg flex items-center gap-2"
-        >
-          <Plus size={14} strokeWidth={3} /> Record Power
-        </button>
+        <div>
+          <button
+            type="button"
+            onClick={() => {
+              fetchFlowCustomers();
+              setShowSearchModal(true);
+            }}
+            className="px-6 py-3.5 bg-black text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-neutral-900 transition-all shadow-lg flex items-center gap-2"
+          >
+            <Plus size={14} /> Add Power
+          </button>
+        </div>
       </div>
 
+      {selectedProfile ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Side: Form Entry */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* Selected Profile Header Card */}
+            <div className="bg-white rounded-[28px] border border-neutral-200 p-6 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-[9px] font-black text-neutral-450 uppercase tracking-widest block mb-0.5">Active Patient</span>
+                <span className="text-sm font-black text-neutral-900 uppercase tracking-wider block">{selectedProfile.name}</span>
+                <span className="text-[10px] font-mono font-bold text-neutral-500 mt-1 block">{selectedProfile.phone}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedProfile(null);
+                  setHistory([]);
+                  reset();
+                }}
+                className="text-[10px] font-black text-red-600 border border-red-200 hover:border-red-600 hover:bg-red-50 rounded-xl px-4 py-2 uppercase tracking-widest transition-all"
+              >
+                Change Patient
+              </button>
+            </div>
+
+            {/* Eye Power Entry Form */}
+            <form onSubmit={handleFormSubmit(handleSavePrescription)} className="space-y-6">
+              {/* Premium Unified Table Card */}
+              <div className="border border-neutral-200 rounded-[24px] overflow-hidden bg-white shadow-sm">
+                <div className="bg-[#0a2240] text-white px-6 py-4 font-black text-xs uppercase tracking-widest text-center">
+                  Power Prescription Matrix
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-neutral-50 text-neutral-600 border-b border-neutral-200">
+                        <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider border-r border-neutral-200 min-w-[60px]">
+                          Rx
+                        </th>
+                        <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider border-r border-neutral-200 min-w-[140px]">
+                          SPH
+                        </th>
+                        <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider border-r border-neutral-200 min-w-[140px]">
+                          CYL
+                        </th>
+                        <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider border-r border-neutral-200 min-w-[80px]">
+                          AXIS
+                        </th>
+                        <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider border-r border-neutral-200 min-w-[140px]">
+                          ADD POWER
+                        </th>
+                        <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider border-r border-neutral-200 min-w-[100px]">
+                          BCVA DISTANCE
+                        </th>
+                        <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider border-r border-neutral-200 min-w-[100px]">
+                          BCVA NEAR
+                        </th>
+                        <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider border-r border-neutral-200 min-w-[80px]">
+                          PD
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* OD (Right Eye) */}
+                      <tr className="border-b border-neutral-200 hover:bg-neutral-50/30">
+                        <td className="px-4 py-3 text-center font-black text-xs text-neutral-800 border-r border-neutral-200 bg-neutral-50/50">
+                          RE
+                        </td>
+                        {/* SPH */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <SmartPowerInput name="re.sph" control={control} tabIndex={1} placeholder="0.00" />
+                        </td>
+                        {/* CYL */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <SmartPowerInput name="re.cyl" control={control} tabIndex={2} placeholder="0.00" />
+                        </td>
+                        {/* AXIS */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <input
+                            type="number"
+                            min="0"
+                            max="180"
+                            {...register("re.axis")}
+                            tabIndex={3}
+                            placeholder="Axis"
+                            className="w-full px-3 py-3 text-xs font-black font-mono text-center border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
+                          />
+                        </td>
+                        {/* ADD POWER */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <SmartPowerInput name="nv_re.add" control={control} tabIndex={4} placeholder="+2.00" />
+                        </td>
+                        {/* BCVA DISTANCE */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <select
+                            {...register(`acuity.distRe`)}
+                            tabIndex={5}
+                            className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white text-center appearance-none"
+                          >
+                            {["—", "6/4", "6/5", "6/6", "6/9", "6/12", "6/18", "6/24", "6/36", "6/60"].map(v => (
+                              <option key={v} value={v === "—" ? "" : v}>{v}</option>
+                            ))}
+                          </select>
+                        </td>
+                        {/* BCVA NEAR */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <select
+                            {...register(`acuity.nearRe`)}
+                            tabIndex={6}
+                            className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white text-center appearance-none"
+                          >
+                            {["—", "N5", "N6", "N8", "N10", "N12", "N18"].map(v => (
+                              <option key={v} value={v === "—" ? "" : v}>{v}</option>
+                            ))}
+                          </select>
+                        </td>
+                        {/* PD */}
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            step="0.5"
+                            {...register("pd.re")}
+                            tabIndex={7}
+                            placeholder="RE PD"
+                            className="w-full px-3 py-3 text-xs font-black font-mono text-center border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
+                          />
+                        </td>
+                      </tr>
+
+                      {/* OS (Left Eye) */}
+                      <tr className="hover:bg-neutral-50/30">
+                        <td className="px-4 py-3 text-center font-black text-xs text-neutral-800 border-r border-neutral-200 bg-neutral-50/50">
+                          LE
+                        </td>
+                        {/* SPH */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <SmartPowerInput name="le.sph" control={control} tabIndex={11} placeholder="0.00" />
+                        </td>
+                        {/* CYL */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <SmartPowerInput name="le.cyl" control={control} tabIndex={12} placeholder="0.00" />
+                        </td>
+                        {/* AXIS */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <input
+                            type="number"
+                            min="0"
+                            max="180"
+                            {...register("le.axis")}
+                            tabIndex={13}
+                            placeholder="Axis"
+                            className="w-full px-3 py-3 text-xs font-black font-mono text-center border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
+                          />
+                        </td>
+                        {/* ADD POWER */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <SmartPowerInput name="nv_le.add" control={control} tabIndex={14} placeholder="+2.00" />
+                        </td>
+                        {/* BCVA DISTANCE */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <select
+                            {...register(`acuity.distLe`)}
+                            tabIndex={15}
+                            className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white text-center appearance-none"
+                          >
+                            {["—", "6/4", "6/5", "6/6", "6/9", "6/12", "6/18", "6/24", "6/36", "6/60"].map(v => (
+                              <option key={v} value={v === "—" ? "" : v}>{v}</option>
+                            ))}
+                          </select>
+                        </td>
+                        {/* BCVA NEAR */}
+                        <td className="px-2 py-2 border-r border-neutral-200">
+                          <select
+                            {...register(`acuity.nearLe`)}
+                            tabIndex={16}
+                            className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white text-center appearance-none"
+                          >
+                            {["—", "N5", "N6", "N8", "N10", "N12", "N18"].map(v => (
+                              <option key={v} value={v === "—" ? "" : v}>{v}</option>
+                            ))}
+                          </select>
+                        </td>
+                        {/* PD */}
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            step="0.5"
+                            {...register("pd.le")}
+                            tabIndex={17}
+                            placeholder="LE PD"
+                            className="w-full px-3 py-3 text-xs font-black font-mono text-center border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
+                          />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Extra configuration toggles and inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white border border-neutral-200 rounded-[24px] p-6 shadow-sm">
+                {/* Checkbox setup controls */}
+                <div className="space-y-3">
+                  <span className="block text-[10px] font-black text-neutral-400 uppercase tracking-widest">Configuration Options</span>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        {...register("samePower")}
+                        className="w-4.5 h-4.5 rounded border-neutral-300 text-black focus:ring-black accent-black"
+                      />
+                      <span className="text-[11px] font-black uppercase tracking-wider text-neutral-700">Same Power Both Eyes</span>
+                    </label>
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        {...register("isProgressive")}
+                        className="w-4.5 h-4.5 rounded border-neutral-300 text-black focus:ring-black accent-black"
+                      />
+                      <span className="text-[11px] font-black uppercase tracking-wider text-neutral-700">Progressive / Bifocal Parameters</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Additional Clinical notes */}
+                <div className="space-y-3">
+                  <span className="block text-[10px] font-black text-neutral-400 uppercase tracking-widest">Prescription Notes</span>
+                  <textarea
+                    {...register("notes")}
+                    placeholder="Write any additional recommendations, vertex distance, or prism data here..."
+                    rows={2}
+                    className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-neutral-300"
+                  />
+                </div>
+              </div>
+
+              {/* Progressive Fitting heights section (Conditionally displayed) */}
+              {watch("isProgressive") && (
+                <div className="bg-white border border-neutral-200 rounded-[24px] p-6 shadow-sm space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-wider border-b border-neutral-100 pb-2">Progressive lens parameters</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">Right Fitting Ht (FH)</label>
+                      <input type="text" {...register("fh.re")} placeholder="mm" className="w-full px-3 py-2.5 text-xs font-black border border-neutral-200 rounded-xl" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">Left Fitting Ht (FH)</label>
+                      <input type="text" {...register("fh.le")} placeholder="mm" className="w-full px-3 py-2.5 text-xs font-black border border-neutral-200 rounded-xl" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">Right Pupil Ht (PB)</label>
+                      <input type="text" {...register("pb.re")} placeholder="mm" className="w-full px-3 py-2.5 text-xs font-black border border-neutral-200 rounded-xl" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">Left Pupil Ht (PB)</label>
+                      <input type="text" {...register("pb.le")} placeholder="mm" className="w-full px-3 py-2.5 text-xs font-black border border-neutral-200 rounded-xl" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Save & Reset controls */}
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    reset();
+                    setSelectedProfile(null);
+                  }}
+                  className="px-6 py-4 border border-neutral-200 hover:border-black text-neutral-600 hover:text-black rounded-2xl text-xs font-black uppercase tracking-widest transition-all bg-white"
+                >
+                  Clear Form
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 px-6 py-4 bg-black hover:bg-neutral-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  {saving ? "Saving..." : "Save Eye Power"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* Right Side: Prescription History list */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="bg-white border border-neutral-200 rounded-[28px] p-6 shadow-sm space-y-4 min-h-[400px]">
+            <div className="border-b border-neutral-100 pb-3">
+              <h3 className="text-xs font-black text-neutral-800 uppercase tracking-widest">Prescription History</h3>
+              <p className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mt-0.5">
+                {selectedProfile ? `Historical logs for ${selectedProfile.name}` : "Search customer to load logs"}
+              </p>
+            </div>
+
+            {loadingHistory ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-2 text-neutral-400">
+                <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                <span className="text-[10px] font-black uppercase tracking-wider">Loading logs...</span>
+              </div>
+            ) : history.length > 0 ? (
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1 no-scrollbar">
+                {history.map((pow) => {
+                  const displayDate = new Date(pow.prescribed_at || pow.created_at).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric"
+                  });
+                  return (
+                    <div key={pow.id} className="border border-neutral-150 rounded-2xl p-4 space-y-3 bg-neutral-50/30 hover:bg-neutral-50 transition-all">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider border-b border-neutral-100 pb-2">
+                        <span className="text-black font-mono">{displayDate}</span>
+                        <span className="text-neutral-400">{pow.is_bifocal_progressive ? "Progressive" : "Single Vision"}</span>
+                      </div>
+                      
+                      {/* Mini matrix */}
+                      <div className="grid grid-cols-5 gap-1.5 text-center font-mono text-[10px]">
+                        <span className="font-bold text-neutral-400 uppercase text-left">Eye</span>
+                        <span className="font-bold text-neutral-400 uppercase">Sph</span>
+                        <span className="font-bold text-neutral-400 uppercase">Cyl</span>
+                        <span className="font-bold text-neutral-400 uppercase">Axis</span>
+                        <span className="font-bold text-neutral-400 uppercase">Add</span>
+
+                        <span className="font-bold text-neutral-800 text-left">RE</span>
+                        <span>{pow.dv_re_sph || "0.00"}</span>
+                        <span>{pow.dv_re_cyl || "—"}</span>
+                        <span>{pow.dv_re_axis || "—"}</span>
+                        <span>{pow.re_add || "—"}</span>
+
+                        <span className="font-bold text-neutral-800 text-left">LE</span>
+                        <span>{pow.dv_le_sph || "0.00"}</span>
+                        <span>{pow.dv_le_cyl || "—"}</span>
+                        <span>{pow.dv_le_axis || "—"}</span>
+                        <span>{pow.le_add || "—"}</span>
+                      </div>
+
+                      {/* PD and BCVA mini stats */}
+                      <div className="flex flex-wrap gap-2 text-[9px] font-black uppercase border-t border-neutral-100 pt-2 text-neutral-600">
+                        {pow.pd_re && <span>PD RE: {pow.pd_re}</span>}
+                        {pow.pd_le && <span>PD LE: {pow.pd_le}</span>}
+                        {pow.bcva_re_dist && <span>D.VA RE: {pow.bcva_re_dist}</span>}
+                        {pow.bcva_le_dist && <span>D.VA LE: {pow.bcva_le_dist}</span>}
+                      </div>
+
+                      {pow.notes && (
+                        <div className="text-[10px] text-neutral-500 font-bold italic not-mono">
+                          Notes: {pow.notes}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-[10px] font-black uppercase tracking-wider text-neutral-400 italic">
+                No history log available
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      ) : null}
+
       {/* Unconditional Recent Prescriptions list always displayed at bottom of page */}
-      <div className="bg-white rounded-[32px] border border-gray-100 p-8 shadow-sm space-y-4">
-        <h3 className="text-sm font-black uppercase tracking-wider text-black">
-          Recent Prescriptions
+      <div className="bg-white rounded-[28px] border border-neutral-200 p-6 shadow-sm space-y-4">
+        <h3 className="text-xs font-black uppercase tracking-wider text-black">
+          Recent Store Prescriptions
         </h3>
-        <div className="overflow-x-auto border border-gray-50 rounded-[24px]">
+        <div className="overflow-x-auto border border-neutral-150 rounded-[20px]">
           {loadingRecent ? (
             <div className="p-10 text-center flex items-center justify-center gap-3">
               <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
@@ -1061,8 +1429,8 @@ export default function Power({ userProfile }) {
             </div>
           ) : recentPowers.length > 0 ? (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
+              <thead className="bg-neutral-50">
+                <tr className="border-b border-neutral-200">
                   <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer</th>
                   <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
                   <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Eye</th>
@@ -1070,77 +1438,48 @@ export default function Power({ userProfile }) {
                   <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">CYL</th>
                   <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">AXIS</th>
                   <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">ADD</th>
+                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">D.VA</th>
+                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">N.VA</th>
+                  <th className="px-6 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">PD</th>
                   <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-[11px] font-black font-mono">
                 {recentPowers.map((pow) => {
-                  const hasNV = !!(pow.nv_re_sph || pow.nv_le_sph || pow.nv_re_cyl || pow.nv_le_cyl || pow.re_add || pow.le_add);
-                  const mainRowSpan = hasNV ? 4 : 2;
-                  const eyeRowSpan = hasNV ? 2 : 1;
                   return (
                     <Fragment key={pow.id}>
-                      {/* Row 1: RE (DV) */}
+                      {/* Row 1: RE */}
                       <tr className="hover:bg-gray-50/50">
-                        <td rowSpan={mainRowSpan} className="px-6 py-4 font-sans border-r border-gray-100">
+                        <td rowSpan={2} className="px-6 py-4 font-sans border-r border-gray-100">
                           <span className="block text-xs font-black uppercase text-black">{pow.customers?.name || "Unknown"}</span>
                           <span className="block text-[9px] text-gray-400 mt-0.5">{pow.customers?.phone}</span>
                         </td>
-                        <td rowSpan={mainRowSpan} className="px-6 py-4 text-xs font-bold text-gray-600 border-r border-gray-100 font-sans">
+                        <td rowSpan={2} className="px-6 py-4 text-xs font-bold text-gray-600 border-r border-gray-100 font-sans">
                           {new Date(pow.prescribed_at || pow.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
                         </td>
-                        <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">RE (DV)</td>
-                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_re_sph || "—"}</td>
-                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_re_cyl || "—"}</td>
-                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_re_axis || "—"}</td>
-                        <td rowSpan={eyeRowSpan} className="px-6 py-3 text-center text-gray-700 border-l border-r border-gray-100 bg-neutral-50/30">
-                          {pow.re_add || pow.nv_re_add || calculateAddVal(pow.dv_re_sph, pow.nv_re_sph) || "—"}
-                        </td>
-                        <td rowSpan={mainRowSpan} className="px-6 py-4 text-xs font-medium text-gray-400 font-sans italic border-l border-gray-100 max-w-[200px]">
-                          {(() => {
-                            const { notesText, extraList } = getPrescriptionDisplay(pow);
-                            const filteredExtra = extraList.filter(item => !item.startsWith("ADD:"));
-                            return (
-                              <div className="space-y-1">
-                                <div>{notesText || "—"}</div>
-                                {filteredExtra.length > 0 && (
-                                  <div className="text-[9px] font-black uppercase text-black not-italic bg-gray-50 px-2 py-1 rounded border border-gray-100 mt-1 inline-block">
-                                    {filteredExtra.join(" | ")}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
+                        <td className="px-4 py-2.5 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider border-r border-gray-100">RE</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.dv_re_sph || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.dv_re_cyl || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.dv_re_axis || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.re_add || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.bcva_re_dist || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.bcva_re_near || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.pd_re || "—"}</td>
+                        <td rowSpan={2} className="px-6 py-4 text-xs font-medium text-gray-400 font-sans italic max-w-[180px] truncate">
+                          {pow.notes || "—"}
                         </td>
                       </tr>
-                      {/* Row 2: RE (NV) */}
-                      {hasNV && (
-                        <tr className="hover:bg-gray-50/50">
-                          <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">RE (NV)</td>
-                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_re_sph || "—"}</td>
-                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_re_cyl || "—"}</td>
-                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_re_axis || "—"}</td>
-                        </tr>
-                      )}
-                      {/* Row 3: LE (DV) */}
-                      <tr className="hover:bg-gray-50/50">
-                        <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">LE (DV)</td>
-                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_le_sph || "—"}</td>
-                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_le_cyl || "—"}</td>
-                        <td className="px-6 py-3 text-center text-gray-700">{pow.dv_le_axis || "—"}</td>
-                        <td rowSpan={eyeRowSpan} className="px-6 py-3 text-center text-gray-700 border-l border-r border-gray-100 bg-neutral-50/30">
-                          {pow.le_add || pow.nv_le_add || calculateAddVal(pow.dv_le_sph, pow.nv_le_sph) || "—"}
-                        </td>
+                      {/* Row 2: LE */}
+                      <tr className="hover:bg-gray-50/50 border-b border-neutral-200">
+                        <td className="px-4 py-2.5 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider border-r border-gray-100">LE</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.dv_le_sph || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.dv_le_cyl || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.dv_le_axis || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.le_add || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.bcva_le_dist || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.bcva_le_near || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700 border-r border-gray-100">{pow.pd_le || "—"}</td>
                       </tr>
-                      {/* Row 4: LE (NV) */}
-                      {hasNV && (
-                        <tr className="hover:bg-gray-50/50 border-b border-gray-100">
-                          <td className="px-6 py-3 text-center bg-gray-50/50 text-[10px] uppercase font-sans tracking-wider">LE (NV)</td>
-                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_le_sph || "—"}</td>
-                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_le_cyl || "—"}</td>
-                          <td className="px-6 py-3 text-center text-gray-700">{pow.nv_le_axis || "—"}</td>
-                        </tr>
-                      )}
                     </Fragment>
                   );
                 })}
@@ -1152,872 +1491,6 @@ export default function Power({ userProfile }) {
         </div>
       </div>
 
-      <CommandDialog
-        isOpen={showSearchModal}
-        onClose={closeSearchModal}
-        title="Find Customer Profile"
-      >
-          <div className="p-8 space-y-6 bg-white min-h-[500px]">
-            {isRegistering ? (
-              /* Inline Registration Wizard inside Drawer */
-              <div className="space-y-6 max-w-xl mx-auto">
-                {registrationStep === 1 ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
-                      <input
-                        required
-                        type="text"
-                        autoFocus
-                        value={regForm.name}
-                        onChange={e => setRegForm({ ...regForm, name: e.target.value })}
-                        className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
-                        placeholder="Customer's Full Name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile Number</label>
-                      <input
-                        disabled
-                        type="text"
-                        value={phone}
-                        className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight opacity-60 cursor-not-allowed text-gray-400"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Address (Optional)</label>
-                      <input
-                        type="email"
-                        value={regForm.email}
-                        onChange={e => setRegForm({ ...regForm, email: e.target.value })}
-                        className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
-                        placeholder="email@example.com"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">City / Town</label>
-                        <input
-                          type="text"
-                          value={regForm.town}
-                          onChange={e => setRegForm({ ...regForm, town: e.target.value })}
-                          className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
-                          placeholder="City or Town"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Age</label>
-                        <input
-                          type="number"
-                          value={regForm.age}
-                          onChange={e => setRegForm({ ...regForm, age: e.target.value })}
-                          className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300"
-                          placeholder="Age"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-3 pt-4">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsRegistering(false);
-                          setRegistrationStep(1);
-                        }}
-                        className="flex-1 py-4 text-xs font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
-                      >
-                        Go Back
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!regForm.name}
-                        onClick={() => setRegistrationStep(2)}
-                        className="flex-1 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow-lg disabled:opacity-40"
-                      >
-                        Continue
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* Step 2: Summary / Confirm */
-                  <div className="space-y-6">
-                    {!showFinalConfirm ? (
-                      <div className="space-y-6">
-                        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6 space-y-4 text-left">
-                          <div>
-                            <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Full Name</span>
-                            <span className="text-[12px] font-black text-black uppercase tracking-tight">{regForm.name}</span>
-                          </div>
-                          <div>
-                            <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Mobile Number</span>
-                            <span className="text-[12px] font-black text-black tracking-tight">{phone}</span>
-                          </div>
-                          {regForm.email && (
-                            <div>
-                              <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Email Address</span>
-                              <span className="text-[12px] font-bold text-black">{regForm.email}</span>
-                            </div>
-                          )}
-                          {regForm.town && (
-                            <div>
-                              <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">City / Town</span>
-                              <span className="text-[12px] font-black text-black uppercase tracking-tight">{regForm.town}</span>
-                            </div>
-                          )}
-                          {regForm.age && (
-                            <div>
-                              <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Age</span>
-                              <span className="text-[12px] font-bold text-black">{regForm.age}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setRegistrationStep(1)}
-                            className="flex-1 py-4 text-xs font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
-                          >
-                            Go Back
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setShowFinalConfirm(true)}
-                            className="flex-1 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow-lg"
-                          >
-                            Confirm
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Step 3: Small Confirmation Alert Dialog Inline */
-                      <div className="p-6 border border-dashed border-neutral-200 rounded-2xl bg-neutral-50 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="space-y-1">
-                          <p className="text-xs font-black text-neutral-900 uppercase tracking-tight">Confirm Registration?</p>
-                          <p className="text-[10px] text-neutral-500 font-medium">Create a new customer profile for this shopper?</p>
-                        </div>
-                        <div className="flex gap-3 pt-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowFinalConfirm(false)}
-                            className="flex-1 py-3 text-[10px] font-black text-neutral-400 hover:text-black uppercase tracking-widest transition-colors"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            disabled={registeringCustomer}
-                            onClick={handleRegisterPowerCustomer}
-                            className="flex-1 py-3 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-neutral-900 transition-all shadow animate-pulse"
-                          >
-                            {registeringCustomer ? 'Registering...' : 'Yes, Confirm'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-6 max-w-xl mx-auto">
-                {/* 1. Today's Flow checked-in customers */}
-                <div className="space-y-3">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Today's Checked-in (Flow) Customers</p>
-                  {loadingFlow ? (
-                    <div className="text-[10px] text-gray-400 font-bold py-2 ml-1">Loading today's flow...</div>
-                  ) : flowCustomers.length === 0 ? (
-                    <div className="p-4 border border-dashed border-neutral-200 rounded-2xl bg-neutral-50/50 text-[10px] font-black text-neutral-400 uppercase tracking-widest text-center">
-                      No customer checked-in today yet
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-1 no-scrollbar">
-                      {flowCustomers.map(p => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => selectProfileFromDrawer(p)}
-                          className="w-full text-left px-5 py-3.5 border border-gray-150 hover:border-black bg-gray-50 hover:bg-white rounded-2xl transition-all flex items-center justify-between shadow-sm group"
-                        >
-                          <div>
-                            <span className="block text-[11px] font-black uppercase tracking-tight text-neutral-900 truncate max-w-[120px]">{p.name}</span>
-                            <span className="block text-[8px] font-bold text-gray-400 uppercase tracking-wider mt-0.5">{p.purpose || "Walk-in"}</span>
-                          </div>
-                          <span className="text-[10px] font-mono font-bold text-neutral-500">{p.phone}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-gray-100 my-4" />
-
-                {/* 2. Search / Register Customer */}
-                <div className="space-y-4">
-                  <form onSubmit={handleSearch} className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center ml-1 h-6">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Search Directory (Mobile Number)</label>
-                        {searchAttempted && !searching && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSearchAttempted(false);
-                              setProfiles([]);
-                              setPhone("");
-                            }}
-                            className="text-[9px] font-black text-black border border-neutral-300 hover:border-black rounded-lg px-2.5 py-1 uppercase tracking-widest flex items-center gap-1 transition-all"
-                          >
-                            ✕ Clear Search
-                          </button>
-                        )}
-                      </div>
-                      <div className="relative">
-                        <input
-                          required
-                          type="tel"
-                          autoFocus
-                          disabled={searching || searchAttempted}
-                          placeholder="+91 MOBILE"
-                          value={phone}
-                          onChange={e => setPhone(e.target.value)}
-                          className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black tracking-tight focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white transition-all placeholder:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed pr-12"
-                        />
-                        {searchAttempted && !searching && (
-                          <Lock size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-neutral-400" />
-                        )}
-                      </div>
-                      {searchAttempted && !searching && (
-                        <p className="text-[9px] text-neutral-500 font-bold ml-1 flex items-center gap-1.5 animate-in fade-in duration-200">
-                          <Lock size={10} /> Search locked. Click "Clear Search" to modify.
-                        </p>
-                      )}
-                    </div>
-
-                    <button 
-                      type="submit" 
-                      disabled={searching || searchAttempted} 
-                      className="w-full px-6 py-4 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg hover:bg-neutral-900 active:scale-[0.98] transition-all disabled:opacity-40 disabled:hover:bg-black flex items-center justify-center gap-2"
-                    >
-                      {searching ? 'Verifying...' : (searchAttempted ? <><Lock size={13} strokeWidth={3} /> Search Locked</> : 'Search')}
-                    </button>
-                  </form>
-                </div>
-
-                {/* 3. Search Results */}
-                {searchAttempted && !searching && (
-                  <div className="pt-2 animate-in fade-in duration-200">
-                    {profiles.length > 0 ? (
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">Select Profile</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-1 no-scrollbar">
-                          {profiles.map(p => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => selectProfileFromDrawer(p)}
-                              className="w-full text-left px-5 py-3.5 border border-gray-150 hover:border-black bg-gray-50 hover:bg-white rounded-2xl transition-all flex items-center justify-between shadow-sm group"
-                            >
-                              <div>
-                                <span className="block text-[11px] font-black uppercase tracking-tight text-neutral-900 truncate max-w-[120px]">{p.name}</span>
-                                <span className="block text-[8px] font-bold text-gray-400 uppercase tracking-wider mt-0.5">{p.label}</span>
-                              </div>
-                              <span className="text-[10px] font-mono font-bold text-neutral-500">{p.phone}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center space-y-4 py-4">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No matching customer profile found</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsRegistering(true);
-                            setRegistrationStep(1);
-                          }}
-                          className="w-full px-5 py-4 bg-white border border-neutral-200 hover:border-black text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm"
-                        >
-                          Register New Profile
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </CommandDialog>
-
-        {selectedProfile && (
-          <SlideDrawer
-            isOpen={showAddModal}
-            onClose={closeAddModal}
-            title="Record Eye Power"
-            subtitle={`Specify prescription data for ${selectedProfile.name}`}
-            width="max-w-5xl"
-          >
-            <div className="bg-neutral-50 min-h-[500px] flex flex-col justify-between select-none">
-          {/* Top Wizard Steps Indicator (Premium black-and-white design) */}
-          <div className="bg-white border-b border-neutral-200 px-8 py-5">
-            <div className="flex items-center justify-between max-w-2xl mx-auto">
-              {["Setup", "Refraction", "Acuity & PD", "Dispensing & Notes"].map((stepLabel, idx) => {
-                const stepNum = idx + 1;
-                const isCompleted = activeStep > stepNum;
-                const isActive = activeStep === stepNum;
-                return (
-                  <div key={stepLabel} className="flex items-center gap-2">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black border transition-all duration-300 ${
-                      isCompleted ? "bg-black border-black text-white" :
-                      isActive ? "bg-neutral-950 border-neutral-950 text-white ring-4 ring-neutral-100" : "bg-white border-neutral-200 text-neutral-400"
-                    }`}>
-                      {stepNum}
-                    </div>
-                    <span className={`text-[10px] font-black uppercase tracking-wider transition-colors duration-300 ${
-                      isActive ? "text-black" : isCompleted ? "text-neutral-500" : "text-neutral-300"
-                    }`}>
-                      {stepLabel}
-                    </span>
-                    {idx < 3 && <div className="w-8 h-[2px] bg-neutral-200 mx-2 hidden sm:block" />}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <form
-            onSubmit={(e) => {
-              if (activeStep < 4) {
-                e.preventDefault();
-                setActiveStep(prev => prev + 1);
-              } else {
-                handleFormSubmit(handleSavePrescription)(e);
-              }
-            }}
-            className="p-8 space-y-8 flex-1"
-          >
-            {/* STEP 1: Exam Configuration (Setup) */}
-            {activeStep === 1 && (
-              <div className="space-y-6 max-w-xl mx-auto bg-white border border-neutral-200 rounded-[24px] p-8 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex items-center gap-2 border-b border-neutral-100 pb-4 mb-4">
-                  <Sparkles className="w-5 h-5 text-black" />
-                  <h3 className="text-xs font-black text-neutral-800 uppercase tracking-widest">Exam Configuration</h3>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  {[
-                    { id: "samePower", label: "Same Power Both Eyes", desc: "Auto-mirrors OD to OS measurements automatically" },
-                    { id: "hasCyl", label: "Has Cylindrical Power", desc: "Enables CYL & AXIS column grids in refraction step" },
-                    { id: "hasNear", label: "Has Near Vision", desc: "Adds ADD columns and near visual acuity controls" },
-                    { id: "isProgressive", label: "Progressive / Bifocal", desc: "Expands fitting heights and progressive lens metrics" },
-                    { id: "hasPrism", label: "Has Prism Correction", desc: "Shows prism and base alignment properties" }
-                  ].map((item) => (
-                    <label key={item.id} className="flex items-start gap-4 p-4 border border-neutral-100 rounded-2xl hover:border-neutral-900 hover:bg-neutral-50 cursor-pointer transition-all">
-                      <input
-                        type="checkbox"
-                        {...register(item.id)}
-                        className="w-5 h-5 rounded-lg border-neutral-300 text-black focus:ring-black accent-black mt-0.5"
-                      />
-                      <div>
-                        <span className="block text-xs font-black uppercase tracking-wider text-neutral-800">{item.label}</span>
-                        <span className="block text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-0.5">{item.desc}</span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* STEP 2: Subjective Refraction */}
-            {activeStep === 2 && (
-              <div className="space-y-8 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="bg-white border border-neutral-200 rounded-[24px] p-8 shadow-sm space-y-6">
-                  <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
-                    <h3 className="text-xs font-black text-neutral-800 uppercase tracking-widest">
-                      Subjective Refraction
-                    </h3>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        {...register("samePower")}
-                        className="w-4 h-4 rounded border-neutral-300 text-black focus:ring-black accent-black cursor-pointer"
-                      />
-                      <span className="text-[10px] font-black uppercase tracking-wider text-neutral-700">Same Power Both Eyes</span>
-                    </label>
-                  </div>
-
-                  {/* Simple Power Entry Grid */}
-                  <div className="space-y-6 pt-2">
-                    {/* Grid Header */}
-                    <div className="grid grid-cols-5 gap-4 text-center items-center">
-                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">EYE</span>
-                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">SPH</span>
-                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">CYL</span>
-                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">AXIS</span>
-                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">ADD</span>
-                    </div>
-
-                    {/* Right Eye */}
-                    <div className="grid grid-cols-5 gap-4 items-center">
-                      <span className="text-[10px] font-black text-black uppercase tracking-wider text-center">R (OD)</span>
-                      <SmartPowerInput name="re.sph" control={control} tabIndex={10} placeholder="0.00" />
-                      <SmartPowerInput name="re.cyl" control={control} tabIndex={11} placeholder="0.00" />
-                      <input
-                        type="number"
-                        min="0"
-                        max="180"
-                        {...register("re.axis")}
-                        tabIndex={12}
-                        className="w-full px-3 py-3 text-xs font-black font-mono text-center border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                        placeholder="90"
-                      />
-                      <SmartPowerInput name="nv_re.add" control={control} tabIndex={13} placeholder="+2.00" />
-                    </div>
-
-                    {/* Left Eye */}
-                    <div className="grid grid-cols-5 gap-4 items-center">
-                      <span className="text-[10px] font-black text-black uppercase tracking-wider text-center">L (OS)</span>
-                      <SmartPowerInput name="le.sph" control={control} tabIndex={20} placeholder="0.00" />
-                      <SmartPowerInput name="le.cyl" control={control} tabIndex={21} placeholder="0.00" />
-                      <input
-                        type="number"
-                        min="0"
-                        max="180"
-                        {...register("le.axis")}
-                        tabIndex={22}
-                        className="w-full px-3 py-3 text-xs font-black font-mono text-center border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                        placeholder="90"
-                      />
-                      <SmartPowerInput name="nv_le.add" control={control} tabIndex={23} placeholder="+2.00" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 3: Binocular & Acuity */}
-            {activeStep === 3 && (
-              <div className="bg-white border border-neutral-200 rounded-[24px] p-8 shadow-sm max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div>
-                  <h3 className="text-xs font-black text-neutral-800 uppercase tracking-widest border-b border-neutral-100 pb-4">
-                    Visual Acuity (Aided)
-                  </h3>
-                  
-                  {/* Distance VA */}
-                  <div className="mt-6 space-y-4">
-                    <label className="text-[10px] font-black text-neutral-500 uppercase tracking-wider">Distance Visual Acuity</label>
-                    <div className="grid grid-cols-3 gap-4">
-                      {["distRe", "distLe", "distOu"].map((vaKey) => {
-                        const label = vaKey === "distRe" ? "Right" : vaKey === "distLe" ? "Left" : "Binocular";
-                        const selectedVal = watch(`acuity.${vaKey}`);
-                        return (
-                          <div key={vaKey} className="space-y-1">
-                            <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">{label}</span>
-                            <div className="relative">
-                              <select
-                                {...register(`acuity.${vaKey}`)}
-                                className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white appearance-none"
-                              >
-                                {["6/4", "6/5", "6/6", "6/9", "6/12", "6/18", "6/24", "6/36", "6/60"].map(v => (
-                                  <option key={v} value={v}>{v}</option>
-                                ))}
-                              </select>
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-mono font-black bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded border border-neutral-200">
-                                logMAR {getLogmar(selectedVal)}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Near VA (If setup enabled) */}
-                  {hasNear && (
-                    <div className="mt-6 space-y-4">
-                      <label className="text-[10px] font-black text-neutral-500 uppercase tracking-wider">Near Visual Acuity</label>
-                      <div className="grid grid-cols-3 gap-4">
-                        {["nearRe", "nearLe", "nearOu"].map((vaKey) => {
-                          const label = vaKey === "nearRe" ? "Right" : vaKey === "nearLe" ? "Left" : "Binocular";
-                          return (
-                            <div key={vaKey} className="space-y-1">
-                              <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">{label}</span>
-                              <select
-                                {...register(`acuity.${vaKey}`)}
-                                className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                              >
-                                {["N5", "N6", "N8", "N10", "N12", "N18"].map(v => (
-                                  <option key={v} value={v}>{v}</option>
-                                ))}
-                              </select>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Pupillary Distance (PD) */}
-                <div className="border-t border-neutral-100 pt-6">
-                  <h3 className="text-xs font-black text-neutral-800 uppercase tracking-widest pb-4">
-                    Pupillary Distance (PD)
-                  </h3>
-                  <div className="flex flex-col sm:flex-row gap-6 mt-2">
-                    <div className="flex items-center gap-6">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value="single"
-                          {...register("pd.type")}
-                          className="w-4 h-4 text-black focus:ring-black accent-black cursor-pointer"
-                        />
-                        <span className="text-xs font-black uppercase tracking-wider text-neutral-700">Single PD</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value="dual"
-                          {...register("pd.type")}
-                          className="w-4 h-4 text-black focus:ring-black accent-black cursor-pointer"
-                        />
-                        <span className="text-xs font-black uppercase tracking-wider text-neutral-700">Dual PD</span>
-                      </label>
-                    </div>
-
-                    <div className="flex-1">
-                      {watch("pd.type") === "single" ? (
-                        <div className="max-w-[150px]">
-                          <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 block">Binocular PD</label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              {...register("pd.single")}
-                              placeholder="64"
-                              className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white pr-10"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-neutral-400">mm</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex gap-4">
-                          <div className="w-28">
-                            <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 block">Right PD</label>
-                            <input
-                              type="number"
-                              {...register("pd.re")}
-                              placeholder="32"
-                              className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                            />
-                          </div>
-                          <div className="w-28">
-                            <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 block">Left PD</label>
-                            <input
-                              type="number"
-                              {...register("pd.le")}
-                              placeholder="32"
-                              className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Prism Correction */}
-                {hasPrism && (
-                  <div className="border-t border-neutral-100 pt-6 space-y-4">
-                    <h3 className="text-xs font-black text-neutral-800 uppercase tracking-widest pb-2">
-                      Prism Correction
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* OD Prism */}
-                      <div className="flex gap-4 items-center">
-                        <div className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center text-xs font-mono font-black">OD</div>
-                        <div className="flex-1">
-                          <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">Prism Power</label>
-                          <input
-                            type="text"
-                            {...register("prism.re.power")}
-                            placeholder="0.00"
-                            className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                          />
-                        </div>
-                        <div className="w-32">
-                          <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">Base</label>
-                          <select
-                            {...register("prism.re.base")}
-                            className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                          >
-                            <option value="">—</option>
-                            <option value="UP">UP</option>
-                            <option value="DOWN">DOWN</option>
-                            <option value="IN">IN</option>
-                            <option value="OUT">OUT</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* OS Prism */}
-                      <div className="flex gap-4 items-center">
-                        <div className="w-8 h-8 rounded-full bg-neutral-100 border border-neutral-300 text-neutral-800 flex items-center justify-center text-xs font-mono font-black">OS</div>
-                        <div className="flex-1">
-                          <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">Prism Power</label>
-                          <input
-                            type="text"
-                            {...register("prism.le.power")}
-                            placeholder="0.00"
-                            className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                          />
-                        </div>
-                        <div className="w-32">
-                          <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">Base</label>
-                          <select
-                            {...register("prism.le.base")}
-                            className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                          >
-                            <option value="">—</option>
-                            <option value="UP">UP</option>
-                            <option value="DOWN">DOWN</option>
-                            <option value="IN">IN</option>
-                            <option value="OUT">OUT</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* STEP 4: Advanced Dispensing & Notes */}
-            {activeStep === 4 && (
-              <div className="bg-white border border-neutral-200 rounded-[24px] p-8 shadow-sm max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <h3 className="text-xs font-black text-neutral-800 uppercase tracking-widest border-b border-neutral-100 pb-4">
-                  Advanced Dispensing Metrics
-                </h3>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 block">Vertex Distance (VD)</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        {...register("vd")}
-                        placeholder="12"
-                        className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white pr-10"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-neutral-400">mm</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 block">Pantoscopic Tilt</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        {...register("panto")}
-                        placeholder="8"
-                        className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white pr-10"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">deg</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 block">Bow / Wrap Angle</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        {...register("wrap")}
-                        placeholder="5"
-                        className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white pr-10"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">deg</span>
-                    </div>
-                  </div>
-                </div>
-
-                {isProgressive && (
-                  <div className="border-t border-neutral-100 pt-6 space-y-6">
-                    {/* Fitting Heights (FH) */}
-                    <div>
-                      <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-3">Fitting Heights (FH)</h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 block">Right Fitting Height</label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              {...register("fh.re")}
-                              placeholder="18"
-                              className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white pr-10"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">mm</span>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 block">Left Fitting Height</label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              {...register("fh.le")}
-                              placeholder="18"
-                              className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white pr-10"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">mm</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Pupil Heights (PB) */}
-                    <div>
-                      <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-3">Pupil Heights (PB)</h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 block">Right Pupil Height</label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              {...register("pb.re")}
-                              placeholder="18"
-                              className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white pr-10"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">mm</span>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 block">Left Pupil Height</label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              {...register("pb.le")}
-                              placeholder="18"
-                              className="w-full px-3 py-3 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white pr-10"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">mm</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Frame Box Sizes (A & B) */}
-                    <div>
-                      <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-3">Frame Dimensions (A & B Box Size)</h4>
-                      <div className="grid grid-cols-2 gap-6">
-                        {/* Right Eye Dimensions */}
-                        <div className="space-y-4 border border-neutral-100 p-4 rounded-2xl bg-neutral-50/50">
-                          <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest block">Right Eye</span>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[8px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">A Size</label>
-                              <input
-                                type="text"
-                                {...register("a_size.re")}
-                                placeholder="52"
-                                className="w-full px-2 py-2 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[8px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">B Size</label>
-                              <input
-                                type="text"
-                                {...register("b_size.re")}
-                                placeholder="40"
-                                className="w-full px-2 py-2 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Left Eye Dimensions */}
-                        <div className="space-y-4 border border-neutral-100 p-4 rounded-2xl bg-neutral-50/50">
-                          <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest block">Left Eye</span>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[8px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">A Size</label>
-                              <input
-                                type="text"
-                                {...register("a_size.le")}
-                                placeholder="52"
-                                className="w-full px-2 py-2 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[8px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">B Size</label>
-                              <input
-                                type="text"
-                                {...register("b_size.le")}
-                                placeholder="40"
-                                className="w-full px-2 py-2 text-xs font-black border border-neutral-200 rounded-xl focus:ring-2 focus:ring-black outline-none bg-white"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="border-t border-neutral-100 pt-6 space-y-2">
-                  <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Lab Notes & Clinical Remarks</label>
-                  <textarea
-                    rows={4}
-                    {...register("notes")}
-                    placeholder="Enter patient tolerance observations, lab parameters, or prism directions..."
-                    className="w-full bg-neutral-50 border border-neutral-100 rounded-2xl px-6 py-4 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all resize-none"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Bottom Navigation Buttons */}
-            <div className="pt-6 border-t border-neutral-200 flex gap-4 max-w-4xl mx-auto">
-              {activeStep > 1 ? (
-                <button
-                  key="btn-back"
-                  type="button"
-                  onClick={() => setActiveStep(activeStep - 1)}
-                  className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-600 border border-neutral-200 rounded-2xl hover:bg-neutral-100 transition-colors"
-                >
-                  Back
-                </button>
-              ) : (
-                <button
-                  key="btn-discard"
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-black transition-colors"
-                >
-                  Discard
-                </button>
-              )}
-
-              {activeStep < 4 ? (
-                <button
-                  key="btn-next"
-                  type="button"
-                  onClick={() => setActiveStep(activeStep + 1)}
-                  className="flex-[2] py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:shadow-2xl hover:bg-neutral-800 transition-all text-center"
-                >
-                  Next Step
-                </button>
-              ) : (
-                <button
-                  key="btn-submit"
-                  type="submit"
-                  disabled={saving}
-                  className="flex-[2] py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:shadow-2xl hover:bg-neutral-800 transition-all"
-                >
-                  {saving ? "Saving..." : "Save Prescription"}
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
-      </SlideDrawer>
-      )}
-
-      {/* ADD Discrepancy Dialog */}
       {discrepancyCheck && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
           <div
@@ -2056,6 +1529,79 @@ export default function Power({ userProfile }) {
                 No, Keep Entered ({formatDiopter(discrepancyCheck.discrepancy.entered)})
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Today's Flow Records Modal / Dialog */}
+      {showSearchModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setShowSearchModal(false)}
+          />
+          <div className="relative bg-white border border-neutral-200 rounded-[28px] p-8 shadow-2xl max-w-lg w-full space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-3 border-b border-neutral-100">
+              <div>
+                <h3 className="text-xs font-black text-neutral-800 uppercase tracking-widest">Select Customer</h3>
+                <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider mt-0.5">Recent Flow Records</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSearchModal(false)}
+                className="text-[9px] font-black text-neutral-400 hover:text-black uppercase tracking-widest"
+              >
+                Close
+              </button>
+            </div>
+
+            {loadingFlow ? (
+              <div className="p-12 text-center flex items-center justify-center gap-3">
+                <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest animate-pulse">Loading flow records...</span>
+              </div>
+            ) : flowCustomers.length > 0 ? (
+              <div className="max-h-[300px] overflow-y-auto space-y-3 pr-1">
+                {flowCustomers.map(p => {
+                  const checkinDate = new Date(p.created_at);
+                  const isToday = new Date().toDateString() === checkinDate.toDateString();
+                  const timeStr = checkinDate.toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit', hour12: true });
+                  const dateStr = checkinDate.toLocaleDateString("en-IN", { day: 'numeric', month: 'short' });
+                  const displayTime = isToday ? `Today • ${timeStr}` : `${dateStr} • ${timeStr}`;
+
+                  const purposeLabels = {
+                    eye_test: "Refraction / Power",
+                    repair: "Repair Service",
+                    shopping: "Shopping / Frames",
+                    pickup: "Order Pick Up",
+                  };
+
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProfile(p);
+                        fetchHistory(p.id);
+                        setShowSearchModal(false);
+                      }}
+                      className="w-full text-left px-5 py-4 border border-neutral-150 hover:border-black bg-neutral-50 hover:bg-white rounded-2xl transition-all flex items-center justify-between shadow-sm"
+                    >
+                      <div>
+                        <span className="block text-[11px] font-black uppercase tracking-tight text-neutral-900">{p.name}</span>
+                        <span className="block text-[8px] font-bold text-gray-400 uppercase tracking-wider mt-0.5">
+                          {purposeLabels[p.purpose] || p.purpose} {p.status ? `(${p.status})` : ''} • {displayTime}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-neutral-500">{p.phone}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-xs font-bold text-neutral-450 uppercase tracking-wider italic">
+                No recent customer check-ins found.
+              </div>
+            )}
           </div>
         </div>
       )}

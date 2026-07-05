@@ -79,18 +79,7 @@ export default function Dashboard({ userProfile }) {
   }
 
   return (
-    <div className="space-y-8 pb-20 animate-fast-slide">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Overview</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Operational Overview & Analytics</p>
-        </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-xl shadow-lg">
-          <WarehouseIcon size={16} strokeWidth={3} />
-          <span className="text-[10px] font-black uppercase tracking-widest">Global Hub</span>
-        </div>
-      </div>
+    <div className="space-y-6 pb-20 animate-fast-slide">
 
       {/* Primary Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

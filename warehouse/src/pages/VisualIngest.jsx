@@ -89,6 +89,80 @@ export default function VisualIngest({ userProfile }) {
     fetchUnassignedBarcodes();
   }, [fetchInitialData, fetchUnassignedBarcodes]);
 
+  const categoryPaths = useMemo(() => {
+    const map = {};
+    categories.forEach(c => {
+      map[c.id] = c;
+    });
+    
+    const paths = {};
+    const getPath = (id) => {
+      if (paths[id]) return paths[id];
+      const cat = map[id];
+      if (!cat) return '';
+      if (!cat.parent_id) {
+        paths[id] = cat.name;
+        return cat.name;
+      }
+      const parentPath = getPath(cat.parent_id);
+      paths[id] = parentPath ? `${parentPath} > ${cat.name}` : cat.name;
+      return paths[id];
+    };
+    
+    categories.forEach(c => {
+      getPath(c.id);
+    });
+    return paths;
+  }, [categories]);
+
+  const [frameFields, setFrameFields] = useState({
+    modelNo: '',
+    color: '',
+    frameType: '',
+    frameShape: '',
+    sizeA: '',
+    sizeB: '',
+    templeLength: '',
+    dbl: ''
+  });
+
+  const [lensFields, setLensFields] = useState({
+    lensType: '',
+    index: '',
+    material: '',
+    coating: '',
+    sph: '',
+    cyl: '',
+    axis: '',
+    add: ''
+  });
+
+  const getCategoryType = useCallback((categoryId) => {
+    if (!categoryId) return null;
+    const path = (categoryPaths[categoryId] || "").toLowerCase();
+    if (path.includes("frame")) return "frame";
+    if (path.includes("lens")) return "lens";
+    return null;
+  }, [categoryPaths]);
+
+  const renderProductDescription = useCallback((desc) => {
+    if (!desc) return "";
+    if (desc.startsWith("{")) {
+      try {
+        const data = JSON.parse(desc);
+        if (data.type === 'frame') {
+          return `Frame: Model: ${data.modelNo || 'N/A'} | Color: ${data.color || 'N/A'} | Type: ${data.frameType || 'N/A'} | Shape: ${data.frameShape || 'N/A'} | Size: ${data.sizeA || 'N/A'}-${data.sizeB || 'N/A'}-${data.templeLength || 'N/A'}-${data.dbl || 'N/A'}`;
+        } else if (data.type === 'lens') {
+          return `Lens: Type: ${data.lensType || 'N/A'} | Index: ${data.index || 'N/A'} | Material: ${data.material || 'N/A'} | Coating: ${data.coating || 'N/A'} | SPH: ${data.sph || 'N/A'} | CYL: ${data.cyl || 'N/A'} | Axis: ${data.axis || 'N/A'} | ADD: ${data.add || 'N/A'}`;
+        }
+        return data.rawDescription || desc;
+      } catch (e) {
+        return desc;
+      }
+    }
+    return desc;
+  }, []);
+
   const categoryChildMap = useMemo(() => {
     const map = {};
     categories.forEach(c => {
@@ -126,6 +200,36 @@ export default function VisualIngest({ userProfile }) {
     setSaving(true);
     setSuccessMessage("");
     try {
+      const catType = getCategoryType(productData.category_id);
+      let finalDesc = productData.description;
+      if (catType === 'frame') {
+        finalDesc = JSON.stringify({
+          type: 'frame',
+          modelNo: frameFields.modelNo,
+          color: frameFields.color,
+          frameType: frameFields.frameType,
+          frameShape: frameFields.frameShape,
+          sizeA: frameFields.sizeA,
+          sizeB: frameFields.sizeB,
+          templeLength: frameFields.templeLength,
+          dbl: frameFields.dbl,
+          rawDescription: productData.description
+        });
+      } else if (catType === 'lens') {
+        finalDesc = JSON.stringify({
+          type: 'lens',
+          lensType: lensFields.lensType,
+          index: lensFields.index,
+          material: lensFields.material,
+          coating: lensFields.coating,
+          sph: lensFields.sph,
+          cyl: lensFields.cyl,
+          axis: lensFields.axis,
+          add: lensFields.add,
+          rawDescription: productData.description
+        });
+      }
+
       // 1. Create the real product in the catalog
       const { data: pData, error: pError } = await supabase
         .from("products")
@@ -135,7 +239,7 @@ export default function VisualIngest({ userProfile }) {
           brand: productData.brand || null,
           base_price: Number(productData.base_price || 0),
           category_id: productData.category_id || null,
-          description: productData.description || null
+          description: finalDesc || null
         }])
         .select()
         .single();
@@ -178,29 +282,7 @@ export default function VisualIngest({ userProfile }) {
   });
 
   return (
-    <div className="space-y-8 animate-fast-slide pb-20">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Visual Ingest</h1>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Select active unassigned barcode tags to intake product details</p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-sm">
-            <Database size={14} className="text-black" />
-            <select
-              value={selectedStore}
-              onChange={e => setSelectedStore(e.target.value)}
-              disabled={!isSuperAdmin}
-              className="appearance-none bg-transparent text-xs font-black text-black uppercase focus:outline-none cursor-pointer pr-8 py-1 disabled:opacity-50"
-            >
-              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            {isSuperAdmin && <ChevronDown size={14} className="text-black -ml-6" />}
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6 animate-fast-slide pb-20">
 
       {/* Success Notification */}
       {successMessage && (
@@ -217,7 +299,19 @@ export default function VisualIngest({ userProfile }) {
           {unassignedBarcodes.length} Unassigned active tags in circulation
         </span>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Store Selection Dropdown */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-sm">
+            <Database size={14} className="text-gray-400" />
+            <select
+              value={selectedStore}
+              onChange={e => setSelectedStore(e.target.value)}
+              disabled={!isSuperAdmin}
+              className="appearance-none bg-transparent text-[11px] font-bold text-black uppercase focus:outline-none cursor-pointer pr-6 py-0.5 disabled:opacity-50"
+            >
+              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
           <div className="relative group">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-black" />
             <input
@@ -387,6 +481,112 @@ export default function VisualIngest({ userProfile }) {
                 })}
               </div>
             </div>
+
+            {/* Conditional Custom Fields for Frame */}
+            {getCategoryType(productData.category_id) === 'frame' && (
+              <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Frame Specifications</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Model No *</label>
+                    <input required type="text" value={frameFields.modelNo} onChange={e => setFrameFields({...frameFields, modelNo: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 78005" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Color *</label>
+                    <input required type="text" value={frameFields.color} onChange={e => setFrameFields({...frameFields, color: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. Black" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Frame Type *</label>
+                    <select required value={frameFields.frameType} onChange={e => setFrameFields({...frameFields, frameType: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-black outline-none cursor-pointer focus:border-black">
+                      <option value="">— Select —</option>
+                      <option value="Full Rim">Full Rim</option>
+                      <option value="Half Rim">Half Rim</option>
+                      <option value="Rimless">Rimless</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Frame Shape *</label>
+                    <select required value={frameFields.frameShape} onChange={e => setFrameFields({...frameFields, frameShape: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-black outline-none cursor-pointer focus:border-black">
+                      <option value="">— Select —</option>
+                      <option value="Square">Square</option>
+                      <option value="Rectangle">Rectangle</option>
+                      <option value="Round">Round</option>
+                      <option value="Oval">Oval</option>
+                      <option value="Aviator">Aviator</option>
+                      <option value="Wayfarer">Wayfarer</option>
+                      <option value="Clubmaster">Clubmaster</option>
+                      <option value="Cat Eye">Cat Eye</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">A Size</label>
+                    <input type="text" value={frameFields.sizeA} onChange={e => setFrameFields({...frameFields, sizeA: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 52" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">B Size</label>
+                    <input type="text" value={frameFields.sizeB} onChange={e => setFrameFields({...frameFields, sizeB: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 38" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Temple</label>
+                    <input type="text" value={frameFields.templeLength} onChange={e => setFrameFields({...frameFields, templeLength: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 140" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">DBL</label>
+                    <input type="text" value={frameFields.dbl} onChange={e => setFrameFields({...frameFields, dbl: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 18" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Conditional Custom Fields for Lens */}
+            {getCategoryType(productData.category_id) === 'lens' && (
+              <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Lens Specifications</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Lens Type *</label>
+                    <select required value={lensFields.lensType} onChange={e => setLensFields({...lensFields, lensType: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-black outline-none cursor-pointer focus:border-black">
+                      <option value="">— Select —</option>
+                      <option value="Single Vision">Single Vision</option>
+                      <option value="Bifocal">Bifocal</option>
+                      <option value="Progressive">Progressive</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Index *</label>
+                    <input required type="text" value={lensFields.index} onChange={e => setLensFields({...lensFields, index: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 1.56, 1.61" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Material *</label>
+                    <input required type="text" value={lensFields.material} onChange={e => setLensFields({...lensFields, material: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. CR-39, Poly" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Coating *</label>
+                    <input required type="text" value={lensFields.coating} onChange={e => setLensFields({...lensFields, coating: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. ARC, Blue Cut" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH Power</label>
+                    <input type="text" value={lensFields.sph} onChange={e => setLensFields({...lensFields, sph: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. -2.00" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL Power</label>
+                    <input type="text" value={lensFields.cyl} onChange={e => setLensFields({...lensFields, cyl: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. -0.50" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
+                    <input type="text" value={lensFields.axis} onChange={e => setLensFields({...lensFields, axis: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. 180" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">ADD Power</label>
+                    <input type="text" value={lensFields.add} onChange={e => setLensFields({...lensFields, add: e.target.value})} className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[12px] font-bold text-black outline-none focus:border-black" placeholder="e.g. +2.00" />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>

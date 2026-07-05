@@ -96,23 +96,9 @@ export default function Vendors({ userProfile }) {
   );
 
   return (
-    <div className="space-y-8 pb-20 animate-fast-slide">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-neutral-200">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Vendors</h1>
-          <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.25em]">Manage Supply Chain Entities</p>
-        </div>
-        <button 
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-black text-white hover:bg-neutral-900 px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
-        >
-          <Plus size={15} strokeWidth={3} /> Onboard Vendor
-        </button>
-      </div>
-
+    <div className="space-y-6 pb-20 animate-fast-slide">
       {/* Search Bar */}
-      <div className="bg-white rounded-3xl p-5 border border-neutral-200 shadow-sm">
+      <div className="bg-white rounded-3xl p-5 border border-neutral-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="relative group w-full md:w-96">
           <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-black transition-colors" strokeWidth={3} />
           <input
@@ -123,6 +109,12 @@ export default function Vendors({ userProfile }) {
             className="w-full bg-neutral-50 border border-neutral-200 rounded-xl pl-11 pr-5 py-3.5 text-[10px] font-mono font-black uppercase tracking-widest focus:ring-1 focus:ring-black focus:border-black focus:bg-white outline-none transition-all"
           />
         </div>
+        <button 
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 bg-black text-white hover:bg-neutral-900 px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+        >
+          <Plus size={15} strokeWidth={3} /> Onboard Vendor
+        </button>
       </div>
 
       {/* Vendor Cards Grid */}

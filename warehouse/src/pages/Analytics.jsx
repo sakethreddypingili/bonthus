@@ -99,26 +99,19 @@ export default function Analytics() {
   }, [fetchAnalytics]);
 
   return (
-    <div className="space-y-8 pb-20 animate-fast-slide">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Analytics</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Warehouse Operational Insights</p>
-        </div>
-        <div className="flex gap-2">
-          {['1M', '3M', '6M', '1Y'].map(range => (
-            <button
-              key={range}
-              onClick={() => setTimeRange(range)}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest  ${
-                timeRange === range ? 'bg-black text-white shadow-lg' : 'bg-gray-50 text-gray-400 hover:text-black hover:bg-gray-100'
-              }`}
-            >
-              {range}
-            </button>
-          ))}
-        </div>
+    <div className="space-y-6 pb-20 animate-fast-slide">
+      <div className="flex justify-end gap-2 mb-4 bg-white rounded-3xl p-3 border border-gray-100 shadow-sm w-fit ml-auto">
+        {['1M', '3M', '6M', '1Y'].map(range => (
+          <button
+            key={range}
+            onClick={() => setTimeRange(range)}
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest  ${
+              timeRange === range ? 'bg-black text-white shadow-lg' : 'bg-gray-50 text-gray-400 hover:text-black'
+            }`}
+          >
+            {range}
+          </button>
+        ))}
       </div>
 
       {/* KPI Cards */}

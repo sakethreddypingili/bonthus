@@ -108,20 +108,7 @@ export default function Categories() {
   );
 
   return (
-    <div className="space-y-8 pb-20 animate-fast-slide">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Categories</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Inventory Classification Logic</p>
-        </div>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-black text-white px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
-        >
-          <Plus size={16} strokeWidth={3} /> Register Category
-        </button>
-      </div>
-
+    <div className="space-y-6 pb-20 animate-fast-slide">
       <div className="bg-white rounded-[40px] p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="relative group w-full max-w-md">
           <Search size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-black" strokeWidth={3} />
@@ -133,6 +120,12 @@ export default function Categories() {
             className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-6 py-4 text-[11px] font-black uppercase tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white outline-none"
           />
         </div>
+        <button 
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 bg-black text-white px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+        >
+          <Plus size={16} strokeWidth={3} /> Register Category
+        </button>
       </div>
 
       <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">

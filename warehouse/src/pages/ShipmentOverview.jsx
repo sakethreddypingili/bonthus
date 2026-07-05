@@ -18,18 +18,7 @@ export default function ShipmentOverview() {
   ];
 
   return (
-    <div className="space-y-8 pb-20 animate-fast-slide">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-neutral-200">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Overview</h1>
-          <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.25em]">Operational Intelligence Vector</p>
-        </div>
-        <div className="flex items-center gap-2 px-5 py-3 bg-black text-white rounded-2xl shadow-sm border border-neutral-900">
-          <TrendingUp size={14} strokeWidth={2.5} className="text-white" />
-          <span className="text-[10px] font-black uppercase tracking-widest">Efficiency: 94.2%</span>
-        </div>
-      </div>
+    <div className="space-y-6 pb-20 animate-fast-slide">
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
