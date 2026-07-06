@@ -14,99 +14,129 @@ const INITIAL_TEMPLATES = [
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="font-family: sans-serif; padding: 40px; background-color: #f6f8fa; margin: 0;">
-  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 28px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
-    
-    <!-- Top Branded Accent -->
-    <div style="background: #000000; padding: 32px 40px; text-align: center; border-bottom: 4px solid #000000;">
-      <span style="font-size: 26px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: #ffffff; display: block; margin-bottom: 4px;">BONTHUS</span>
-      <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: #94a3b8; display: block;">EMPOWERING VISION</span>
+<body style="margin: 0; padding: 32px 16px; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
+  <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden;">
+
+    <!-- BLACK HEADER -->
+    <div style="background: #000000; padding: 36px 40px; text-align: center;">
+      <div style="font-size: 28px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; line-height: 1;">BONTHUS</div>
+      <div style="font-size: 11px; font-weight: 400; letter-spacing: 0.12em; color: #9ca3af; margin-top: 6px;">Empowering Vision</div>
     </div>
 
-    <div style="padding: 40px; text-align: center;">
-      <!-- Greeting Header -->
-      <h1 style="font-size: 26px; font-weight: 900; color: #000000; letter-spacing: -0.04em; margin: 0 0 8px 0; line-height: 1.2;">
-        Welcome to the Family, {{NAME}}!
+    <!-- WHITE HERO SECTION -->
+    <div style="padding: 40px 40px 28px; text-align: center; background: #ffffff;">
+
+      <!-- Big Heading -->
+      <h1 style="margin: 0 0 10px 0; font-size: 30px; font-weight: 900; color: #111111; line-height: 1.2; letter-spacing: -0.02em;">
+        Welcome to the<br>Family, {{NAME}}!
       </h1>
-      <p style="color: #64748b; font-size: 14px; line-height: 1.5; margin: 0 0 24px 0;">
+      <p style="margin: 0 0 28px 0; font-size: 14px; color: #6b7280; line-height: 1.5;">
         We're excited to have you on board.
       </p>
 
-      <!-- Welcome Illustration (Handshake SVG) -->
-      <div style="margin-bottom: 32px; display: inline-block;">
-        <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: 0 auto;">
-          <path d="M40 50L25 35L15 45L30 60L40 50Z" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
-          <path d="M80 50L95 35L105 45L90 60L80 50Z" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
-          <path d="M40 50C42 45 48 42 55 45C60 47 62 47 65 45C72 42 78 45 80 50L60 65L40 50Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
-          <circle cx="53" cy="50" r="3" fill="#94a3b8"/>
-          <circle cx="67" cy="50" r="3" fill="#94a3b8"/>
-          <path d="M50 56C53 58 67 58 70 56" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+      <!-- Handshake SVG illustration -->
+      <div style="margin: 0 auto 32px auto; width: 130px; height: 90px;">
+        <svg width="130" height="90" viewBox="0 0 130 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Left arm -->
+          <path d="M10 55 L28 35 L42 48" stroke="#c8d0da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M10 55 L28 73 L42 60" stroke="#c8d0da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M28 35 L28 73" stroke="#d4dae3" stroke-width="8" stroke-linecap="round" fill="none"/>
+          <!-- Right arm -->
+          <path d="M120 55 L102 35 L88 48" stroke="#c8d0da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M120 55 L102 73 L88 60" stroke="#c8d0da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M102 35 L102 73" stroke="#d4dae3" stroke-width="8" stroke-linecap="round" fill="none"/>
+          <!-- Clasped hands -->
+          <ellipse cx="65" cy="54" rx="24" ry="16" fill="#dce2ea" stroke="#c0c9d4" stroke-width="1.5"/>
+          <path d="M45 50 Q55 44 65 46 Q75 44 85 50" stroke="#b0bcc8" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <path d="M48 56 Q58 62 65 60 Q72 62 82 56" stroke="#b0bcc8" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <!-- Fingers detail -->
+          <path d="M55 46 Q57 40 60 46" stroke="#c0ccd8" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          <path d="M62 45 Q64 39 67 45" stroke="#c0ccd8" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          <path d="M69 46 Q71 40 74 46" stroke="#c0ccd8" stroke-width="1.5" stroke-linecap="round" fill="none"/>
         </svg>
       </div>
-      
-      <!-- Profile Overview Card -->
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 24px; border-radius: 20px; margin-bottom: 32px; text-align: left;">
-        <h3 style="margin: 0 0 16px 0; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; text-align: center;">YOUR PROFILE</h3>
-        
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-          <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Employee ID</td>
-            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; text-align: right;">{{EMPLOYEE_ID}}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Designation</td>
-            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; text-align: right;">{{DESIGNATION}}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Department</td>
-            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; text-align: right;">{{DOMAIN}}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Phone</td>
-            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; text-align: right;">{{PHONE}}</td>
+
+      <!-- ICE-BLUE PROFILE CARD with bordered table -->
+      <div style="background: #e8edf5; border-radius: 14px; padding: 20px 24px; margin-bottom: 28px; text-align: left;">
+        <div style="font-size: 11px; font-weight: 800; color: #374151; text-transform: uppercase; letter-spacing: 0.1em; text-align: center; margin-bottom: 14px;">YOUR PROFILE</div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px; background: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="padding: 10px 14px; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb; width: 50%;">Employee ID</td>
+            <td style="padding: 10px 14px; color: #111111; font-weight: 700; border: 1px solid #e5e7eb;">{{EMPLOYEE_ID}}</td>
           </tr>
           <tr>
-            <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Joined On</td>
-            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; text-align: right;">{{JOIN_DATE}}</td>
+            <td style="padding: 10px 14px; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb;">Designation</td>
+            <td style="padding: 10px 14px; color: #111111; font-weight: 700; border: 1px solid #e5e7eb;">{{DESIGNATION}}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 14px; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb;">Department</td>
+            <td style="padding: 10px 14px; color: #111111; font-weight: 700; border: 1px solid #e5e7eb;">{{DOMAIN}}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 14px; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb;">Phone</td>
+            <td style="padding: 10px 14px; color: #111111; font-weight: 700; border: 1px solid #e5e7eb;">+91 {{PHONE}}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 14px; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb;">Joined On</td>
+            <td style="padding: 10px 14px; color: #111111; font-weight: 700; border: 1px solid #e5e7eb;">{{JOIN_DATE}}</td>
           </tr>
         </table>
       </div>
 
-      <!-- Action Items / Checklist -->
-      <div style="margin-bottom: 36px;">
-        <h4 style="margin: 0 0 6px 0; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">What's Next</h4>
-        <h3 style="margin: 0 0 20px 0; font-size: 20px; font-weight: 900; color: #000000; letter-spacing: -0.02em;">Your First Steps</h3>
-        
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px;">
+      <!-- WHAT'S NEXT SECTION -->
+      <div style="margin-bottom: 32px;">
+        <div style="font-size: 13px; font-weight: 400; color: #6b7280; margin-bottom: 4px;">What's Next</div>
+        <div style="font-size: 20px; font-weight: 900; color: #111111; margin-bottom: 24px; letter-spacing: -0.01em;">Your First Steps</div>
+
+        <!-- 3 Steps with connecting lines -->
+        <table style="width: 100%; border-collapse: collapse;">
           <tr>
-            <td style="width: 33.33%; padding: 0 8px; text-align: center; vertical-align: top;">
-              <span style="display: inline-block; background: #f1f5f9; border-radius: 50%; width: 28px; height: 28px; text-align: center; font-weight: 800; font-size: 12px; line-height: 28px; color: #475569; margin-bottom: 8px;">1</span>
-              <div style="color: #4b5563; font-weight: 700; line-height: 1.4;">Set up your password</div>
+            <!-- Step 1 -->
+            <td style="width: 33.33%; text-align: center; vertical-align: top; padding: 0 4px;">
+              <div style="display: inline-block; width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #9ca3af; text-align: center; line-height: 30px; font-size: 13px; font-weight: 700; color: #374151; background: #ffffff; margin-bottom: 10px;">1</div>
+              <div style="font-size: 12px; color: #4b5563; font-weight: 500; line-height: 1.5;">Set up your<br>password</div>
             </td>
-            <td style="width: 33.33%; padding: 0 8px; text-align: center; vertical-align: top;">
-              <span style="display: inline-block; background: #f1f5f9; border-radius: 50%; width: 28px; height: 28px; text-align: center; font-weight: 800; font-size: 12px; line-height: 28px; color: #475569; margin-bottom: 8px;">2</span>
-              <div style="color: #4b5563; font-weight: 700; line-height: 1.4;">Explore the portal</div>
+            <!-- Connector line (visual trick using a cell with border) -->
+            <td style="width: 0; padding: 0; vertical-align: top; padding-top: 16px;">
+              <div style="width: 48px; height: 1px; background: #d1d5db; margin: 0 -20px;"></div>
             </td>
-            <td style="width: 33.33%; padding: 0 8px; text-align: center; vertical-align: top;">
-              <span style="display: inline-block; background: #f1f5f9; border-radius: 50%; width: 28px; height: 28px; text-align: center; font-weight: 800; font-size: 12px; line-height: 28px; color: #475569; margin-bottom: 8px;">3</span>
-              <div style="color: #4b5563; font-weight: 700; line-height: 1.4;">Connect with your team</div>
+            <!-- Step 2 -->
+            <td style="width: 33.33%; text-align: center; vertical-align: top; padding: 0 4px;">
+              <div style="display: inline-block; width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #9ca3af; text-align: center; line-height: 30px; font-size: 13px; font-weight: 700; color: #374151; background: #ffffff; margin-bottom: 10px;">2</div>
+              <div style="font-size: 12px; color: #4b5563; font-weight: 500; line-height: 1.5;">Explore the<br>portal</div>
+            </td>
+            <!-- Connector line -->
+            <td style="width: 0; padding: 0; vertical-align: top; padding-top: 16px;">
+              <div style="width: 48px; height: 1px; background: #d1d5db; margin: 0 -20px;"></div>
+            </td>
+            <!-- Step 3 -->
+            <td style="width: 33.33%; text-align: center; vertical-align: top; padding: 0 4px;">
+              <div style="display: inline-block; width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #9ca3af; text-align: center; line-height: 30px; font-size: 13px; font-weight: 700; color: #374151; background: #ffffff; margin-bottom: 10px;">3</div>
+              <div style="font-size: 12px; color: #4b5563; font-weight: 500; line-height: 1.5;">Connect with<br>your team</div>
             </td>
           </tr>
         </table>
       </div>
 
-      <!-- Call to Action -->
-      <div style="margin: 36px 0 24px 0;">
-        <a href="{{PORTAL_URL}}" style="display: inline-block; background: #000000; color: #ffffff; padding: 16px 36px; border-radius: 50px; text-decoration: none; font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">GET STARTED NOW</a>
+      <!-- CTA BUTTON -->
+      <div style="margin-bottom: 8px;">
+        <a href="{{PORTAL_URL}}" style="display: inline-block; background: #000000; color: #ffffff; padding: 16px 48px; border-radius: 50px; text-decoration: none; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em;">GET STARTED NOW</a>
       </div>
 
-      <!-- Footer -->
-      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 24px; line-height: 1.5;">
-        Bonthus Human Resources Department | <a href="mailto:bonthusofficial@gmail.com" style="color: #64748b; text-decoration: none; font-weight: 700;">bonthusofficial@gmail.com</a><br>
-        <span style="font-size: 10px; color: #cbd5e1; display: block; margin-top: 6px;">This is an official onboarding communication from Bonthus.</span>
-      </p>
     </div>
+
+    <!-- FOOTER SECTION (separate gray block) -->
+    <div style="background: #f3f4f6; padding: 20px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
+      <div style="font-size: 12px; color: #374151; font-weight: 500; margin-bottom: 5px;">
+        Bonthus Human Resources Department | bonthusofficial@gmail.com
+      </div>
+      <div style="font-size: 11px; color: #9ca3af;">
+        This is an official onboarding communication from Bonthus.
+      </div>
+    </div>
+
   </div>
 </body>
 </html>`
