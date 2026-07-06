@@ -217,6 +217,8 @@ export default function EmailEngine({ userProfile }) {
         "template_3c9lvcn",
         {
           to_email: selectedUser.email,
+          email: selectedUser.email,
+          user_email: selectedUser.email,
           to_name: selectedUser.name,
           subject: subject,
           message_html: finalHtml
