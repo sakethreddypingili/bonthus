@@ -423,7 +423,7 @@ export default function ProductList({ userProfile }) {
         setActiveTab("stock");
       } else {
         // Quick Add logic (always saves to pending queue under 'Quick Intake')
-        const { error } = await supabase
+        const { data: quickAddData, error } = await supabase
           .from("pending_products")
           .insert([{
             checkpoint_name: "Quick Intake",
@@ -438,9 +438,40 @@ export default function ProductList({ userProfile }) {
             unit_price: Number(productData.unit_price || productData.base_price || 0),
             store_id: selectedStore,
             status: 'pending'
-          }]);
+          }])
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Generate and insert the barcode for this Quick Add product
+        const uniqueBarcode = generateBarcode();
+        const { error: barcodeError } = await supabase
+          .from("pending_product_barcodes")
+          .insert([{
+            pending_product_id: quickAddData.id,
+            barcode: uniqueBarcode
+          }]);
+
+        if (barcodeError) console.error("Error creating barcode for Quick Add:", barcodeError.message);
+
+        // Shadow-write to quick_add_history table
+        try {
+          await supabase
+            .from("quick_add_history")
+            .insert([{
+              pending_product_id: quickAddData.id,
+              name: productData.name,
+              sku: productData.sku,
+              barcode: uniqueBarcode,
+              brand: productData.brand || null,
+              base_price: Number(productData.base_price || 0),
+              category_id: productData.category_id || null,
+              store_id: selectedStore || null
+            }]);
+        } catch (historyErr) {
+          console.error("Shadow write to quick_add_history failed:", historyErr);
+        }
         
         setSuccessMessage(`Product added to Review Queue under checkpoint: Quick Intake`);
         await fetchPendingQueue();
@@ -593,6 +624,43 @@ export default function ProductList({ userProfile }) {
         .insert(barcodeRecords);
 
       if (barcodeError) throw barcodeError;
+
+      // 3. Shadow-write to long-term history tables (parallel, non-blocking)
+      try {
+        const { data: checkpointData, error: cpError } = await supabase
+          .from("intake_checkpoints")
+          .insert([{
+            checkpoint_name: finalCheckpointName,
+            store_id: selectedStore || null,
+            category_id: bulkCategoryId || null,
+            item_count: records.length
+          }])
+          .select("id")
+          .single();
+
+        if (!cpError && checkpointData) {
+          const checkpointItemsRecords = insertedProducts.map(p => {
+            const originalRecord = records.find(r => r.sku === p.sku);
+            const matchingBarcode = barcodeRecords.find(b => b.pending_product_id === p.id);
+            return {
+              checkpoint_id: checkpointData.id,
+              pending_product_id: p.id,
+              name: originalRecord?.name || "",
+              sku: p.sku,
+              barcode: matchingBarcode?.barcode || null,
+              brand: originalRecord?.brand || null,
+              base_price: originalRecord?.base_price || null,
+              category_id: bulkCategoryId || null
+            };
+          });
+
+          await supabase
+            .from("intake_checkpoint_items")
+            .insert(checkpointItemsRecords);
+        }
+      } catch (historyErr) {
+        console.error("Shadow write to checkpoint history failed:", historyErr);
+      }
 
       setSuccessMessage(`Bulk batch containing ${records.length} items added to Review Queue!`);
       setBulkCheckpointName("");

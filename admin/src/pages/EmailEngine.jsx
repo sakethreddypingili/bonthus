@@ -12,42 +12,101 @@ const INITIAL_TEMPLATES = [
     description: "Welcome new staff members with initial details, task tracking, and onboarding checklists.",
     body: `<!DOCTYPE html>
 <html>
-<body style="font-family: sans-serif; padding: 40px; background-color: #f9fafb; margin: 0;">
-  <div style="max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 24px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-    <div style="text-align: center; margin-bottom: 30px;">
-      <span style="font-size: 24px; font-weight: 900; letter-spacing: -0.05em; text-transform: uppercase;">Bonthus Onboarding</span>
-    </div>
+<head>
+  <meta charset="utf-8">
+</head>
+<body style="font-family: sans-serif; padding: 40px; background-color: #f6f8fa; margin: 0;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 28px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
     
-    <h1 style="font-size: 22px; font-weight: 900; color: #000; letter-spacing: -0.03em; margin-bottom: 10px;">Welcome to the Team, {{NAME}}!</h1>
-    <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
-      We are thrilled to welcome you as our new <strong>{{DESIGNATION}}</strong>. Your onboarding profile is prepared, and we are ready to help you hit the ground running.
-    </p>
-    
-    <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 24px; border-radius: 16px; margin: 24px 0;">
-      <h3 style="margin: 0 0 16px 0; font-size: 12px; font-weight: 800; color: #000; text-transform: uppercase; letter-spacing: 0.05em;">Your Onboarding Overview</h3>
-      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-        <tr>
-          <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Employee ID:</td>
-          <td style="padding: 6px 0; color: #0f172a; font-weight: 700; text-align: right;">{{EMPLOYEE_ID}}</td>
-        </tr>
-        <tr>
-          <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Designation:</td>
-          <td style="padding: 6px 0; color: #0f172a; font-weight: 700; text-align: right;">{{DESIGNATION}}</td>
-        </tr>
-        <tr>
-          <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Role Domain:</td>
-          <td style="padding: 6px 0; color: #0f172a; font-weight: 700; text-align: right; text-transform: uppercase;">{{ROLE}}</td>
-        </tr>
-      </table>
+    <!-- Top Branded Accent -->
+    <div style="background: #000000; padding: 32px 40px; text-align: center; border-bottom: 4px solid #000000;">
+      <span style="font-size: 26px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: #ffffff; display: block; margin-bottom: 4px;">BONTHUS</span>
+      <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: #94a3b8; display: block;">EMPOWERING VISION</span>
     </div>
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="{{PORTAL_URL}}" style="display: inline-block; background: #000; color: #fff; padding: 16px 32px; border-radius: 12px; text-decoration: none; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;">Get Started Now</a>
-    </div>
+    <div style="padding: 40px; text-align: center;">
+      <!-- Greeting Header -->
+      <h1 style="font-size: 26px; font-weight: 900; color: #000000; letter-spacing: -0.04em; margin: 0 0 8px 0; line-height: 1.2;">
+        Welcome to the Family, {{NAME}}!
+      </h1>
+      <p style="color: #64748b; font-size: 14px; line-height: 1.5; margin: 0 0 24px 0;">
+        We're excited to have you on board.
+      </p>
 
-    <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 20px;">
-      This is an official transmission from Bonthus Human Resources Department.
-    </p>
+      <!-- Welcome Illustration (Handshake SVG) -->
+      <div style="margin-bottom: 32px; display: inline-block;">
+        <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: 0 auto;">
+          <path d="M40 50L25 35L15 45L30 60L40 50Z" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M80 50L95 35L105 45L90 60L80 50Z" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M40 50C42 45 48 42 55 45C60 47 62 47 65 45C72 42 78 45 80 50L60 65L40 50Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="53" cy="50" r="3" fill="#94a3b8"/>
+          <circle cx="67" cy="50" r="3" fill="#94a3b8"/>
+          <path d="M50 56C53 58 67 58 70 56" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      
+      <!-- Profile Overview Card -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 24px; border-radius: 20px; margin-bottom: 32px; text-align: left;">
+        <h3 style="margin: 0 0 16px 0; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; text-align: center;">YOUR PROFILE</h3>
+        
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Employee ID</td>
+            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; text-align: right;">{{EMPLOYEE_ID}}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Designation</td>
+            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; text-align: right;">{{DESIGNATION}}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Department</td>
+            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; text-align: right;">{{DOMAIN}}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Phone</td>
+            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; text-align: right;">{{PHONE}}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Joined On</td>
+            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; text-align: right;">{{JOIN_DATE}}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Action Items / Checklist -->
+      <div style="margin-bottom: 36px;">
+        <h4 style="margin: 0 0 6px 0; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">What's Next</h4>
+        <h3 style="margin: 0 0 20px 0; font-size: 20px; font-weight: 900; color: #000000; letter-spacing: -0.02em;">Your First Steps</h3>
+        
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px;">
+          <tr>
+            <td style="width: 33.33%; padding: 0 8px; text-align: center; vertical-align: top;">
+              <span style="display: inline-block; background: #f1f5f9; border-radius: 50%; width: 28px; height: 28px; text-align: center; font-weight: 800; font-size: 12px; line-height: 28px; color: #475569; margin-bottom: 8px;">1</span>
+              <div style="color: #4b5563; font-weight: 700; line-height: 1.4;">Set up your password</div>
+            </td>
+            <td style="width: 33.33%; padding: 0 8px; text-align: center; vertical-align: top;">
+              <span style="display: inline-block; background: #f1f5f9; border-radius: 50%; width: 28px; height: 28px; text-align: center; font-weight: 800; font-size: 12px; line-height: 28px; color: #475569; margin-bottom: 8px;">2</span>
+              <div style="color: #4b5563; font-weight: 700; line-height: 1.4;">Explore the portal</div>
+            </td>
+            <td style="width: 33.33%; padding: 0 8px; text-align: center; vertical-align: top;">
+              <span style="display: inline-block; background: #f1f5f9; border-radius: 50%; width: 28px; height: 28px; text-align: center; font-weight: 800; font-size: 12px; line-height: 28px; color: #475569; margin-bottom: 8px;">3</span>
+              <div style="color: #4b5563; font-weight: 700; line-height: 1.4;">Connect with your team</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Call to Action -->
+      <div style="margin: 36px 0 24px 0;">
+        <a href="{{PORTAL_URL}}" style="display: inline-block; background: #000000; color: #ffffff; padding: 16px 36px; border-radius: 50px; text-decoration: none; font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">GET STARTED NOW</a>
+      </div>
+
+      <!-- Footer -->
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 24px; line-height: 1.5;">
+        Bonthus Human Resources Department | <a href="mailto:bonthusofficial@gmail.com" style="color: #64748b; text-decoration: none; font-weight: 700;">bonthusofficial@gmail.com</a><br>
+        <span style="font-size: 10px; color: #cbd5e1; display: block; margin-top: 6px;">This is an official onboarding communication from Bonthus.</span>
+      </p>
+    </div>
   </div>
 </body>
 </html>`
@@ -140,7 +199,7 @@ export default function EmailEngine({ userProfile }) {
     try {
       const { data, error } = await supabase
         .from("users")
-        .select("id, name, email, role, designation")
+        .select("id, name, email, role, designation, emp_id, phone, joined_at, operation_type")
         .order("name");
       if (error) throw error;
       setUsers(data || []);
@@ -183,13 +242,29 @@ export default function EmailEngine({ userProfile }) {
 
   const processTemplateVariables = (html) => {
     if (!selectedUser) return html;
+
+    const cleanDomain = selectedUser.operation_type 
+      ? selectedUser.operation_type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+      : (selectedUser.role ? selectedUser.role.toUpperCase() : "General Operations");
+
+    const formattedJoinDate = selectedUser.joined_at
+      ? new Date(selectedUser.joined_at).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric"
+        })
+      : "Not Specified";
+
     let result = html
       .replace(/{{NAME}}/g, selectedUser.name)
       .replace(/{{EMAIL}}/g, selectedUser.email)
       .replace(/{{PORTAL_URL}}/g, window.location.origin)
       .replace(/{{DESIGNATION}}/g, selectedUser.designation || "Executive Team Member")
       .replace(/{{ROLE}}/g, selectedUser.role || "sales")
-      .replace(/{{EMPLOYEE_ID}}/g, selectedUser.id.substring(0, 8).toUpperCase());
+      .replace(/{{EMPLOYEE_ID}}/g, selectedUser.emp_id || selectedUser.id.substring(0, 8).toUpperCase())
+      .replace(/{{PHONE}}/g, selectedUser.phone || "Not Provided")
+      .replace(/{{JOIN_DATE}}/g, formattedJoinDate)
+      .replace(/{{DOMAIN}}/g, cleanDomain);
 
     if (selectedTemplate.id === "custom") {
       result = result.replace(/{{CUSTOM_MESSAGE}}/g, customMsg);
