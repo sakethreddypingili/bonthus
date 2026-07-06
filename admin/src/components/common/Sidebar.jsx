@@ -20,7 +20,8 @@ import {
   FlaskConical,
   Wrench,
   ScanBarcode,
-  FileText
+  FileText,
+  Mail
 } from "lucide-react";
 import { useState } from "react";
 const logoImg = '/assets/images/logo.webp';
@@ -250,6 +251,21 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
             >
               <Building2 size={18} className="flex-shrink-0" />
               {!collapsed && <span>Infrastructure</span>}
+            </NavLink>
+            <NavLink
+              to="/email-engine"
+              className={`
+                flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+                ${location.pathname.startsWith("/email-engine")
+                  ? "bg-black text-white shadow-md"
+                  : "text-gray-600 hover:text-black hover:bg-gray-100"
+                }
+                ${collapsed ? "justify-center" : ""}
+              `}
+              title={collapsed ? "Email Engine" : undefined}
+            >
+              <Mail size={18} className="flex-shrink-0" />
+              {!collapsed && <span>Email Engine</span>}
             </NavLink>
           </div>
         )}

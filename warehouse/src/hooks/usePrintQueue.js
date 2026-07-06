@@ -86,15 +86,25 @@ export function usePrintQueue() {
       if (error) throw error;
       if (!data || data.length === 0) return 0;
 
-      const formatted = data.map((item) => ({
-        id: item.id.toString(),
-        barcodeValue: item.sku,
-        categoryId: item.category_id,
-        categoryName: categoryPathsMap[item.category_id] || "Uncategorized",
-        quantity: 1, // Default to 1 label per item in the batch
-        status: "pending",
-        addedAt: new Date().toISOString(),
-      }));
+      const formatted = data.map((item) => {
+        let bcVal = item.sku;
+        try {
+          const parsed = JSON.parse(item.description);
+          if (parsed.barcode) bcVal = parsed.barcode;
+        } catch (e) {}
+
+        return {
+          id: item.id.toString(),
+          barcodeValue: bcVal,
+          brandValue: item.brand || "",
+          skuValue: item.sku,
+          categoryId: item.category_id,
+          categoryName: categoryPathsMap[item.category_id] || "Uncategorized",
+          quantity: 1, // Default to 1 label per item in the batch
+          status: "pending",
+          addedAt: new Date().toISOString(),
+        };
+      });
 
       addItems(formatted);
       return formatted.length;

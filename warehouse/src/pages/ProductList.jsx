@@ -10,6 +10,11 @@ const generateSKU = () => {
   return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 };
 
+// Auto-generate a unique 13-digit EAN-style barcode
+const generateBarcode = () => {
+  return "8901" + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
+};
+
 export default function ProductList({ userProfile }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -506,9 +511,9 @@ export default function ProductList({ userProfile }) {
         const catType = getCategoryType(bulkCategoryId);
         const qty = Math.max(1, Number(row.stock_quantity || 1));
         
-        let finalDesc = row.description || null;
+        let baseDescObj = {};
         if (catType === 'frame') {
-          finalDesc = JSON.stringify({
+          baseDescObj = {
             type: 'frame',
             modelNo: row.frame_model_no || '',
             color: row.frame_color || '',
@@ -519,9 +524,9 @@ export default function ProductList({ userProfile }) {
             templeLength: row.frame_temple_length || '',
             dbl: row.frame_dbl || '',
             rawDescription: row.description || ''
-          });
+          };
         } else if (catType === 'lens') {
-          finalDesc = JSON.stringify({
+          baseDescObj = {
             type: 'lens',
             lensType: row.lens_type || '',
             index: row.lens_index || '',
@@ -532,19 +537,26 @@ export default function ProductList({ userProfile }) {
             axis: row.lens_axis || '',
             add: row.lens_add || '',
             rawDescription: row.description || ''
-          });
+          };
+        } else {
+          baseDescObj = {
+            type: 'generic',
+            rawDescription: row.description || ''
+          };
         }
 
         // Loop 'qty' times to generate unique records for quantity > 1
         for (let i = 0; i < qty; i++) {
+          const uniqueBarcode = generateBarcode();
+          const itemDescObj = { ...baseDescObj, barcode: uniqueBarcode };
           records.push({
             checkpoint_name: finalCheckpointName,
             name: qty > 1 ? `${row.name} #${i + 1}` : row.name,
-            sku: generateSKU(), // generate a unique barcode for each product
+            sku: generateSKU(), // unique 5-character SKU
             brand: row.brand || null,
             base_price: Number(row.base_price || 0),
             category_id: bulkCategoryId,
-            description: finalDesc,
+            description: JSON.stringify(itemDescObj),
             stock_quantity: 1, // each individual product has quantity = 1
             low_stock_threshold: Number(row.low_stock_threshold || 5),
             unit_price: Number(row.base_price || 0),
@@ -598,6 +610,24 @@ export default function ProductList({ userProfile }) {
 
         if (pError) throw pError;
 
+        // 1b. Insert the barcode record
+        let parsedBarcode = null;
+        try {
+          const parsed = JSON.parse(item.description);
+          if (parsed.barcode) parsedBarcode = parsed.barcode;
+        } catch (e) {}
+
+        if (parsedBarcode) {
+          const { error: pbError } = await supabase
+            .from("product_barcodes")
+            .insert([{
+              product_id: pData.id,
+              barcode: parsedBarcode,
+              status: 'active'
+            }]);
+          if (pbError) console.error("Error inserting product_barcode:", pbError);
+        }
+
         // 2. Insert into store_inventory
         const { error: iError } = await supabase
           .from("store_inventory")
@@ -648,6 +678,24 @@ export default function ProductList({ userProfile }) {
         .single();
 
       if (pError) throw pError;
+
+      // Insert the barcode record
+      let parsedBarcode = null;
+      try {
+        const parsed = JSON.parse(item.description);
+        if (parsed.barcode) parsedBarcode = parsed.barcode;
+      } catch (e) {}
+
+      if (parsedBarcode) {
+        const { error: pbError } = await supabase
+          .from("product_barcodes")
+          .insert([{
+            product_id: pData.id,
+            barcode: parsedBarcode,
+            status: 'active'
+          }]);
+        if (pbError) console.error("Error inserting product_barcode:", pbError);
+      }
 
       const { error: iError } = await supabase
         .from("store_inventory")
@@ -1820,7 +1868,8 @@ export default function ProductList({ userProfile }) {
                         <tr className="bg-white border-b border-gray-100">
                           <th className="w-12 px-6 py-3"></th>
                           <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Name</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">BARCODE</th>
+                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Unique Code (SKU)</th>
+                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Barcode</th>
                           <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Brand</th>
                           <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Category</th>
                           <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Price</th>
@@ -1842,7 +1891,17 @@ export default function ProductList({ userProfile }) {
                               />
                             </td>
                             <td className="px-6 py-3 text-xs font-black text-black uppercase tracking-tight">{item.name}</td>
-                            <td className="px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider">{item.sku}</td>
+                            <td className="px-6 py-3 text-xs font-mono font-bold text-black uppercase tracking-wider">{item.sku}</td>
+                            <td className="px-6 py-3 text-xs font-mono font-bold text-gray-400 uppercase tracking-wider">
+                              {(() => {
+                                try {
+                                  const parsed = JSON.parse(item.description);
+                                  return parsed.barcode || "-";
+                                } catch (e) {
+                                  return "-";
+                                }
+                              })()}
+                            </td>
                             <td className="px-6 py-3 text-xs font-bold text-black uppercase tracking-widest">{item.brand || "Generic"}</td>
                             <td className="px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
                               {item.category?.name || "Unassigned"}

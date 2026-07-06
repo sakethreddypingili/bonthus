@@ -34,6 +34,7 @@ import EmployeeManagement from "./pages/EmployeeManagement";
 import Infrastructure from "./pages/Infrastructure";
 import Repairs from "./pages/Repairs";
 import Power from "./pages/Power";
+import EmailEngine from "./pages/EmailEngine";
 import { PROFILE_CACHE_KEY, logout } from "./utils/auth";
 
 
@@ -389,6 +390,7 @@ function App() {
       <Route path="/infrastructure" element={<Infrastructure userProfile={userProfile} />} />
       <Route path="/repairs" element={<Repairs userProfile={userProfile} />} />
       <Route path="/power" element={<Power userProfile={userProfile} />} />
+      <Route path="/email-engine" element={<EmailEngine userProfile={userProfile} />} />
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
       <Route path="/invoice/:orderNumber" element={<InvoiceView userProfile={userProfile} />} />
       <Route path="/mobile-scan" element={<MobileScan />} />
