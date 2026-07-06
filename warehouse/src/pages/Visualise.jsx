@@ -125,13 +125,35 @@ export default function Visualise({ userProfile }) {
         try {
             const queryVal = barcodeQuery.trim();
 
-            // Path 1: Look up in pending_products
-            const { data: pendingData, error: pendingError } = await supabase
-                .from("pending_products")
-                .select("*")
-                .eq("sku", queryVal)
-                .eq("status", "pending")
+            let pendingData = null;
+
+            // Path 1a: Check if barcode is registered in pending_product_barcodes
+            const { data: pBarData } = await supabase
+                .from("pending_product_barcodes")
+                .select("pending_product_id")
+                .eq("barcode", queryVal)
                 .maybeSingle();
+
+            if (pBarData) {
+                const { data: pProd } = await supabase
+                    .from("pending_products")
+                    .select("*")
+                    .eq("id", pBarData.pending_product_id)
+                    .eq("status", "pending")
+                    .maybeSingle();
+                pendingData = pProd;
+            }
+
+            // Path 1b: Fallback to searching SKU directly in pending_products (if they entered SKU code)
+            if (!pendingData) {
+                const { data: pProd } = await supabase
+                    .from("pending_products")
+                    .select("*")
+                    .eq("sku", queryVal)
+                    .eq("status", "pending")
+                    .maybeSingle();
+                pendingData = pProd;
+            }
 
             if (pendingData) {
                 // Process pending product (existing flow)
@@ -190,7 +212,7 @@ export default function Visualise({ userProfile }) {
             }
 
             // Path 2: Look up in product_barcodes and find matching imagine_pool items
-            const { data: barcodeData, error: barcodeError } = await supabase
+            const { data: barcodeData } = await supabase
                 .from("product_barcodes")
                 .select("product_id")
                 .eq("barcode", queryVal)
@@ -198,7 +220,7 @@ export default function Visualise({ userProfile }) {
 
             if (barcodeData) {
                 // Find matching pending imagine_pool item for this product
-                const { data: poolData, error: poolError } = await supabase
+                const { data: poolData } = await supabase
                     .from("imagine_pool")
                     .select(`
                         id,
@@ -232,7 +254,6 @@ export default function Visualise({ userProfile }) {
                     return;
                 }
             }
-
             // Path 3: Fallback - Product not found anywhere
             setErrorMessage(`No pending product or order request found with barcode: ${queryVal}`);
         } catch (err) {
