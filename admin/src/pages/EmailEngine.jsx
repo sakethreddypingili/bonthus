@@ -71,21 +71,21 @@ const INITIAL_TEMPLATES = [
     [data-ogsc] td.footer-container { background-color: #f3f4f6 !important; }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #eef0f3;" bgcolor="#eef0f3">
+<body style="margin: 0; padding: 0; background-color: #eef0f3; min-width: 100%;" bgcolor="#eef0f3">
 
   <!-- OUTER WRAPPER TABLE - fixed 600px, never changes -->
-  <table class="outer-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef0f3">
+  <table class="outer-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef0f3" style="min-width: 100%; width: 100%;">
     <tr>
       <td align="center" style="padding: 32px 0;">
 
         <!-- EMAIL CARD - fixed 580px width -->
-        <table class="email-card" width="580" cellpadding="0" cellspacing="0" border="0" style="border-radius: 20px; overflow: hidden; background-color: #ffffff;" bgcolor="#ffffff">
+        <table class="email-card" width="580" cellpadding="0" cellspacing="0" border="0" style="border-radius: 20px; overflow: hidden; background-color: #ffffff; width: 580px; min-width: 580px;" bgcolor="#ffffff">
 
-          <!-- ===== BLACK HEADER ===== -->
+          <!-- ===== BLUE HEADER ===== -->
           <tr>
-            <td bgcolor="#000000" align="center" style="padding: 36px 40px; background-color: #000000;">
+            <td bgcolor="#0046c7" align="center" style="padding: 36px 40px; background-color: #0046c7 !important;">
               <p style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: 8px; text-transform: uppercase; color: #ffffff !important; font-family: Arial, sans-serif; line-height: 1;">BONTHUS</p>
-              <p style="margin: 8px 0 0 0; font-size: 11px; font-weight: 400; letter-spacing: 3px; color: #9ca3af !important; font-family: Arial, sans-serif;">Empowering Vision</p>
+              <p style="margin: 8px 0 0 0; font-size: 11px; font-weight: 400; letter-spacing: 3px; color: #a1c2ff !important; font-family: Arial, sans-serif;">Empowering Vision</p>
             </td>
           </tr>
 
@@ -174,7 +174,7 @@ const INITIAL_TEMPLATES = [
                   <!-- Line between 1 and 2 -->
                   <td valign="top" style="padding-top: 16px;">
                     <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                      <tr><td height="1" bgcolor="#d1d5db" style="font-size: 0; line-height: 0;">&nbsp;</td></tr>
+                      <tr><td height="0" style="border-top: 2px dashed #9ca3af; font-size: 0; line-height: 0;">&nbsp;</td></tr>
                     </table>
                   </td>
                   <!-- Step 2 -->
@@ -193,7 +193,7 @@ const INITIAL_TEMPLATES = [
                   <!-- Line between 2 and 3 -->
                   <td valign="top" style="padding-top: 16px;">
                     <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                      <tr><td height="1" bgcolor="#d1d5db" style="font-size: 0; line-height: 0;">&nbsp;</td></tr>
+                      <tr><td height="0" style="border-top: 2px dashed #9ca3af; font-size: 0; line-height: 0;">&nbsp;</td></tr>
                     </table>
                   </td>
                   <!-- Step 3 -->
