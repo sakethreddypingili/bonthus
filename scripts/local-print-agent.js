@@ -20,7 +20,7 @@ const printRawWindows = (rawTspl, printerName, callback) => {
         console.log("[Local Agent] No default printer returned from system. Simulating print output...");
         try {
           fs.unlinkSync(tempFile);
-        } catch (e) {}
+        } catch (e) { }
         callback(null, "Simulated successfully");
         return;
       }
@@ -32,31 +32,89 @@ const printRawWindows = (rawTspl, printerName, callback) => {
 };
 
 const sendToWindowsPrinter = (filePath, printerName, callback) => {
-  // Use PowerShell to send raw bytes directly to the printer
-  // This is highly robust on Windows for TSPL/ZPL printers
-  const command = `powershell -Command "[System.IO.File]::WriteAllText('${filePath}', [System.IO.File]::ReadAllText('${filePath}')); Out-Printer -Name '${printerName}' -InputObject (Get-Content '${filePath}' -Raw)"`;
-  
+  // Read the raw command file contents
+  const rawData = fs.readFileSync(filePath, "utf8");
+
+  // Escape single quotes for PowerShell execution safely
+  const escapedData = rawData.replace(/'/g, "''");
+
+  // This PowerShell snippet opens a direct raw stream bypass into the Windows Spooler API
+  // It completely bypasses driver rendering and works flawlessly on BOTH standard and generic drivers!
+  const command = `powershell -Command "
+    $code = @'
+    using System;
+    using System.Runtime.InteropServices;
+    public class RawPrinterHelper {
+        [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi)]
+        public class DOCINFOA {
+            [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+            [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
+            [MarshalAs(UnmanagedType.LPStr)] public string pDatatype;
+        }
+        [DllImport(\\"winspool.Drv\\", EntryPoint=\\"OpenPrinterA\\", SetLastError=true, CharSet=CharSet.Ansi, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+        public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
+        [DllImport(\\"winspool.Drv\\", EntryPoint=\\"ClosePrinter\\", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+        public static extern bool ClosePrinter(IntPtr hPrinter);
+        [DllImport(\\"winspool.Drv\\", EntryPoint=\\"StartDocPrinterA\\", SetLastError=true, CharSet=CharSet.Ansi, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+        public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPCustomMarshaler, MarshalTypeRef = typeof(System.Runtime.InteropServices.CustomMarshalers.TypeToTypeMarshaler))] DOCINFOA di);
+        [DllImport(\\"winspool.Drv\\", EntryPoint=\\"EndDocPrinter\\", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+        public static extern bool EndDocPrinter(IntPtr hPrinter);
+        [DllImport(\\"winspool.Drv\\", EntryPoint=\\"StartPagePrinter\\", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+        public static extern bool StartPagePrinter(IntPtr hPrinter);
+        [DllImport(\\"winspool.Drv\\", EntryPoint=\\"EndPagePrinter\\", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+        public static extern bool EndPagePrinter(IntPtr hPrinter);
+        [DllImport(\\"winspool.Drv\\", EntryPoint=\\"WritePrinter\\", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+        public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
+
+        public static bool SendStringToPrinter(string szPrinterName, string szString) {
+            IntPtr hPrinter = IntPtr.Zero;
+            DOCINFOA di = new DOCINFOA();
+            bool bSuccess = false;
+            di.pDocName = \\"TSPL Raw Print Job\\";
+            di.pDatatype = \\"RAW\\";
+            if (OpenPrinter(szPrinterName.Normalize(), out hPrinter, IntPtr.Zero)) {
+                if (StartDocPrinter(hPrinter, 1, di)) {
+                    if (StartPagePrinter(hPrinter)) {
+                        IntPtr pBytes = Marshal.StringToCoTaskMemAnsi(szString);
+                        Int32 dwCount = szString.Length;
+                        Int32 dwWritten = 0;
+                        bSuccess = WritePrinter(hPrinter, pBytes, dwCount, out dwWritten);
+                        Marshal.FreeCoTaskMem(pBytes);
+                        EndPagePrinter(hPrinter);
+                    }
+                    EndDocPrinter(hPrinter);
+                }
+                ClosePrinter(hPrinter);
+            }
+            return bSuccess;
+        }
+    }
+'@
+    Add-Type -TypeDefinition $code
+    [RawPrinterHelper]::SendStringToPrinter('${printerName}', '${escapedData}')
+  "`;
+
   exec(command, (err, stdout, stderr) => {
     try {
       fs.unlinkSync(filePath);
-    } catch (e) {}
-    
-    if (err) {
-      console.error(`[Local Agent] Print error on printer "${printerName}":`, stderr);
-      callback(err);
+    } catch (e) { }
+
+    if (err || stdout.trim() === "False") {
+      console.error(\`[Local Agent] Print error on printer "${printerName}":\`, stderr || "Failed to submit raw spool data.");
+      callback(err || new Error("Raw submission returned false status"));
     } else {
-      console.log(`[Local Agent] Successfully printed to "${printerName}"`);
+      console.log(\`[Local Agent] Successfully printed raw payload to "${printerName}"\`);
       callback(null);
     }
   });
 };
 
 const printRawUnix = (rawTspl, printerName, callback) => {
-  const tempFile = path.join(os.tmpdir(), `print_job_${Date.now()}.txt`);
+  const tempFile = path.join(os.tmpdir(), `print_job_${ Date.now() }.txt`);
   fs.writeFileSync(tempFile, rawTspl, "utf8");
 
   // Determine target command (lp or lpr)
-  const cmd = printerName ? `lp -d "${printerName}" "${tempFile}"` : `lp "${tempFile}"`;
+  const cmd = printerName ? `lp - d "${printerName}" "${tempFile}"` : `lp "${tempFile}"`;
   
   exec(cmd, (err, stdout, stderr) => {
     try {
@@ -64,7 +122,7 @@ const printRawUnix = (rawTspl, printerName, callback) => {
     } catch (e) {}
 
     if (err) {
-      console.error(`[Local Agent] Print error:`, stderr);
+      console.error(`[Local Agent]Print error: `, stderr);
       callback(err);
     } else {
       console.log("[Local Agent] Successfully printed via lp command");
@@ -74,7 +132,7 @@ const printRawUnix = (rawTspl, printerName, callback) => {
 };
 
 const server = http.createServer((req, res) => {
-  console.log(`[Local Agent] Incoming request: ${req.method} ${req.url}`);
+  console.log(`[Local Agent]Incoming request: ${ req.method } ${ req.url }`);
   
   // CORS Headers
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -112,7 +170,7 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        console.log(`[Local Agent] Received print job payload:\n${rawTspl}`);
+        console.log(`[Local Agent]Received print job payload: \n${ rawTspl }`);
 
         const isWin = os.platform() === "win32";
         const printFunc = isWin ? printRawWindows : printRawUnix;
@@ -139,6 +197,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[Local Agent] Running on http://localhost:${PORT} with zero dependencies.`);
-  console.log(`[Local Agent] OS Platform: ${os.platform()}`);
-});
+  console.log(`[Local Agent]Running on http://localhost:${PORT} with zero dependencies.`);
+        console.log(`[Local Agent] OS Platform: ${os.platform()}`);
+    });

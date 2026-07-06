@@ -491,6 +491,11 @@ export default function ProductList({ userProfile }) {
     setSaving(true);
     setSuccessMessage("");
     try {
+      // Append a unique date/time string to the checkpoint name so that
+      // batches created with the same name at different times are grouped separately.
+      const timestamp = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const finalCheckpointName = `${bulkCheckpointName.trim()} (${timestamp})`;
+
       const records = [];
       for (const row of bulkRows) {
         const catType = getCategoryType(bulkCategoryId);
@@ -525,16 +530,17 @@ export default function ProductList({ userProfile }) {
           });
         }
 
+        // Loop 'qty' times to generate unique records for quantity > 1
         for (let i = 0; i < qty; i++) {
           records.push({
-            checkpoint_name: bulkCheckpointName.trim(),
-            name: row.name,
-            sku: generateSKU(),
+            checkpoint_name: finalCheckpointName,
+            name: qty > 1 ? `${row.name} #${i + 1}` : row.name,
+            sku: generateSKU(), // generate a unique barcode for each product
             brand: row.brand || null,
             base_price: Number(row.base_price || 0),
             category_id: bulkCategoryId,
             description: finalDesc,
-            stock_quantity: 1,
+            stock_quantity: 1, // each individual product has quantity = 1
             low_stock_threshold: Number(row.low_stock_threshold || 5),
             unit_price: Number(row.base_price || 0),
             store_id: selectedStore,
@@ -546,7 +552,7 @@ export default function ProductList({ userProfile }) {
       const { error } = await supabase.from("pending_products").insert(records);
       if (error) throw error;
 
-      setSuccessMessage(`Bulk batch containing ${bulkRows.length} items added to Review Queue!`);
+      setSuccessMessage(`Bulk batch containing ${records.length} items added to Review Queue!`);
       setBulkCheckpointName("");
       setBulkCategoryId("");
       setBulkCascadePath([]);
