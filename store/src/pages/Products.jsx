@@ -381,6 +381,8 @@ export default function Products({ userProfile }) {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Product</th>
+                    <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Unique Code (SKU)</th>
+                    <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Barcode</th>
                     <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">{isSuperAdmin ? "Brand" : "Category"}</th>
                     <th className="px-6 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Value</th>
                     {isSuperAdmin && <th className="px-6 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Stock</th>}
@@ -392,12 +394,10 @@ export default function Products({ userProfile }) {
                   {filtered.map(p => (
                     <tr key={p.inventory_id} className="hover:bg-gray-50 group">
                       <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-black text-black uppercase tracking-tight">{p.name}</span>
-                          <span className="text-[9px] font-black text-gray-500 uppercase font-mono">SKU: {p.sku}</span>
-                          <span className="text-[9px] text-gray-400 uppercase font-mono">BAR: {p.barcode}</span>
-                        </div>
+                        <span className="text-[11px] font-black text-black uppercase tracking-tight">{p.name}</span>
                       </td>
+                      <td className="px-6 py-4 text-[10px] font-bold font-mono text-black uppercase">{p.sku}</td>
+                      <td className="px-6 py-4 text-[10px] font-bold font-mono text-gray-400 uppercase">{p.barcode}</td>
                       <td className="px-6 py-4">
                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{isSuperAdmin ? (p.brand || 'N/A') : (p.category || 'N/A')}</span>
                       </td>

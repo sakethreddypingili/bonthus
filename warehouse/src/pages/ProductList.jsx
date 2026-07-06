@@ -824,7 +824,8 @@ export default function ProductList({ userProfile }) {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Identify</th>
-                      <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">CODE / BARCODE</th>
+                      <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Unique Code (SKU)</th>
+                      <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Barcode</th>
                       <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Brand</th>
                       <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Classification</th>
                       <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Price</th>
@@ -840,12 +841,8 @@ export default function ProductList({ userProfile }) {
                           <p className="text-xs font-black text-black uppercase tracking-tight">{item.name}</p>
                           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide truncate max-w-xs">{renderProductDescription(item.description)}</p>
                         </td>
-                        <td className="px-6 py-4 text-xs font-mono font-bold text-gray-500 uppercase tracking-wider">
-                          <div className="flex flex-col">
-                            <span className="text-[11px] font-black text-black">SKU: {item.sku}</span>
-                            <span className="text-[9px] text-gray-400">BAR: {item.barcode}</span>
-                          </div>
-                        </td>
+                        <td className="px-6 py-4 text-xs font-mono font-bold text-black uppercase tracking-wider">{item.sku}</td>
+                        <td className="px-6 py-4 text-xs font-mono font-bold text-gray-400 uppercase tracking-wider">{item.barcode}</td>
                         <td className="px-6 py-4 text-xs font-bold text-black uppercase tracking-widest">{item.brand || "Generic"}</td>
                         <td className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">{item.category || "Unassigned"}</td>
                         <td className="px-6 py-4 text-xs font-black text-black">₹{item.price.toLocaleString('en-IN')}</td>
