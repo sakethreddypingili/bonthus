@@ -10,7 +10,6 @@ const convertToWebP = (file) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             const img = new Image();
-            img.crossOrigin = "anonymous";
             img.onload = () => {
                 const canvas = document.createElement("canvas");
                 const maxDim = 1200;
@@ -1004,12 +1003,12 @@ export default function Visualise({ userProfile }) {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 {POSITIONS.map(pos => {
                                     const img = images[pos];
-                                    if (!img?.webpPreviewUrl) return null;
+                                    if (!img?.webpPreviewUrl && !img?.preview) return null;
                                     return (
                                         <div key={pos} className="bg-white border border-neutral-200 p-3 rounded-2xl space-y-1">
                                             <span className="text-[8px] font-black text-black uppercase tracking-widest">{pos} View</span>
                                             <div className="aspect-video w-full rounded-xl overflow-hidden bg-neutral-50 flex items-center justify-center border border-neutral-100">
-                                                <img src={img.webpPreviewUrl} alt={pos} className="max-h-full max-w-full object-contain" />
+                                                <img src={img.preview || img.webpPreviewUrl} alt={pos} className="max-h-full max-w-full object-contain" />
                                             </div>
                                         </div>
                                     );
@@ -1214,12 +1213,12 @@ export default function Visualise({ userProfile }) {
                         <div className="space-y-3">
                             {POSITIONS.map(pos => {
                                 const img = images[pos];
-                                if (!img?.webpPreviewUrl) return null;
+                                if (!img?.webpPreviewUrl && !img?.preview) return null;
                                 return (
                                     <div key={pos} className="space-y-0.5 text-left border border-neutral-100 p-2.5 rounded-xl">
                                         <span className="text-[8px] font-black text-black uppercase tracking-widest">{pos} View</span>
                                         <div className="aspect-video w-full rounded-lg overflow-hidden bg-neutral-50 flex items-center justify-center border border-neutral-200">
-                                            <img src={img.webpPreviewUrl} alt={pos} className="max-h-full max-w-full object-contain" />
+                                            <img src={img.preview || img.webpPreviewUrl} alt={pos} className="max-h-full max-w-full object-contain" />
                                         </div>
                                     </div>
                                 );
