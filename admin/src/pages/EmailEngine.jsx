@@ -8,14 +8,14 @@ const INITIAL_TEMPLATES = [
   {
     id: "onboarding",
     name: "Employee Onboarding Template",
-    subject: "Welcome to LensCare - Onboarding & Next Steps",
+    subject: "Welcome to Bonthus - Onboarding & Next Steps",
     description: "Welcome new staff members with initial details, task tracking, and onboarding checklists.",
     body: `<!DOCTYPE html>
 <html>
 <body style="font-family: sans-serif; padding: 40px; background-color: #f9fafb; margin: 0;">
   <div style="max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 24px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
     <div style="text-align: center; margin-bottom: 30px;">
-      <span style="font-size: 24px; font-weight: 900; letter-spacing: -0.05em; text-transform: uppercase;">LensCare Onboarding</span>
+      <span style="font-size: 24px; font-weight: 900; letter-spacing: -0.05em; text-transform: uppercase;">Bonthus Onboarding</span>
     </div>
     
     <h1 style="font-size: 22px; font-weight: 900; color: #000; letter-spacing: -0.03em; margin-bottom: 10px;">Welcome to the Team, {{NAME}}!</h1>
@@ -46,7 +46,7 @@ const INITIAL_TEMPLATES = [
     </div>
 
     <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 20px;">
-      This is an official transmission from LensCare Human Resources Department.
+      This is an official transmission from Bonthus Human Resources Department.
     </p>
   </div>
 </body>
@@ -55,7 +55,7 @@ const INITIAL_TEMPLATES = [
   {
     id: "portal_access",
     name: "Portal Access & Credentials Template",
-    subject: "Your LensCare Admin Portal Access Credentials",
+    subject: "Your Bonthus Admin Portal Access Credentials",
     description: "Provide login URLs, user accounts, temporary passwords, and secure password-reset advice.",
     body: `<!DOCTYPE html>
 <html>
@@ -63,7 +63,7 @@ const INITIAL_TEMPLATES = [
   <div style="max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 24px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
     <h1 style="font-size: 22px; font-weight: 900; color: #000; letter-spacing: -0.03em; margin-bottom: 10px;">Portal Setup for {{NAME}}</h1>
     <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
-      Your access account for the LensCare administrative dashboard has been provisioned. Please find your access link and temporary password credentials below:
+      Your access account for the Bonthus administrative dashboard has been provisioned. Please find your access link and temporary password credentials below:
     </p>
     
     <div style="background: #f1f5f9; padding: 24px; border-radius: 16px; margin: 24px 0; font-family: sans-serif;">
@@ -91,7 +91,7 @@ const INITIAL_TEMPLATES = [
   {
     id: "custom",
     name: "Custom Broadcast Notification",
-    subject: "Official Announcement from LensCare HQ",
+    subject: "Official Announcement from Bonthus HQ",
     description: "Send standard notifications, broadcasts, and custom templates directly to users.",
     body: `<!DOCTYPE html>
 <html>
@@ -106,7 +106,7 @@ const INITIAL_TEMPLATES = [
       {{CUSTOM_MESSAGE}}
     </div>
 
-    <p style="font-size: 11px; color: #94a3b8; text-align: center;">Sent by LensCare Administration Hub.</p>
+    <p style="font-size: 11px; color: #94a3b8; text-align: center;">Sent by Bonthus Administration Hub.</p>
   </div>
 </body>
 </html>`

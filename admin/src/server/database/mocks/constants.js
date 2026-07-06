@@ -55,6 +55,7 @@ export const ROLES_BY_OPERATION = {
         { value: 'logistics_coordinator', label: 'Logistics Coordinator' },
         { value: 'dispatch_clerk', label: 'Dispatch Clerk' },
         { value: 'receiving_associate', label: 'Receiving Associate' },
+        { value: 'warehouse_executive', label: 'Warehouse Executive' },
         { value: 'lab', label: 'Lab Operations [Unit Based]' }
     ],
     lab: [
