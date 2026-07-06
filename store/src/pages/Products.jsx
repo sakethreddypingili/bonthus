@@ -144,7 +144,8 @@ export default function Products({ userProfile }) {
             brand,
             base_price,
             description,
-            category:categories(id, name)
+            category:categories(id, name),
+            product_barcodes(barcode)
           )
         `)
         .eq('store_id', selectedStore);
@@ -156,6 +157,7 @@ export default function Products({ userProfile }) {
         inventory_id: item.id,
         name: item.product?.name,
         sku: item.product?.sku,
+        barcode: item.product?.product_barcodes?.[0]?.barcode || item.product?.sku || "",
         brand: item.product?.brand,
         description: item.product?.description,
         category: categoryPaths[item.product?.category?.id] || item.product?.category?.name,
@@ -392,7 +394,8 @@ export default function Products({ userProfile }) {
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <span className="text-[11px] font-black text-black uppercase tracking-tight">{p.name}</span>
-                          <span className="text-[9px] font-black text-gray-400 uppercase font-mono">{p.sku}</span>
+                          <span className="text-[9px] font-black text-gray-500 uppercase font-mono">SKU: {p.sku}</span>
+                          <span className="text-[9px] text-gray-400 uppercase font-mono">BAR: {p.barcode}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -433,7 +436,8 @@ export default function Products({ userProfile }) {
                 <div className="flex items-start justify-between mb-4">
                   <div onClick={() => navigate(`/inventory-entities/${p.id}`)}>
                     <p className="text-[11px] font-black text-black uppercase tracking-tight group-hover:text-black">{p.name}</p>
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">{p.sku}</p>
+                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">SKU: {p.sku}</p>
+                    <p className="text-[9px] text-gray-400 uppercase tracking-widest mt-0.5">BAR: {p.barcode}</p>
                   </div>
                   {isSuperAdmin && (
                     <button onClick={() => handleEditClick(p)} className="p-1 rounded-lg hover:bg-black hover:text-white text-gray-300" title="Edit">
