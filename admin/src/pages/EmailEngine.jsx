@@ -11,136 +11,222 @@ const INITIAL_TEMPLATES = [
     subject: "Welcome to Bonthus - Onboarding & Next Steps",
     description: "Welcome new staff members with initial details, task tracking, and onboarding checklists.",
     body: `<!DOCTYPE html>
-<html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <style>
+    :root { color-scheme: light only; }
+    body { color-scheme: light only; background-color: #eef0f3 !important; }
+    * { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  </style>
 </head>
-<body style="margin: 0; padding: 32px 16px; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
-  <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden;">
+<body style="margin: 0; padding: 0; background-color: #eef0f3;" bgcolor="#eef0f3">
 
-    <!-- BLACK HEADER -->
-    <div style="background: #000000; padding: 36px 40px; text-align: center;">
-      <div style="font-size: 28px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; line-height: 1;">BONTHUS</div>
-      <div style="font-size: 11px; font-weight: 400; letter-spacing: 0.12em; color: #9ca3af; margin-top: 6px;">Empowering Vision</div>
-    </div>
+  <!-- OUTER WRAPPER TABLE - fixed 600px, never changes -->
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef0f3">
+    <tr>
+      <td align="center" style="padding: 32px 0;">
 
-    <!-- WHITE HERO SECTION -->
-    <div style="padding: 40px 40px 28px; text-align: center; background: #ffffff;">
+        <!-- EMAIL CARD - fixed 580px width -->
+        <table width="580" cellpadding="0" cellspacing="0" border="0" style="border-radius: 20px; overflow: hidden; background-color: #ffffff;" bgcolor="#ffffff">
 
-      <!-- Big Heading -->
-      <h1 style="margin: 0 0 10px 0; font-size: 30px; font-weight: 900; color: #111111; line-height: 1.2; letter-spacing: -0.02em;">
-        Welcome to the<br>Family, {{NAME}}!
-      </h1>
-      <p style="margin: 0 0 28px 0; font-size: 14px; color: #6b7280; line-height: 1.5;">
-        We're excited to have you on board.
-      </p>
+          <!-- ===== BLACK HEADER ===== -->
+          <tr>
+            <td bgcolor="#000000" align="center" style="padding: 36px 40px; background-color: #000000;">
+              <p style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: 8px; text-transform: uppercase; color: #ffffff; font-family: Arial, sans-serif; line-height: 1;">BONTHUS</p>
+              <p style="margin: 8px 0 0 0; font-size: 11px; font-weight: 400; letter-spacing: 3px; color: #9ca3af; font-family: Arial, sans-serif;">Empowering Vision</p>
+            </td>
+          </tr>
 
-      <!-- Handshake SVG illustration -->
-      <div style="margin: 0 auto 32px auto; width: 130px; height: 90px;">
-        <svg width="130" height="90" viewBox="0 0 130 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Left arm -->
-          <path d="M10 55 L28 35 L42 48" stroke="#c8d0da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <path d="M10 55 L28 73 L42 60" stroke="#c8d0da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <path d="M28 35 L28 73" stroke="#d4dae3" stroke-width="8" stroke-linecap="round" fill="none"/>
-          <!-- Right arm -->
-          <path d="M120 55 L102 35 L88 48" stroke="#c8d0da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <path d="M120 55 L102 73 L88 60" stroke="#c8d0da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <path d="M102 35 L102 73" stroke="#d4dae3" stroke-width="8" stroke-linecap="round" fill="none"/>
-          <!-- Clasped hands -->
-          <ellipse cx="65" cy="54" rx="24" ry="16" fill="#dce2ea" stroke="#c0c9d4" stroke-width="1.5"/>
-          <path d="M45 50 Q55 44 65 46 Q75 44 85 50" stroke="#b0bcc8" stroke-width="2" stroke-linecap="round" fill="none"/>
-          <path d="M48 56 Q58 62 65 60 Q72 62 82 56" stroke="#b0bcc8" stroke-width="2" stroke-linecap="round" fill="none"/>
-          <!-- Fingers detail -->
-          <path d="M55 46 Q57 40 60 46" stroke="#c0ccd8" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-          <path d="M62 45 Q64 39 67 45" stroke="#c0ccd8" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-          <path d="M69 46 Q71 40 74 46" stroke="#c0ccd8" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-        </svg>
-      </div>
+          <!-- ===== WHITE HERO ===== -->
+          <tr>
+            <td bgcolor="#ffffff" align="center" style="padding: 44px 40px 20px; background-color: #ffffff;">
 
-      <!-- ICE-BLUE PROFILE CARD with bordered table -->
-      <div style="background: #e8edf5; border-radius: 14px; padding: 20px 24px; margin-bottom: 28px; text-align: left;">
-        <div style="font-size: 11px; font-weight: 800; color: #374151; text-transform: uppercase; letter-spacing: 0.1em; text-align: center; margin-bottom: 14px;">YOUR PROFILE</div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px; background: #ffffff; border-radius: 8px; overflow: hidden;">
-          <tr>
-            <td style="padding: 10px 14px; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb; width: 50%;">Employee ID</td>
-            <td style="padding: 10px 14px; color: #111111; font-weight: 700; border: 1px solid #e5e7eb;">{{EMPLOYEE_ID}}</td>
+              <!-- Heading -->
+              <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: 900; color: #111111; line-height: 1.25; letter-spacing: -0.5px; font-family: Arial, sans-serif;">Welcome to the<br>Family, {{NAME}}!</h1>
+              <p style="margin: 0 0 32px 0; font-size: 14px; color: #6b7280; font-family: Arial, sans-serif; line-height: 1.5;">We're excited to have you on board.</p>
+
+              <!-- HANDSHAKE SVG - proper clasped hands illustration -->
+              <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin-bottom: 32px;">
+                <tr>
+                  <td align="center">
+                    <svg width="160" height="100" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <!-- Left sleeve/arm -->
+                      <rect x="0" y="52" width="44" height="28" rx="6" fill="#dde3ec"/>
+                      <!-- Right sleeve/arm -->
+                      <rect x="116" y="52" width="44" height="28" rx="6" fill="#dde3ec"/>
+                      
+                      <!-- Left hand body -->
+                      <rect x="36" y="44" width="32" height="20" rx="5" fill="#e8edf5"/>
+                      <!-- Left fingers (4 fingers) -->
+                      <rect x="38" y="30" width="7" height="18" rx="3.5" fill="#e8edf5"/>
+                      <rect x="47" y="27" width="7" height="20" rx="3.5" fill="#e8edf5"/>
+                      <rect x="56" y="28" width="7" height="19" rx="3.5" fill="#e8edf5"/>
+                      <!-- Left thumb -->
+                      <rect x="32" y="46" width="8" height="13" rx="4" fill="#dde3ec" transform="rotate(-20 32 46)"/>
+                      
+                      <!-- Right hand body -->
+                      <rect x="92" y="44" width="32" height="20" rx="5" fill="#e8edf5"/>
+                      <!-- Right fingers (4 fingers) -->
+                      <rect x="115" y="30" width="7" height="18" rx="3.5" fill="#e8edf5"/>
+                      <rect x="106" y="27" width="7" height="20" rx="3.5" fill="#e8edf5"/>
+                      <rect x="97" y="28" width="7" height="19" rx="3.5" fill="#e8edf5"/>
+                      <!-- Right thumb -->
+                      <rect x="120" y="46" width="8" height="13" rx="4" fill="#dde3ec" transform="rotate(20 128 46)"/>
+                      
+                      <!-- Clasped / interlocked area in center -->
+                      <rect x="62" y="44" width="36" height="22" rx="5" fill="#d4dbe8"/>
+                      
+                      <!-- Knuckle lines on left hand -->
+                      <line x1="40" y1="44" x2="40" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
+                      <line x1="50" y1="44" x2="50" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
+                      <line x1="60" y1="44" x2="60" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
+                      <!-- Knuckle lines on right hand -->
+                      <line x1="100" y1="44" x2="100" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
+                      <line x1="110" y1="44" x2="110" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
+                      <line x1="120" y1="44" x2="120" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
+                    </svg>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
           </tr>
+
+          <!-- ===== PROFILE CARD ===== -->
           <tr>
-            <td style="padding: 10px 14px; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb;">Designation</td>
-            <td style="padding: 10px 14px; color: #111111; font-weight: 700; border: 1px solid #e5e7eb;">{{DESIGNATION}}</td>
+            <td bgcolor="#ffffff" style="padding: 0 40px 28px; background-color: #ffffff;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #e8edf5; border-radius: 14px;" bgcolor="#e8edf5">
+                <tr>
+                  <td align="center" style="padding: 18px 20px 14px;">
+                    <p style="margin: 0; font-size: 11px; font-weight: 800; color: #374151; text-transform: uppercase; letter-spacing: 2px; font-family: Arial, sans-serif;">YOUR PROFILE</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 0 16px 16px;">
+                    <!-- Profile rows table -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse: collapse; background-color: #ffffff; border-color: #e5e7eb; border-radius: 8px;" bgcolor="#ffffff">
+                      <tr>
+                        <td width="50%" style="padding: 11px 14px; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Employee ID</td>
+                        <td width="50%" style="padding: 11px 14px; font-size: 13px; color: #111111; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{EMPLOYEE_ID}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Designation</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #111111; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{DESIGNATION}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Department</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #111111; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{DOMAIN}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Phone</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #111111; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">+91 {{PHONE}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Joined On</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #111111; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{JOIN_DATE}}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
           </tr>
+
+          <!-- ===== WHAT'S NEXT ===== -->
           <tr>
-            <td style="padding: 10px 14px; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb;">Department</td>
-            <td style="padding: 10px 14px; color: #111111; font-weight: 700; border: 1px solid #e5e7eb;">{{DOMAIN}}</td>
+            <td bgcolor="#ffffff" align="center" style="padding: 0 40px 28px; background-color: #ffffff;">
+              <p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif;">What's Next</p>
+              <p style="margin: 0 0 24px 0; font-size: 20px; font-weight: 900; color: #111111; font-family: Arial, sans-serif; letter-spacing: -0.5px;">Your First Steps</p>
+
+              <!-- Steps table with connecting lines -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <!-- Step 1 -->
+                  <td width="33%" align="center" valign="top">
+                    <table cellpadding="0" cellspacing="0" border="0" align="center">
+                      <tr>
+                        <td align="center" width="34" height="34" style="width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; vertical-align: middle; font-size: 13px; font-weight: 700; color: #374151; font-family: Arial, sans-serif; background-color: #ffffff;" bgcolor="#ffffff">1</td>
+                      </tr>
+                      <tr>
+                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563; font-family: Arial, sans-serif; line-height: 1.5;">Set up your<br>password</td>
+                      </tr>
+                    </table>
+                  </td>
+                  <!-- Line between 1 and 2 -->
+                  <td valign="top" style="padding-top: 16px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr><td height="1" bgcolor="#d1d5db" style="font-size: 0; line-height: 0;">&nbsp;</td></tr>
+                    </table>
+                  </td>
+                  <!-- Step 2 -->
+                  <td width="33%" align="center" valign="top">
+                    <table cellpadding="0" cellspacing="0" border="0" align="center">
+                      <tr>
+                        <td align="center" width="34" height="34" style="width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; vertical-align: middle; font-size: 13px; font-weight: 700; color: #374151; font-family: Arial, sans-serif; background-color: #ffffff;" bgcolor="#ffffff">2</td>
+                      </tr>
+                      <tr>
+                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563; font-family: Arial, sans-serif; line-height: 1.5;">Explore the<br>portal</td>
+                      </tr>
+                    </table>
+                  </td>
+                  <!-- Line between 2 and 3 -->
+                  <td valign="top" style="padding-top: 16px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr><td height="1" bgcolor="#d1d5db" style="font-size: 0; line-height: 0;">&nbsp;</td></tr>
+                    </table>
+                  </td>
+                  <!-- Step 3 -->
+                  <td width="33%" align="center" valign="top">
+                    <table cellpadding="0" cellspacing="0" border="0" align="center">
+                      <tr>
+                        <td align="center" width="34" height="34" style="width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; vertical-align: middle; font-size: 13px; font-weight: 700; color: #374151; font-family: Arial, sans-serif; background-color: #ffffff;" bgcolor="#ffffff">3</td>
+                      </tr>
+                      <tr>
+                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563; font-family: Arial, sans-serif; line-height: 1.5;">Connect with<br>your team</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
           </tr>
+
+          <!-- ===== CTA BUTTON ===== -->
           <tr>
-            <td style="padding: 10px 14px; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb;">Phone</td>
-            <td style="padding: 10px 14px; color: #111111; font-weight: 700; border: 1px solid #e5e7eb;">+91 {{PHONE}}</td>
+            <td bgcolor="#ffffff" align="center" style="padding: 8px 40px 40px; background-color: #ffffff;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" bgcolor="#000000" style="border-radius: 50px; background-color: #000000;">
+                    <a href="{{PORTAL_URL}}" style="display: inline-block; padding: 16px 48px; font-size: 13px; font-weight: 800; color: #ffffff; text-decoration: none; text-transform: uppercase; letter-spacing: 2px; font-family: Arial, sans-serif; border-radius: 50px;">GET STARTED NOW</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
           </tr>
+
+          <!-- ===== FOOTER ===== -->
           <tr>
-            <td style="padding: 10px 14px; color: #6b7280; font-weight: 500; border: 1px solid #e5e7eb;">Joined On</td>
-            <td style="padding: 10px 14px; color: #111111; font-weight: 700; border: 1px solid #e5e7eb;">{{JOIN_DATE}}</td>
+            <td bgcolor="#f3f4f6" align="center" style="padding: 22px 32px; background-color: #f3f4f6; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 5px 0; font-size: 12px; color: #374151; font-weight: 500; font-family: Arial, sans-serif;">Bonthus Human Resources Department | bonthusofficial@gmail.com</p>
+              <p style="margin: 0; font-size: 11px; color: #9ca3af; font-family: Arial, sans-serif;">This is an official onboarding communication from Bonthus.</p>
+            </td>
           </tr>
+
         </table>
-      </div>
+        <!-- END EMAIL CARD -->
 
-      <!-- WHAT'S NEXT SECTION -->
-      <div style="margin-bottom: 32px;">
-        <div style="font-size: 13px; font-weight: 400; color: #6b7280; margin-bottom: 4px;">What's Next</div>
-        <div style="font-size: 20px; font-weight: 900; color: #111111; margin-bottom: 24px; letter-spacing: -0.01em;">Your First Steps</div>
+      </td>
+    </tr>
+  </table>
 
-        <!-- 3 Steps with connecting lines -->
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <!-- Step 1 -->
-            <td style="width: 33.33%; text-align: center; vertical-align: top; padding: 0 4px;">
-              <div style="display: inline-block; width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #9ca3af; text-align: center; line-height: 30px; font-size: 13px; font-weight: 700; color: #374151; background: #ffffff; margin-bottom: 10px;">1</div>
-              <div style="font-size: 12px; color: #4b5563; font-weight: 500; line-height: 1.5;">Set up your<br>password</div>
-            </td>
-            <!-- Connector line (visual trick using a cell with border) -->
-            <td style="width: 0; padding: 0; vertical-align: top; padding-top: 16px;">
-              <div style="width: 48px; height: 1px; background: #d1d5db; margin: 0 -20px;"></div>
-            </td>
-            <!-- Step 2 -->
-            <td style="width: 33.33%; text-align: center; vertical-align: top; padding: 0 4px;">
-              <div style="display: inline-block; width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #9ca3af; text-align: center; line-height: 30px; font-size: 13px; font-weight: 700; color: #374151; background: #ffffff; margin-bottom: 10px;">2</div>
-              <div style="font-size: 12px; color: #4b5563; font-weight: 500; line-height: 1.5;">Explore the<br>portal</div>
-            </td>
-            <!-- Connector line -->
-            <td style="width: 0; padding: 0; vertical-align: top; padding-top: 16px;">
-              <div style="width: 48px; height: 1px; background: #d1d5db; margin: 0 -20px;"></div>
-            </td>
-            <!-- Step 3 -->
-            <td style="width: 33.33%; text-align: center; vertical-align: top; padding: 0 4px;">
-              <div style="display: inline-block; width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #9ca3af; text-align: center; line-height: 30px; font-size: 13px; font-weight: 700; color: #374151; background: #ffffff; margin-bottom: 10px;">3</div>
-              <div style="font-size: 12px; color: #4b5563; font-weight: 500; line-height: 1.5;">Connect with<br>your team</div>
-            </td>
-          </tr>
-        </table>
-      </div>
-
-      <!-- CTA BUTTON -->
-      <div style="margin-bottom: 8px;">
-        <a href="{{PORTAL_URL}}" style="display: inline-block; background: #000000; color: #ffffff; padding: 16px 48px; border-radius: 50px; text-decoration: none; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em;">GET STARTED NOW</a>
-      </div>
-
-    </div>
-
-    <!-- FOOTER SECTION (separate gray block) -->
-    <div style="background: #f3f4f6; padding: 20px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
-      <div style="font-size: 12px; color: #374151; font-weight: 500; margin-bottom: 5px;">
-        Bonthus Human Resources Department | bonthusofficial@gmail.com
-      </div>
-      <div style="font-size: 11px; color: #9ca3af;">
-        This is an official onboarding communication from Bonthus.
-      </div>
-    </div>
-
-  </div>
 </body>
 </html>`
   },
+
+
   {
     id: "portal_access",
     name: "Portal Access & Credentials Template",
