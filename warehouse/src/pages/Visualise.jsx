@@ -164,12 +164,20 @@ export default function Visualise({ userProfile }) {
                     const parsed = data.description ? JSON.parse(data.description) : {};
                     setFrameForm({
                         modelNo: parsed.modelNo || data.frame_model_no || "",
-                        color: parsed.color || data.frame_color || ""
+                        color: parsed.color || data.frame_color || "",
+                        sizeA: parsed.sizeA || "",
+                        sizeB: parsed.sizeB || "",
+                        dbl: parsed.dbl || "",
+                        templeLength: parsed.templeLength || ""
                     });
                 } catch (e) {
                     setFrameForm({
                         modelNo: data.frame_model_no || "",
-                        color: data.frame_color || ""
+                        color: data.frame_color || "",
+                        sizeA: "",
+                        sizeB: "",
+                        dbl: "",
+                        templeLength: ""
                     });
                 }
             }
@@ -238,6 +246,10 @@ export default function Visualise({ userProfile }) {
                     type: 'frame',
                     modelNo: frameForm.modelNo,
                     color: frameForm.color,
+                    sizeA: frameForm.sizeA,
+                    sizeB: frameForm.sizeB,
+                    dbl: frameForm.dbl,
+                    templeLength: frameForm.templeLength,
                     imageUrls: uploadedUrls,
                     coverUrl: coverUrl || scannedProduct.image_url
                 });
@@ -700,6 +712,42 @@ export default function Visualise({ userProfile }) {
                                             className="w-full px-3 py-2 border-2 border-gray-150 rounded-xl text-[11px] font-bold text-black outline-none focus:border-black"
                                         />
                                     </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">A Size</label>
+                                        <input 
+                                            type="text" 
+                                            readOnly
+                                            value={frameForm.sizeA || "—"} 
+                                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[11px] font-bold text-gray-400 bg-gray-50 outline-none cursor-not-allowed"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">B Size</label>
+                                        <input 
+                                            type="text" 
+                                            readOnly
+                                            value={frameForm.sizeB || "—"} 
+                                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[11px] font-bold text-gray-400 bg-gray-50 outline-none cursor-not-allowed"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">DBL</label>
+                                        <input 
+                                            type="text" 
+                                            readOnly
+                                            value={frameForm.dbl || "—"} 
+                                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[11px] font-bold text-gray-400 bg-gray-50 outline-none cursor-not-allowed"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Temple Length</label>
+                                        <input 
+                                            type="text" 
+                                            readOnly
+                                            value={frameForm.templeLength || "—"} 
+                                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[11px] font-bold text-gray-400 bg-gray-50 outline-none cursor-not-allowed"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -897,6 +945,22 @@ export default function Visualise({ userProfile }) {
                                     <div>
                                         <span className="text-[8px] font-black text-gray-400 block">Color</span>
                                         <span className="text-black">{frameForm.color}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[8px] font-black text-gray-400 block">A Size</span>
+                                        <span className="text-black">{frameForm.sizeA || "—"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[8px] font-black text-gray-400 block">B Size</span>
+                                        <span className="text-black">{frameForm.sizeB || "—"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[8px] font-black text-gray-400 block">DBL</span>
+                                        <span className="text-black">{frameForm.dbl || "—"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[8px] font-black text-gray-400 block">Temple Length</span>
+                                        <span className="text-black">{frameForm.templeLength || "—"}</span>
                                     </div>
                                 </div>
                             </div>
