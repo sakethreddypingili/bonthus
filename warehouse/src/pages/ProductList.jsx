@@ -247,7 +247,7 @@ export default function ProductList({ userProfile }) {
         inventory_id: item.id,
         name: item.product?.name,
         sku: item.product?.sku,
-        barcode: item.product?.product_barcodes?.[0]?.barcode || item.product?.sku || "",
+        barcode: item.product?.product_barcodes?.[0]?.barcode || "-",
         brand: item.product?.brand,
         description: item.product?.description,
         category: item.product?.category ? categoryPaths[item.product.category.id] || item.product.category.name : "",

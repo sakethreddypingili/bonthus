@@ -722,12 +722,13 @@ export default function Visualise({ userProfile }) {
                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Capture Frame Images</p>
                             <div className="space-y-4">
                                 {/* Grid container for Cover and Front views (Row 1) */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {['cover', 'front'].map((pos) => {
-                                        const img = images[pos];
-                                        return (
-                                            <div key={pos} className="bg-white border border-neutral-200 rounded-2xl p-4 shadow-sm space-y-2.5">
-                                                <div className="flex justify-between items-center">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {POSITIONS.map((pos) => {
+                                    const img = images[pos];
+                                    return (
+                                        <div key={pos} className="bg-white border border-neutral-200 rounded-2xl p-4 shadow-sm space-y-2.5 flex flex-col justify-between">
+                                            <div>
+                                                <div className="flex justify-between items-center mb-2">
                                                     <span className="text-[9px] font-black text-black uppercase tracking-widest">{pos} View</span>
                                                     {img && (
                                                         <button type="button" onClick={() => handleRemoveImage(pos)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
@@ -741,59 +742,17 @@ export default function Visualise({ userProfile }) {
                                                         <div className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">WebP Ready</div>
                                                     </div>
                                                 ) : (
-                                                    <div className="grid grid-cols-2 gap-2.5">
-                                                        <label className="flex flex-col items-center justify-center gap-1.5 aspect-square border-2 border-dashed border-neutral-200 hover:border-black rounded-xl cursor-pointer p-3 transition-all">
-                                                            <Camera size={20} className="text-neutral-400" />
-                                                            <span className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Camera</span>
-                                                            <input type="file" accept="image/*" capture="environment" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
-                                                        </label>
-                                                        <label className="flex flex-col items-center justify-center gap-1.5 aspect-square border-2 border-dashed border-neutral-200 hover:border-black rounded-xl cursor-pointer p-3 transition-all">
-                                                            <Upload size={20} className="text-neutral-400" />
-                                                            <span className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Upload</span>
-                                                            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
-                                                        </label>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Full width container for Side view (Row 2) */}
-                                {['side'].map((pos) => {
-                                    const img = images[pos];
-                                    return (
-                                        <div key={pos} className="bg-white border border-neutral-200 rounded-2xl p-4 shadow-sm space-y-2.5 w-full">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[9px] font-black text-black uppercase tracking-widest">{pos} View</span>
-                                                {img && (
-                                                    <button type="button" onClick={() => handleRemoveImage(pos)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
-                                                        <Trash2 size={13} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {(img?.webpPreviewUrl || img?.preview) ? (
-                                                <div className="aspect-video w-full rounded-xl border border-neutral-150 overflow-hidden bg-neutral-50 flex items-center justify-center relative">
-                                                    <img src={img.webpPreviewUrl || img.preview} alt={pos} className="max-h-full max-w-full object-contain" />
-                                                    <div className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">WebP Ready</div>
-                                                </div>
-                                            ) : (
-                                                <div className="grid grid-cols-2 gap-2.5">
-                                                    <label className="flex flex-col items-center justify-center gap-1.5 aspect-square border-2 border-dashed border-neutral-200 hover:border-black rounded-xl cursor-pointer p-3 transition-all">
-                                                        <Camera size={20} className="text-neutral-400" />
-                                                        <span className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Camera</span>
-                                                        <input type="file" accept="image/*" capture="environment" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
-                                                    </label>
-                                                    <label className="flex flex-col items-center justify-center gap-1.5 aspect-square border-2 border-dashed border-neutral-200 hover:border-black rounded-xl cursor-pointer p-3 transition-all">
+                                                    <label className="flex flex-col items-center justify-center gap-1.5 aspect-video border-2 border-dashed border-neutral-200 hover:border-black rounded-xl cursor-pointer p-4 transition-all">
                                                         <Upload size={20} className="text-neutral-400" />
-                                                        <span className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Upload</span>
+                                                        <span className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Upload Image</span>
                                                         <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
                                                     </label>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
+                            </div>
                             </div>
                         </div>
                     )}
@@ -1122,38 +1081,33 @@ export default function Visualise({ userProfile }) {
                     </div>
 
                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Capture Images (WebP)</p>
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {POSITIONS.map((pos) => {
                             const img = images[pos];
                             return (
-                                <div key={pos} className="bg-white border border-neutral-200 rounded-2xl p-4 shadow-sm space-y-2.5">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[9px] font-black text-black uppercase tracking-widest">{pos} View</span>
-                                        {img && (
-                                            <button type="button" onClick={() => handleRemoveImage(pos)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
-                                                <Trash2 size={13} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    {img?.webpPreviewUrl ? (
-                                        <div className="aspect-video w-full rounded-xl border border-neutral-150 overflow-hidden bg-neutral-50 flex items-center justify-center relative">
-                                            <img src={img.webpPreviewUrl} alt={pos} className="max-h-full max-w-full object-contain" />
-                                            <div className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">WebP Ready</div>
+                                <div key={pos} className="bg-white border border-neutral-200 rounded-2xl p-4 shadow-sm space-y-2.5 flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-[9px] font-black text-black uppercase tracking-widest">{pos} View</span>
+                                            {img && (
+                                                <button type="button" onClick={() => handleRemoveImage(pos)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            )}
                                         </div>
-                                    ) : (
-                                        <div className="grid grid-cols-2 gap-2.5">
-                                            <label className="flex flex-col items-center justify-center gap-1.5 aspect-square border-2 border-dashed border-neutral-200 hover:border-black rounded-xl cursor-pointer p-3 transition-all">
-                                                <Camera size={20} className="text-neutral-400" />
-                                                <span className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Camera</span>
-                                                <input type="file" accept="image/*" capture="environment" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
-                                            </label>
-                                            <label className="flex flex-col items-center justify-center gap-1.5 aspect-square border-2 border-dashed border-neutral-200 hover:border-black rounded-xl cursor-pointer p-3 transition-all">
+                                        {(img?.webpPreviewUrl || img?.preview) ? (
+                                            <div className="aspect-video w-full rounded-xl border border-neutral-150 overflow-hidden bg-neutral-50 flex items-center justify-center relative">
+                                                <img src={img.webpPreviewUrl || img.preview} alt={pos} className="max-h-full max-w-full object-contain" />
+                                                <div className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">WebP Ready</div>
+                                            </div>
+                                        ) : (
+                                            <label className="flex flex-col items-center justify-center gap-1.5 aspect-video border-2 border-dashed border-neutral-200 hover:border-black rounded-xl cursor-pointer p-4 transition-all">
                                                 <Upload size={20} className="text-neutral-400" />
-                                                <span className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Upload</span>
+                                                <span className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Upload Image</span>
                                                 <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
                                             </label>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}
