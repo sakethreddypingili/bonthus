@@ -4,7 +4,17 @@ import { supabase } from "../server/supabase/supabase";
 
 const POSITIONS = ['cover', 'front', 'side'];
 
-// Helper to convert any image file to a WebP blob client-side
+// Read a File as a Base64 Data URL
+const readFileAsDataURL = (file) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Failed to read file as Data URL"));
+        reader.readAsDataURL(file);
+    });
+};
+
+// Helper to convert any image file to a WebP data URL (Base64)
 const convertToWebP = (file) => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -30,13 +40,12 @@ const convertToWebP = (file) => {
                 const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, width, height);
 
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        resolve(blob);
-                    } else {
-                        reject(new Error("Failed to convert image to WebP"));
-                    }
-                }, "image/webp", 0.82);
+                const dataUrl = canvas.toDataURL("image/webp", 0.82);
+                if (dataUrl) {
+                    resolve(dataUrl);
+                } else {
+                    reject(new Error("Failed to convert image to WebP"));
+                }
             };
             img.onerror = () => reject(new Error("Failed to load image element"));
             img.src = event.target.result;
@@ -44,6 +53,12 @@ const convertToWebP = (file) => {
         reader.onerror = () => reject(new Error("Failed to read file"));
         reader.readAsDataURL(file);
     });
+};
+
+// Convert a data URL back to a Blob for upload
+const dataURLToBlob = async (dataUrl) => {
+    const res = await fetch(dataUrl);
+    return res.blob();
 };
 
 export default function Visualise({ userProfile }) {
@@ -57,7 +72,7 @@ export default function Visualise({ userProfile }) {
     
     // Captured images mapping
     const [images, setImages] = useState({
-        cover: null, // { file, preview, webpBlob, webpPreviewUrl }
+        cover: null, // { file, previewDataUrl, webpDataUrl, webpBlob }
         front: null,
         side: null
     });
@@ -202,10 +217,6 @@ export default function Visualise({ userProfile }) {
                         });
                     }
                 }
-                POSITIONS.forEach(pos => {
-                    if (images[pos]?.preview) URL.revokeObjectURL(images[pos].preview);
-                    if (images[pos]?.webpPreviewUrl) URL.revokeObjectURL(images[pos].webpPreviewUrl);
-                });
                 setImages({ cover: null, front: null, side: null });
                 return;
             }
@@ -355,10 +366,6 @@ export default function Visualise({ userProfile }) {
 
             setSuccessMessage(`Successfully confirmed and moved ${scannedProduct.name} to Confirmed Queue!`);
             
-            POSITIONS.forEach(pos => {
-                if (images[pos]?.preview) URL.revokeObjectURL(images[pos].preview);
-                if (images[pos]?.webpPreviewUrl) URL.revokeObjectURL(images[pos].webpPreviewUrl);
-            });
             setImages({ cover: null, front: null, side: null });
             setScannedProduct(null);
             setVisualiseStage('scan');
@@ -445,11 +452,6 @@ export default function Visualise({ userProfile }) {
 
     const handleSelectItem = (item) => {
         setSelectedItem(item);
-        // Clear previews
-        POSITIONS.forEach(pos => {
-            if (images[pos]?.preview) URL.revokeObjectURL(images[pos].preview);
-            if (images[pos]?.webpPreviewUrl) URL.revokeObjectURL(images[pos].webpPreviewUrl);
-        });
         setImages({ cover: null, front: null, side: null });
         setErrorMessage("");
         setSuccessMessage("");
@@ -459,37 +461,35 @@ export default function Visualise({ userProfile }) {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Clean up old object URLs
-        if (images[position]?.preview) URL.revokeObjectURL(images[position].preview);
-        if (images[position]?.webpPreviewUrl) URL.revokeObjectURL(images[position].webpPreviewUrl);
-
         try {
-            const preview = URL.createObjectURL(file);
-            
-            // Set temporary local preview first so UI does not show broken image
+            // Read the file as a base64 data URL for immediate preview
+            const previewDataUrl = await readFileAsDataURL(file);
+
+            // Set temporary local preview with the original file data URL
+            // webpBlob defaults to the raw file until WebP conversion completes
             setImages(prev => ({
                 ...prev,
                 [position]: {
                     file,
-                    preview,
-                    webpBlob: file, // fallback to raw file until WebP converts
-                    webpPreviewUrl: preview // show preview immediately
+                    previewDataUrl,
+                    webpDataUrl: previewDataUrl,
+                    webpBlob: file
                 }
             }));
 
-            // Convert to webp blob asynchronously
-            const webpBlob = await convertToWebP(file);
-            const webpPreviewUrl = URL.createObjectURL(webpBlob);
+            // Convert to WebP data URL asynchronously
+            const webpDataUrl = await convertToWebP(file);
+            // Create a blob from the WebP data URL for storage upload
+            const webpBlob = await dataURLToBlob(webpDataUrl);
 
             setImages(prev => {
-                // Only update if item is still present
                 if (!prev[position]) return prev;
                 return {
                     ...prev,
                     [position]: {
                         ...prev[position],
-                        webpBlob,
-                        webpPreviewUrl
+                        webpDataUrl,
+                        webpBlob
                     }
                 };
             });
@@ -499,8 +499,6 @@ export default function Visualise({ userProfile }) {
     };
 
     const handleRemoveImage = (position) => {
-        if (images[position]?.preview) URL.revokeObjectURL(images[position].preview);
-        if (images[position]?.webpPreviewUrl) URL.revokeObjectURL(images[position].webpPreviewUrl);
         setImages(prev => ({ ...prev, [position]: null }));
     };
 
@@ -575,12 +573,6 @@ export default function Visualise({ userProfile }) {
             if (updateError) throw updateError;
 
             setSuccessMessage("WebP images uploaded and linked to product successfully!");
-            
-            // Clean up URLs
-            POSITIONS.forEach(pos => {
-                if (images[pos]?.preview) URL.revokeObjectURL(images[pos].preview);
-                if (images[pos]?.webpPreviewUrl) URL.revokeObjectURL(images[pos].webpPreviewUrl);
-            });
 
             setImages({ cover: null, front: null, side: null });
             setSelectedItem(null);
@@ -804,9 +796,9 @@ export default function Visualise({ userProfile }) {
                                                         </button>
                                                     )}
                                                 </div>
-                                                {(img?.webpPreviewUrl || img?.preview) ? (
+                                                {(img?.webpDataUrl || img?.previewDataUrl) ? (
                                                     <div className="aspect-video w-full rounded-xl border border-neutral-150 overflow-hidden bg-neutral-50 flex items-center justify-center relative">
-                                                        <img src={img.webpPreviewUrl || img.preview} alt={pos} className="max-h-full max-w-full object-contain" />
+                                                        <img src={img.webpDataUrl || img.previewDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
                                                         <div className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">WebP Ready</div>
                                                     </div>
                                                 ) : (
@@ -1003,12 +995,12 @@ export default function Visualise({ userProfile }) {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 {POSITIONS.map(pos => {
                                     const img = images[pos];
-                                    if (!img?.webpPreviewUrl && !img?.preview) return null;
+                                    if (!img?.webpDataUrl && !img?.previewDataUrl) return null;
                                     return (
                                         <div key={pos} className="bg-white border border-neutral-200 p-3 rounded-2xl space-y-1">
                                             <span className="text-[8px] font-black text-black uppercase tracking-widest">{pos} View</span>
                                             <div className="aspect-video w-full rounded-xl overflow-hidden bg-neutral-50 flex items-center justify-center border border-neutral-100">
-                                                <img src={img.preview || img.webpPreviewUrl} alt={pos} className="max-h-full max-w-full object-contain" />
+                                                <img src={img.previewDataUrl || img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
                                             </div>
                                         </div>
                                     );
@@ -1163,9 +1155,9 @@ export default function Visualise({ userProfile }) {
                                                 </button>
                                             )}
                                         </div>
-                                        {(img?.webpPreviewUrl || img?.preview) ? (
+                                        {(img?.webpDataUrl || img?.previewDataUrl) ? (
                                             <div className="aspect-video w-full rounded-xl border border-neutral-150 overflow-hidden bg-neutral-50 flex items-center justify-center relative">
-                                                <img src={img.webpPreviewUrl || img.preview} alt={pos} className="max-h-full max-w-full object-contain" />
+                                                <img src={img.webpDataUrl || img.previewDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
                                                 <div className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">WebP Ready</div>
                                             </div>
                                         ) : (
@@ -1213,12 +1205,12 @@ export default function Visualise({ userProfile }) {
                         <div className="space-y-3">
                             {POSITIONS.map(pos => {
                                 const img = images[pos];
-                                if (!img?.webpPreviewUrl && !img?.preview) return null;
+                                if (!img?.webpDataUrl && !img?.previewDataUrl) return null;
                                 return (
                                     <div key={pos} className="space-y-0.5 text-left border border-neutral-100 p-2.5 rounded-xl">
                                         <span className="text-[8px] font-black text-black uppercase tracking-widest">{pos} View</span>
                                         <div className="aspect-video w-full rounded-lg overflow-hidden bg-neutral-50 flex items-center justify-center border border-neutral-200">
-                                            <img src={img.preview || img.webpPreviewUrl} alt={pos} className="max-h-full max-w-full object-contain" />
+                                            <img src={img.previewDataUrl || img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
                                         </div>
                                     </div>
                                 );

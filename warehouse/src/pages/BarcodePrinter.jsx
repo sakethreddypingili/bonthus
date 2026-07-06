@@ -10,49 +10,55 @@ import BatchLoader from "../components/printing/BatchLoader";
 import PrintQueue from "../components/printing/PrintQueue";
 
 /**
- * BarcodePrinter — TSC TE244 @ 203 DPI
- * Real label: 4.00 in × 1.00 in die-cut (101.6 mm × 25.4 mm)
- * TSPL sent via: WebUSB (primary) → Local Agent port 9100 (secondary) → Browser dialog (fallback)
+ * BarcodePrinter - TSC TE244 @ 203 DPI
+ * Real label: 4.00 in x 1.00 in die-cut (101.6 mm x 25.4 mm)
+ * TSPL sent via: WebUSB (primary) -> Local Agent port 9100 (secondary) -> Browser dialog (fallback)
  */
 
 const TSC_USB_VID = 0x0FE6;
 
 const DEFAULT_SETTINGS = {
-  widthMm:       101.6,   // 4.00 inches
-  heightMm:       25.4,   // 1.00 inch
-  gapMm:           3,     // gap between labels
-  direction:        1,    // 0=normal, 1=rotated 180°
-  categoryX:       50,    // Shifted right (from 30) to prevent left clipping
-  categoryY1:      20,    // brand/first line Y
-  categoryY2:      65,    // category/second line Y
-  categoryY3:     110,    // model/third line Y
-  categoryY4:     155,    // SKU/fourth line Y
-  categoryFont:   "2",    // TSPL font
-  barcodeX:       300,    // Shifted left (from 450) to keep inside the wide rectangular body
-  barcodeY:        45,    // Vertically centered to prevent bottom clipping
-  barcodeHeight:   70,    // Reduced height (from 90) to fit comfortably
-  barcodeNarrow:    1,    // Denser barcode width
+  widthMm:       101.6,   // 101.6 mm full physical roll width
+  heightMm:      15,      // 15 mm height
+  gapMm:         20,      // 20 mm sensor gap (tail)
+  direction:     1,       // 180 deg rotated mapping coordinates for standard feed orientation
+  categoryX:     15,
+  categoryY1:    8,
+  categoryY2:    42,
+  categoryY3:    70,
+  categoryY4:    98,
+  categoryFont:  "1",
+  barcodeX:      265,
+  barcodeY:      45,
+  barcodeHeight: 40,
+  barcodeNarrow: 1,
+  barcodeTextY:  95,
 };
 
 export default function BarcodePrinter({ userProfile }) {
-  // ── Core state ─────────────────────────────────────────────────────────────
+  // -- Core state ------------------------------------------------------------ 
   const [barcodeValue, setBarcodeValue]   = useState("1414199999");
   const [brandValue, setBrandValue]       = useState("Ray-Ban");
   const [skuValue, setSkuValue]           = useState("RB3025");
   const [modelValue, setModelValue]       = useState(""); // Model No text input
   const [categoryName, setCategoryName]   = useState("Eyeglasses");
+  const [priceValue, setPriceValue]       = useState("1200");
+  const [sizeA, setSizeA]                 = useState("52");
+  const [sizeB, setSizeB]                 = useState("45");
+  const [dbl, setDbl]                     = useState("18");
+  const [templeLength, setTempleLength]   = useState("140");
   const [printQuantity, setPrintQuantity] = useState(1);
   const [printingStatus, setPrintingStatus] = useState("IDLE");
 
-  // ── Label / TSPL settings ──────────────────────────────────────────────────
+  // -- Label / TSPL settings --------------------------------------------------
   const [settings, setSettings]       = useState(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const setSetting = (key, val) => setSettings((s) => ({ ...s, [key]: val }));
 
-  // ── Batch Loader Drawer ─────────────────────────────────────────────────────
+  // -- Batch Loader Drawer ---------------------------------------------------- 
   const [showBatchDrawer, setShowBatchDrawer] = useState(false);
 
-  // ── Print Queue State Hook ─────────────────────────────────────────────────
+  // -- Print Queue State Hook ------------------------------------------------ 
   const {
     queue,
     addSingleItem,
@@ -67,23 +73,23 @@ export default function BarcodePrinter({ userProfile }) {
   const [isPrintingBatch, setIsPrintingBatch] = useState(false);
   const [currentBatchIdx, setCurrentBatchIdx] = useState(-1);
 
-  // ── Console logs ───────────────────────────────────────────────────────────
+  // -- Console logs ---------------------------------------------------------- 
   const [logs, setLogs] = useState([
     { ts: new Date().toLocaleTimeString(), status: "INFO", msg: "Barcode Printer initialized. TSC TE244 @ 203 DPI." },
-    { ts: new Date().toLocaleTimeString(), status: "INFO", msg: "Label: 4.00 in × 1.00 in die-cut (101.6 mm × 25.4 mm)" },
+    { ts: new Date().toLocaleTimeString(), status: "INFO", msg: "Label: 4.00 in x 1.00 in die-cut (101.6 mm x 25.4 mm)" },
   ]);
   const logsEndRef = useRef(null);
   const addLog = (status, msg) =>
     setLogs((p) => [...p, { ts: new Date().toLocaleTimeString(), status, msg }]);
   useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
 
-  // ── USB state ──────────────────────────────────────────────────────────────
+  // -- USB state --------------------------------------------------------------
   const [usbStatus, setUsbStatus] = useState("DISCONNECTED");
   const usbDeviceRef   = useRef(null);
   const usbEndpointRef = useRef(null);
   const isUsbSupported = "usb" in navigator;
 
-  // ── Local agent ping ───────────────────────────────────────────────────────
+  // -- Local agent ping ------------------------------------------------------ 
   const [agentStatus, setAgentStatus] = useState("UNKNOWN");
   useEffect(() => {
     let active = true, delay = 3000, tid;
@@ -98,36 +104,41 @@ export default function BarcodePrinter({ userProfile }) {
     return () => { active = false; clearTimeout(tid); };
   }, []);
 
-  // ── Auto-resolve barcode → category name, brand, SKU, and model no ──────────
+  // -- Auto-resolve barcode -> category name, brand, SKU, and model no ----------
   useEffect(() => {
     const resolve = async () => {
       if (!barcodeValue?.trim()) return;
       try {
         const { data: bc } = await supabase.from("product_barcodes").select("product_id").eq("barcode", barcodeValue).maybeSingle();
         const q = bc?.product_id
-          ? supabase.from("products").select("id, name, sku, brand, category_id, category:categories(name), description").eq("id", bc.product_id)
-          : supabase.from("products").select("id, name, sku, brand, category_id, category:categories(name), description").or(`sku.eq.${barcodeValue}`);
+          ? supabase.from("products").select("id, name, sku, brand, category_id, category:categories(name), description, base_price").eq("id", bc.product_id)
+          : supabase.from("products").select("id, name, sku, brand, category_id, category:categories(name), description, base_price").or(`sku.eq.${barcodeValue}`);
         const { data: prod } = await q.maybeSingle();
         if (prod) {
           if (prod.brand) setBrandValue(prod.brand);
           if (prod.sku) setSkuValue(prod.sku);
           if (prod.category?.name) setCategoryName(prod.category.name);
+          if (prod.base_price) setPriceValue(prod.base_price.toString());
           
           try {
             const descObj = JSON.parse(prod.description);
-            if (descObj && descObj.modelNo) {
-              setModelValue(descObj.modelNo);
+            if (descObj) {
+              if (descObj.modelNo) setModelValue(descObj.modelNo);
+              if (descObj.sizeA) setSizeA(descObj.sizeA.toString());
+              if (descObj.sizeB) setSizeB(descObj.sizeB.toString());
+              if (descObj.dbl) setDbl(descObj.dbl.toString());
+              if (descObj.templeLength) setTempleLength(descObj.templeLength.toString());
             }
           } catch (e) {}
 
-          addLog("INFO", `Resolved "${barcodeValue}" → "${prod.category?.name || "Uncategorized"}" (${prod.brand || "No Brand"})`);
+          addLog("INFO", `Resolved "${barcodeValue}" -> "${prod.category?.name || "Uncategorized"}" (${prod.brand || "No Brand"})`);
         }
       } catch (e) { console.error(e); }
     };
     const t = setTimeout(resolve, 400); return () => clearTimeout(t);
   }, [barcodeValue]);
 
-  // ── Add Current Item to Queue ──────────────────────────────────────────────
+  // -- Add Current Item to Queue ----------------------------------------------
   const handleAddToQueue = () => {
     if (!barcodeValue?.trim()) return;
     addSingleItem({
@@ -137,6 +148,11 @@ export default function BarcodePrinter({ userProfile }) {
       modelValue,
       skuValue,
       categoryName,
+      priceValue,
+      sizeA,
+      sizeB,
+      dbl,
+      templeLength,
       quantity: printQuantity,
       status: "pending",
       addedAt: new Date().toISOString(),
@@ -144,40 +160,86 @@ export default function BarcodePrinter({ userProfile }) {
     addLog("INFO", `Added "${barcodeValue}" to queue (${printQuantity}x).`);
   };
 
-  // ── TSPL GENERATION ─────────────────────────────────────────────────────────
-  // Label: 101.6 mm × 25.4 mm = 812 × 203 dots at 203 DPI
-  // Left zone  (x = 0–340 dots):  category, brand and SKU text
-  // Right zone (x = 370–812 dots): barcode
-  const buildItemTspl = (category, brand, model, sku, val, qty) => {
-    const s = settings;
+  // -- TSPL GENERATION -------------------------------------------------------- 
+  // Label: 101.6 mm x 15.4 mm = 812 x 123 dots at 203 DPI
+  //
+  // -- TAIL ACCOUNTING (EMPIRICALLY VERIFIED) ---------------------------------- 
+  // Dumbbell/jewelry tag - tail (~20mm = 160 dots) is on the PHYSICAL RIGHT.
+  // In DIRECTION 1,0: LOW X = physical RIGHT side, HIGH X = physical LEFT side.
+  //   X=0   -> physical RIGHT (tail tip - DO NOT PLACE CONTENT HERE)
+  //   X=160  -> start of wide body (tail-body junction)
+  //   X=812  -> physical LEFT (far end of wide body)
+  //
+  // EMPIRICALLY CONFIRMED from print output (matching user's original snippet):
+  //   BARCODE 180 = physical RIGHT area of wide body (near tail edge) OK
+  //   TEXT 500    = physical LEFT area of wide body OK
+  //
+  // SAFE WIDE-BODY PRINTABLE ZONE: X=172-800, Y=8-115
+  //
+  // LAYOUT (left->right physically = high->low X in coordinates):
+  //   PHYSICAL LEFT  (text info):   X = 470-800  [330 dots / 41mm]
+  //   PHYSICAL RIGHT (spec+barcode): X = 172-460  [288 dots / 36mm]
+  //   TAIL ZONE (avoid):            X = 0-165
+  //
+  // Y BUDGET (height=15.4mm=123 dots, Y=8-120 usable):
+  const buildItemTspl = (category, brand, model, sku, val, qty, price, sizeAVal, sizeBVal, dblVal, templeLengthVal) => {
+    const truncatedCategory = (category || "").slice(0, 8); // Truncate category to 8 chars to guarantee zero overlap
     const cmds = [
-      `SIZE ${s.widthMm} mm, ${s.heightMm} mm`,
-      `GAP ${s.gapMm} mm, 0 mm`,
-      `DIRECTION ${s.direction},0`,
+      `SIZE 101.6 mm, 15 mm`,
+      `GAP 20 mm, 0 mm`,
+      `DIRECTION 1,0`, // Keeps the text printing right-side up
       `CLS`,
       `REFERENCE 0,0`,
-      // Line 1: Brand
-      `TEXT ${s.categoryX},${s.categoryY1},"${s.categoryFont}",0,1,1,"${brand || ""}"`,
-      // Line 2: Category
-      `TEXT ${s.categoryX},${s.categoryY2},"${s.categoryFont}",0,1,1,"${category || ""}"`,
-      // Line 3: Model No
-      `TEXT ${s.categoryX},${s.categoryY3},"${s.categoryFont}",0,1,1,"${model ? "M:" + model : ""}"`,
-      // Line 4: SKU / Alphanumeric Code
-      `TEXT ${s.categoryX},${s.categoryY4},"${s.categoryFont}",0,1,1,"${sku ? "SKU:" + sku : ""}"`,
-    ];
-    cmds.push(
-      `BARCODE ${s.barcodeX},${s.barcodeY},"128",${s.barcodeHeight},1,0,${s.barcodeNarrow},${s.barcodeNarrow},"${val}"`,
+
+      // ── LEFT FLAP (Shifted down by 10% for vertical centering) ────────
+      `TEXT 110,27,"2",0,1,1,"${brand || ""}"`,
+      `TEXT 80,67,"1",0,1,1,"${truncatedCategory}"`,
+      `TEXT 180,67,"1",0,1,1,"SKU:${sku || ""}"`,
+      `TEXT 80,102,"1",0,1,1,"Rs.${price || ""}"`,
+      `TEXT 180,102,"1",0,1,1,"M:${model || ""}"`,
+
+      // ── RIGHT FLAP (Specs shifted down by 10%) ────────
+      `TEXT 340,30,"1",0,1,1,"A"`,
+      `TEXT 370,30,"1",0,1,1,"B"`,
+      `TEXT 400,30,"1",0,1,1,"DBL"`,
+      `TEXT 445,30,"1",0,1,1,"Tem"`,
+
+      `TEXT 340,46,"1",0,1,1,"${sizeAVal || ""}"`,
+      `TEXT 370,46,"1",0,1,1,"${sizeBVal || ""}"`,
+      `TEXT 400,46,"1",0,1,1,"${dblVal || ""}"`,
+      `TEXT 445,46,"1",0,1,1,"${templeLengthVal || ""}"`,
+
+      // Barcode decreased in height to 32, shifted right to X=350, and down by 5% to Y=62
+      `BARCODE 350,62,"128",32,0,0,1,1,"${val}"`,
+      // Barcode number centered under barcode at Y=100
+      `TEXT 415,100,"1",0,1,1,2,"${val}"`,
+
+      // ── TAIL ZONE (X = 440 to 812) ────────
+      // Untouched and blank
+
       `PRINT ${qty},1`
-    );
+    ];
     return cmds.join("\r\n");
   };
 
   const generateTsplCode = () => {
-    return buildItemTspl(categoryName, brandValue, modelValue, skuValue, barcodeValue, printQuantity);
+    return buildItemTspl(
+      categoryName,
+      brandValue,
+      modelValue,
+      skuValue,
+      barcodeValue,
+      printQuantity,
+      priceValue,
+      sizeA,
+      sizeB,
+      dbl,
+      templeLength
+    );
   };
   const tsplOutput = generateTsplCode();
 
-  // ── WebUSB connect ──────────────────────────────────────────────────────────
+  // -- WebUSB connect ----------------------------------------------------------
   const connectUSB = async () => {
     if (!isUsbSupported) { addLog("ERROR", "WebUSB requires Chrome or Edge."); return; }
     setUsbStatus("CONNECTING");
@@ -212,7 +274,7 @@ export default function BarcodePrinter({ userProfile }) {
     catch (err) { setUsbStatus("ERROR"); addLog("ERROR", `Claim interface failed: ${err.message}`); await device.close().catch(() => {}); return; }
     usbDeviceRef.current = device; usbEndpointRef.current = bulkOut;
     setUsbStatus("CONNECTED");
-    addLog("SUCCESS", `USB connected — interface ${targetIface}, endpoint #${bulkOut}.`);
+    addLog("SUCCESS", `USB connected - interface ${targetIface}, endpoint #${bulkOut}.`);
   };
 
   const disconnectUSB = async () => {
@@ -223,7 +285,7 @@ export default function BarcodePrinter({ userProfile }) {
 
   useEffect(() => () => { if (usbDeviceRef.current) usbDeviceRef.current.close().catch(() => {}); }, []);
 
-  // ── Print via USB ───────────────────────────────────────────────────────────
+  // -- Print via USB ---------------------------------------------------------- 
   const handleUsbPrint = async () => {
     if (usbStatus !== "CONNECTED") { addLog("ERROR", "USB printer not connected."); return; }
     setPrintingStatus("SENDING..."); addLog("PENDING", `Spooling ${printQuantity} label(s) via USB...`);
@@ -235,7 +297,7 @@ export default function BarcodePrinter({ userProfile }) {
     } catch (err) { setPrintingStatus("ERROR"); addLog("ERROR", `USB print: ${err.message}`); }
   };
 
-  // ── Print via local agent ───────────────────────────────────────────────────
+  // -- Print via local agent -------------------------------------------------- 
   const handleAgentPrint = async () => {
     if (agentStatus !== "ONLINE") { addLog("ERROR", "Local agent offline. Run: node scripts/local-print-agent.js"); return; }
     setPrintingStatus("SENDING..."); addLog("PENDING", `Dispatching ${printQuantity} label(s) via agent...`);
@@ -252,7 +314,7 @@ export default function BarcodePrinter({ userProfile }) {
     } catch (err) { setPrintingStatus("ERROR"); addLog("ERROR", `Agent: ${err.message}`); }
   };
 
-  // ── Batch Printing Dispatcher (Sequential with Delay) ────────────────────
+  // -- Batch Printing Dispatcher (Sequential with Delay) --------------------
   const handlePrintBatch = async () => {
     const pendingItems = queue.filter((item) => item.status === "pending");
     if (pendingItems.length === 0) {
@@ -279,7 +341,19 @@ export default function BarcodePrinter({ userProfile }) {
       updateItemStatus(item.id, "printing");
       addLog("INFO", `[Batch] Printing item ${i + 1}/${queue.length}: ${item.barcodeValue}`);
 
-      const tspl = buildItemTspl(item.categoryName || "", item.brandValue || "", item.modelValue || "", item.skuValue || "", item.barcodeValue, item.quantity);
+      const tspl = buildItemTspl(
+        item.categoryName || "",
+        item.brandValue || "",
+        item.modelValue || "",
+        item.skuValue || "",
+        item.barcodeValue,
+        item.quantity,
+        item.priceValue || "",
+        item.sizeA || "",
+        item.sizeB || "",
+        item.dbl || "",
+        item.templeLength || ""
+      );
 
       try {
         if (mode === "USB") {
@@ -302,8 +376,6 @@ export default function BarcodePrinter({ userProfile }) {
         updateItemStatus(item.id, "error");
         addLog("ERROR", `[Batch] Failed to print ${item.barcodeValue}: ${err.message}`);
       }
-
-      await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
     setIsPrintingBatch(false);
@@ -311,7 +383,7 @@ export default function BarcodePrinter({ userProfile }) {
     addLog("SUCCESS", "Batch print session completed.");
   };
 
-  // ── Browser print fallback ──────────────────────────────────────────────────
+  // -- Browser print fallback --------------------------------------------------
   const handleBrowserPrint = () => {
     try {
       const iframe = document.createElement("iframe");
@@ -331,15 +403,15 @@ export default function BarcodePrinter({ userProfile }) {
     } catch (err) { addLog("ERROR", `Browser: ${err.message}`); }
   };
 
-  // ── SVG barcode bars (mock) ─────────────────────────────────────────────────
-  const renderMockBars = (startX, barAreaWidth) => {
+  // -- SVG barcode bars (mock) ------------------------------------------------ 
+  const renderMockBars = (startX, barAreaWidth, startY = 8, barHeight = 56) => {
     const lines = []; let x = startX;
     const seed = barcodeValue || "1414199999";
     for (let i = 0; i < seed.length * 4; i++) {
       const c = seed.charCodeAt(i % seed.length);
       const w = Math.max(1, (c % 3) + 1);
       if (x + w > startX + barAreaWidth) break;
-      lines.push(<rect key={i} x={x} y={8} width={w} height={56} fill="#111" />);
+      lines.push(<rect key={i} x={x} y={startY} width={w} height={barHeight} fill="#111" />);
       x += w + ((c + i) % 3) + 1;
     }
     return lines;
@@ -350,7 +422,7 @@ export default function BarcodePrinter({ userProfile }) {
   const isUsbConnected = usbStatus === "CONNECTED";
   const isDriverBlocked = usbStatus === "DRIVER_BLOCKED";
 
-  // ── Settings input helper ───────────────────────────────────────────────────
+  // -- Settings input helper -------------------------------------------------- 
   const SettingRow = ({ label, settingKey, type = "number", min, max, step = 1, options }) => (
     <div className="flex items-center justify-between gap-3">
       <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex-1">{label}</label>
@@ -370,7 +442,7 @@ export default function BarcodePrinter({ userProfile }) {
   return (
     <div className="w-full space-y-4 p-2 sm:p-4">
 
-      {/* ── Status Bar ── */}
+      {/* -- Status Bar -- */}
       <div className="flex flex-wrap items-center gap-2">
         {/* USB */}
         <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
@@ -393,27 +465,27 @@ export default function BarcodePrinter({ userProfile }) {
         {/* Label size badge */}
         <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-full px-3 py-1.5 ml-auto">
           <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
-            {settings.widthMm}mm × {settings.heightMm}mm
+            {settings.widthMm}mm x {settings.heightMm}mm
           </span>
         </div>
       </div>
 
-      {/* ── Zadig Warning ── */}
+      {/* -- Zadig Warning -- */}
       {isDriverBlocked && (
         <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 text-xs space-y-2">
-          <div className="flex items-center gap-2 font-bold text-orange-800"><AlertTriangle className="w-4 h-4" /> Windows Driver Conflict — swap to WinUSB using Zadig</div>
+          <div className="flex items-center gap-2 font-bold text-orange-800"><AlertTriangle className="w-4 h-4" /> Windows Driver Conflict - swap to WinUSB using Zadig</div>
           <div className="bg-white border border-orange-100 rounded-xl p-3 font-mono text-[11px] space-y-1">
             <p>1. Download <a href="https://zadig.akeo.ie" target="_blank" rel="noreferrer" className="text-blue-600 underline inline-flex items-center gap-0.5">zadig.akeo.ie <ExternalLink className="w-2.5 h-2.5"/></a></p>
-            <p>2. Options → List All Devices → select <strong>TSC TE244</strong></p>
-            <p>3. Set driver → <strong>WinUSB</strong> → Replace Driver → replug USB</p>
+            <p>2. Options -> List All Devices -> select <strong>TSC TE244</strong></p>
+            <p>3. Set driver -> <strong>WinUSB</strong> -> Replace Driver -> replug USB</p>
           </div>
         </div>
       )}
 
-      {/* ── Main Grid ── */}
+      {/* -- Main Grid -- */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-        {/* ════ Left Panel: Tag Config & Connections ════ */}
+        {/* ==== Left Panel: Tag Config & Connections ==== */}
         <div className="lg:col-span-4 space-y-4">
 
           {/* Card 1: Tag Properties */}
@@ -456,6 +528,43 @@ export default function BarcodePrinter({ userProfile }) {
                   onChange={(e) => setCategoryName(e.target.value)}
                   placeholder="e.g. Eyeglasses"
                   className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Price (Rs.)</label>
+                <input type="text" value={priceValue}
+                  onChange={(e) => setPriceValue(e.target.value)}
+                  placeholder="e.g. 1200"
+                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">A</label>
+                  <input type="text" value={sizeA}
+                    onChange={(e) => setSizeA(e.target.value)}
+                    placeholder="52"
+                    className="w-full border border-gray-200 rounded-xl px-2 py-2 text-center text-xs focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">B</label>
+                  <input type="text" value={sizeB}
+                    onChange={(e) => setSizeB(e.target.value)}
+                    placeholder="45"
+                    className="w-full border border-gray-200 rounded-xl px-2 py-2 text-center text-xs focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">DBL</label>
+                  <input type="text" value={dbl}
+                    onChange={(e) => setDbl(e.target.value)}
+                    placeholder="18"
+                    className="w-full border border-gray-200 rounded-xl px-2 py-2 text-center text-xs focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tem</label>
+                  <input type="text" value={templeLength}
+                    onChange={(e) => setTempleLength(e.target.value)}
+                    placeholder="140"
+                    className="w-full border border-gray-200 rounded-xl px-2 py-2 text-center text-xs focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
+                </div>
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Quantity</label>
@@ -516,7 +625,7 @@ export default function BarcodePrinter({ userProfile }) {
                 <Settings className="w-3.5 h-3.5" />
                 {agentStatus === "ONLINE"
                   ? "Print Single via Local Agent"
-                  : "Agent Offline — run local-print-agent.js"}
+                  : "Agent Offline - run local-print-agent.js"}
               </button>
 
               {/* Fallback Dialog */}
@@ -530,7 +639,7 @@ export default function BarcodePrinter({ userProfile }) {
             </div>
           </div>
 
-          {/* ── Custom Settings Panel ── */}
+          {/* -- Custom Settings Panel -- */}
           <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <button onClick={() => setShowSettings((s) => !s)}
               className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-all">
@@ -550,7 +659,7 @@ export default function BarcodePrinter({ userProfile }) {
                     <SettingRow label="Height (mm)" settingKey="heightMm" min={10} max={200} step={0.1} />
                     <SettingRow label="Gap (mm)" settingKey="gapMm" min={0} max={20} step={0.5} />
                     <SettingRow label="Direction" settingKey="direction"
-                      options={[{ value: 0, label: "0 — Normal" }, { value: 1, label: "1 — Rotate 180°" }]} />
+                      options={[{ value: 0, label: "0 - Normal" }, { value: 1, label: "1 - Rotate 180 deg" }]} />
                   </div>
                 </div>
 
@@ -559,15 +668,15 @@ export default function BarcodePrinter({ userProfile }) {
                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Category Text</p>
                   <div className="space-y-2">
                     <SettingRow label="X offset (dots)" settingKey="categoryX" min={0} max={800} />
-                    <SettingRow label="Y — brand (dots)" settingKey="categoryY1" min={0} max={200} />
-                    <SettingRow label="Y — category (dots)" settingKey="categoryY2" min={0} max={200} />
-                    <SettingRow label="Y — SKU (dots)" settingKey="categoryY3" min={0} max={200} />
+                    <SettingRow label="Y - brand (dots)" settingKey="categoryY1" min={0} max={200} />
+                    <SettingRow label="Y - category (dots)" settingKey="categoryY2" min={0} max={200} />
+                    <SettingRow label="Y - SKU (dots)" settingKey="categoryY3" min={0} max={200} />
                     <SettingRow label="Font size" settingKey="categoryFont"
                       options={[
-                        { value: "1", label: "1 — Tiny" },
-                        { value: "2", label: "2 — Small" },
-                        { value: "3", label: "3 — Medium" },
-                        { value: "4", label: "4 — Large" },
+                        { value: "1", label: "1 - Tiny" },
+                        { value: "2", label: "2 - Small" },
+                        { value: "3", label: "3 - Medium" },
+                        { value: "4", label: "4 - Large" },
                       ]} />
                   </div>
                 </div>
@@ -580,6 +689,7 @@ export default function BarcodePrinter({ userProfile }) {
                     <SettingRow label="Y position (dots)" settingKey="barcodeY" min={0} max={180} />
                     <SettingRow label="Bar height (dots)" settingKey="barcodeHeight" min={20} max={200} />
                     <SettingRow label="Narrow bar (dots)" settingKey="barcodeNarrow" min={1} max={4} />
+                    <SettingRow label="Text Y position (dots)" settingKey="barcodeTextY" min={0} max={180} />
                   </div>
                 </div>
 
@@ -593,13 +703,13 @@ export default function BarcodePrinter({ userProfile }) {
           </div>
         </div>
 
-        {/* ════ Right Panel: Preview + Queue + Logs ════ */}
+        {/* ==== Right Panel: Preview + Queue + Logs ==== */}
         <div className="lg:col-span-8 space-y-4">
 
-          {/* ── Label Preview ── */}
+          {/* -- Label Preview -- */}
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
             <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-              Live Label Preview — {settings.widthMm}mm × {settings.heightMm}mm (Jewelry/Dumbbell Tag)
+              Live Label Preview - {settings.widthMm}mm x {settings.heightMm}mm (Jewelry/Dumbbell Tag)
             </h2>
             <div className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-4 flex items-center justify-center min-h-[120px]">
               <svg
@@ -609,64 +719,89 @@ export default function BarcodePrinter({ userProfile }) {
                 style={{ maxHeight: 140 }}
                 xmlns="http://www.w3.org/2000/svg"
               >
-                {/* Background: jewelry tag style */}
+                {/* Background: actual physical flat-edged jewelry dumbbell tag shape with a tail */}
                 <path
-                  d="M 10,15 H 180 A 15,15 0 0,1 195,30 V 40 A 10,10 0 0,0 205,50 H 260 A 10,10 0 0,0 270,40 V 30 A 15,15 0 0,1 285,15 H 390 A 10,10 0 0,1 400,25 V 75 A 10,10 0 0,1 390,85 H 285 A 15,15 0 0,1 270,70 V 60 A 10,10 0 0,0 260,50 H 205 A 10,10 0 0,0 195,60 V 70 A 15,15 0 0,1 180,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z"
+                  d="M 10,15 H 310 A 10,10 0 0,1 320,25 V 42 H 390 A 8,8 0 0,1 390,58 H 320 V 75 A 10,10 0 0,1 310,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z"
                   fill="white" stroke="#e5e7eb" strokeWidth="1.5"
                 />
 
-                {/* Brand text (Line 1) */}
+                {/* Left Flap: Brand Name (Centered at X = 65 dots -> SVG X = 47) */}
                 <text
-                  x={Math.round((settings.categoryX / 812) * SVG_W) + 4}
-                  y={Math.round((settings.categoryY1 / 203) * SVG_H) + 2}
-                  fontFamily="'Inter', sans-serif" fontWeight="700"
-                  fontSize={settings.categoryFont === "4" ? 10 : settings.categoryFont === "3" ? 8 : settings.categoryFont === "2" ? 7 : 6}
+                  x={Math.round((65 / 440) * 320)}
+                  y={32}
+                  fontFamily="'Inter', sans-serif" fontWeight="800"
+                  fontSize={8}
                   fill="#111"
+                  textAnchor="middle"
                 >
                   {brandValue || "No Brand"}
                 </text>
 
-                {/* Category text (Line 2) */}
+                {/* Left Flap: Category (Left-aligned at X = 15 dots -> SVG X = 11) */}
                 <text
-                  x={Math.round((settings.categoryX / 812) * SVG_W) + 4}
-                  y={Math.round((settings.categoryY2 / 203) * SVG_H) + 2}
+                  x={Math.round((15 / 440) * 320)}
+                  y={54}
                   fontFamily="'Inter', sans-serif" fontWeight="700"
-                  fontSize={settings.categoryFont === "4" ? 10 : settings.categoryFont === "3" ? 8 : settings.categoryFont === "2" ? 7 : 6}
+                  fontSize={6}
                   fill="#555"
                 >
                   {categoryName || "Uncategorized"}
                 </text>
 
-                {/* Model No text (Line 3) */}
+                {/* Left Flap: SKU (Right-aligned at X = 130 dots -> SVG X = 95) */}
                 <text
-                  x={Math.round((settings.categoryX / 812) * SVG_W) + 4}
-                  y={Math.round((settings.categoryY3 / 203) * SVG_H) + 2}
+                  x={Math.round((130 / 440) * 320)}
+                  y={54}
                   fontFamily="monospace" fontWeight="700"
-                  fontSize={7}
+                  fontSize={6}
                   fill="#444"
                 >
-                  {modelValue ? "M:" + modelValue : ""}
+                  SKU:{skuValue || ""}
                 </text>
 
-                {/* Alphanumeric Code / SKU (Line 4) */}
+                {/* Left Flap: Price (Left-aligned at X = 15 dots -> SVG X = 11) */}
                 <text
-                  x={Math.round((settings.categoryX / 812) * SVG_W) + 4}
-                  y={Math.round((settings.categoryY4 / 203) * SVG_H) + 2}
-                  fontFamily="monospace" fontWeight="700"
-                  fontSize={7}
+                  x={Math.round((15 / 440) * 320)}
+                  y={74}
+                  fontFamily="'Inter', sans-serif" fontWeight="700"
+                  fontSize={6}
                   fill="#444"
                 >
-                  {skuValue ? "SKU:" + skuValue : ""}
+                  price:Rs.{priceValue || ""}
                 </text>
 
-                {/* Barcode */}
-                {renderMockBars(Math.round((settings.barcodeX / 812) * SVG_W), Math.round((220 / 812) * SVG_W))}
-
-                {/* Barcode number */}
+                {/* Left Flap: Model No (Right-aligned at X = 130 dots -> SVG X = 95) */}
                 <text
-                  x={Math.round((settings.barcodeX / 812) * SVG_W) + Math.round((220 / 812) * SVG_W) / 2}
-                  y={SVG_H - 18}
-                  fontFamily="monospace" fontSize="7" fill="#333" textAnchor="middle"
+                  x={Math.round((130 / 440) * 320)}
+                  y={74}
+                  fontFamily="monospace" fontWeight="700"
+                  fontSize={6}
+                  fill="#444"
+                >
+                  M:{modelValue || ""}
+                </text>
+
+                {/* Right Flap: Spec Headers & Values (Evenly spaced columns starting at X=240 dots) */}
+                <text x={Math.round((240 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">A</text>
+                <text x={Math.round((240 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeA || ""}</text>
+
+                <text x={Math.round((290 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">B</text>
+                <text x={Math.round((290 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeB || ""}</text>
+
+                <text x={Math.round((340 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">DBL</text>
+                <text x={Math.round((340 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{dbl || ""}</text>
+
+                <text x={Math.round((390 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">Tem</text>
+                <text x={Math.round((390 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{templeLength || ""}</text>
+
+                {/* Right Flap: Barcode (Centered in the right flap zone, Y=48 to 74) */}
+                {renderMockBars(Math.round((230 / 440) * 320), Math.round((200 / 440) * 320), 48, 26)}
+
+                {/* Right Flap: Barcode number (Y = 82) */}
+                <text
+                  x={Math.round((270 / 440) * 320)}
+                  y={82}
+                  fontFamily="monospace" fontSize="6" fill="#333" textAnchor="middle"
                 >
                   {barcodeValue}
                 </text>
@@ -674,7 +809,7 @@ export default function BarcodePrinter({ userProfile }) {
             </div>
           </div>
 
-          {/* ── Active Review Queue Table ── */}
+          {/* -- Active Review Queue Table -- */}
           <PrintQueue
             queue={queue}
             onUpdateQty={updateItemQty}
@@ -687,7 +822,7 @@ export default function BarcodePrinter({ userProfile }) {
             activeMode={usbStatus === "CONNECTED" ? "usb" : "agent"}
           />
 
-          {/* ── TSPL Payload Preview ── */}
+          {/* -- TSPL Payload Preview -- */}
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
             <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
               Generated Single Label TSPL
@@ -697,7 +832,7 @@ export default function BarcodePrinter({ userProfile }) {
             </pre>
           </div>
 
-          {/* ── Console Spooler Logs ── */}
+          {/* -- Console Spooler Logs -- */}
           <div className="bg-black text-white border border-neutral-800 rounded-2xl overflow-hidden">
             <div className="bg-neutral-900 border-b border-neutral-800 px-4 py-2.5 flex items-center justify-between">
               <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -728,7 +863,7 @@ export default function BarcodePrinter({ userProfile }) {
         </div>
       </div>
 
-      {/* ── Drawer: Ingestion Checkpoint Loader ── */}
+      {/* -- Drawer: Ingestion Checkpoint Loader -- */}
       <SlideDrawer
         isOpen={showBatchDrawer}
         onClose={() => setShowBatchDrawer(false)}

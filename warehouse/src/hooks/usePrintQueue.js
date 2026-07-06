@@ -94,9 +94,19 @@ export function usePrintQueue() {
       const formatted = data.map((item) => {
         const bcVal = item.pending_product_barcodes?.[0]?.barcode || item.sku;
         let model = "";
+        let sizeA = "";
+        let sizeB = "";
+        let dbl = "";
+        let templeLength = "";
         try {
           const parsed = JSON.parse(item.description);
-          if (parsed && parsed.modelNo) model = parsed.modelNo;
+          if (parsed) {
+            if (parsed.modelNo) model = parsed.modelNo;
+            if (parsed.sizeA) sizeA = parsed.sizeA.toString();
+            if (parsed.sizeB) sizeB = parsed.sizeB.toString();
+            if (parsed.dbl) dbl = parsed.dbl.toString();
+            if (parsed.templeLength) templeLength = parsed.templeLength.toString();
+          }
         } catch (e) {}
 
         return {
@@ -107,6 +117,11 @@ export function usePrintQueue() {
           skuValue: item.sku,
           categoryId: item.category_id,
           categoryName: categoryPathsMap[item.category_id] || "Uncategorized",
+          priceValue: item.unit_price?.toString() || item.base_price?.toString() || "1200",
+          sizeA,
+          sizeB,
+          dbl,
+          templeLength,
           quantity: 1, // Default to 1 label per item in the batch
           status: "pending",
           addedAt: new Date().toISOString(),
