@@ -80,18 +80,19 @@ export function usePrintQueue() {
     try {
       const { data, error } = await supabase
         .from("pending_products")
-        .select("*")
+        .select(`
+          *,
+          pending_product_barcodes (
+            barcode
+          )
+        `)
         .eq("checkpoint_name", checkpointName);
 
       if (error) throw error;
       if (!data || data.length === 0) return 0;
 
       const formatted = data.map((item) => {
-        let bcVal = item.sku;
-        try {
-          const parsed = JSON.parse(item.description);
-          if (parsed.barcode) bcVal = parsed.barcode;
-        } catch (e) {}
+        const bcVal = item.pending_product_barcodes?.[0]?.barcode || item.sku;
 
         return {
           id: item.id.toString(),

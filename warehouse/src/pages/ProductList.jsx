@@ -285,6 +285,9 @@ export default function ProductList({ userProfile }) {
           store:stores (
             id,
             name
+          ),
+          pending_product_barcodes (
+            barcode
           )
         `)
         .order("created_at", { ascending: false });
@@ -547,27 +550,49 @@ export default function ProductList({ userProfile }) {
 
         // Loop 'qty' times to generate unique records for quantity > 1
         for (let i = 0; i < qty; i++) {
+          const uniqueSku = generateSKU();
           const uniqueBarcode = generateBarcode();
-          const itemDescObj = { ...baseDescObj, barcode: uniqueBarcode };
           records.push({
             checkpoint_name: finalCheckpointName,
             name: qty > 1 ? `${row.name} #${i + 1}` : row.name,
-            sku: generateSKU(), // unique 5-character SKU
+            sku: uniqueSku, // unique 5-character SKU
             brand: row.brand || null,
             base_price: Number(row.base_price || 0),
             category_id: bulkCategoryId,
-            description: JSON.stringify(itemDescObj),
+            description: JSON.stringify(baseDescObj),
             stock_quantity: 1, // each individual product has quantity = 1
             low_stock_threshold: Number(row.low_stock_threshold || 5),
             unit_price: Number(row.base_price || 0),
             store_id: selectedStore,
-            status: 'pending'
+            status: 'pending',
+            temp_barcode: uniqueBarcode // Temporary property to map to barcodes table below
           });
         }
       }
 
-      const { error } = await supabase.from("pending_products").insert(records);
-      if (error) throw error;
+      // Strip temporary property before insertion, but keep mapping
+      const dbRecords = records.map(({ temp_barcode, ...rest }) => rest);
+      const { data: insertedProducts, error: insertError } = await supabase
+        .from("pending_products")
+        .insert(dbRecords)
+        .select("id, sku");
+
+      if (insertError) throw insertError;
+
+      // Map inserted IDs to their respective barcode records
+      const barcodeRecords = insertedProducts.map(p => {
+        const originalRecord = records.find(r => r.sku === p.sku);
+        return {
+          pending_product_id: p.id,
+          barcode: originalRecord?.temp_barcode || generateBarcode()
+        };
+      });
+
+      const { error: barcodeError } = await supabase
+        .from("pending_product_barcodes")
+        .insert(barcodeRecords);
+
+      if (barcodeError) throw barcodeError;
 
       setSuccessMessage(`Bulk batch containing ${records.length} items added to Review Queue!`);
       setBulkCheckpointName("");
@@ -611,11 +636,7 @@ export default function ProductList({ userProfile }) {
         if (pError) throw pError;
 
         // 1b. Insert the barcode record
-        let parsedBarcode = null;
-        try {
-          const parsed = JSON.parse(item.description);
-          if (parsed.barcode) parsedBarcode = parsed.barcode;
-        } catch (e) {}
+        const parsedBarcode = item.pending_product_barcodes?.[0]?.barcode;
 
         if (parsedBarcode) {
           const { error: pbError } = await supabase
@@ -680,11 +701,7 @@ export default function ProductList({ userProfile }) {
       if (pError) throw pError;
 
       // Insert the barcode record
-      let parsedBarcode = null;
-      try {
-        const parsed = JSON.parse(item.description);
-        if (parsed.barcode) parsedBarcode = parsed.barcode;
-      } catch (e) {}
+      const parsedBarcode = item.pending_product_barcodes?.[0]?.barcode;
 
       if (parsedBarcode) {
         const { error: pbError } = await supabase
@@ -1893,14 +1910,7 @@ export default function ProductList({ userProfile }) {
                             <td className="px-6 py-3 text-xs font-black text-black uppercase tracking-tight">{item.name}</td>
                             <td className="px-6 py-3 text-xs font-mono font-bold text-black uppercase tracking-wider">{item.sku}</td>
                             <td className="px-6 py-3 text-xs font-mono font-bold text-gray-400 uppercase tracking-wider">
-                              {(() => {
-                                try {
-                                  const parsed = JSON.parse(item.description);
-                                  return parsed.barcode || "-";
-                                } catch (e) {
-                                  return "-";
-                                }
-                              })()}
+                              {item.pending_product_barcodes?.[0]?.barcode || "-"}
                             </td>
                             <td className="px-6 py-3 text-xs font-bold text-black uppercase tracking-widest">{item.brand || "Generic"}</td>
                             <td className="px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
