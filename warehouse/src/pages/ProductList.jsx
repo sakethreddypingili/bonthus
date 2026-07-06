@@ -4,9 +4,10 @@ import { Search, Plus, LayoutGrid, List, X, MoreVertical, ChevronDown, Check, Ta
 import { supabase } from "../server/supabase/supabase";
 import SlideDrawer from "../components/common/SlideDrawer";
 
-// Auto-generate a unique numeric barcode (12 digits)
+// Auto-generate a unique 5-character uppercase alphanumeric code
 const generateSKU = () => {
-  return Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join('');
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 };
 
 export default function ProductList({ userProfile }) {
