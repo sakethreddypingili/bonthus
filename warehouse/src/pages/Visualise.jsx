@@ -123,70 +123,118 @@ export default function Visualise({ userProfile }) {
         setErrorMessage("");
         setSuccessMessage("");
         try {
-            const { data, error } = await supabase
+            const queryVal = barcodeQuery.trim();
+
+            // Path 1: Look up in pending_products
+            const { data: pendingData, error: pendingError } = await supabase
                 .from("pending_products")
                 .select("*")
-                .eq("sku", barcodeQuery.trim())
+                .eq("sku", queryVal)
                 .eq("status", "pending")
-                .single();
+                .maybeSingle();
 
-            if (error || !data) {
-                setErrorMessage(`No pending product found with barcode: ${barcodeQuery}`);
+            if (pendingData) {
+                // Process pending product (existing flow)
+                const categoryPath = await fetchCategoryPath(pendingData.category_id);
+                const categoryType = getCategoryType(categoryPath);
+
+                setScannedProduct(pendingData);
+                setScannedProductCategoryPath(categoryPath);
+                setScannedProductCategoryType(categoryType);
+                setVisualiseStage('input');
+
+                if (categoryType === 'lens' && pendingData.description) {
+                    try {
+                        const parsed = JSON.parse(pendingData.description);
+                        if (parsed.type === 'lens') {
+                            setLensForm({
+                                lensType: parsed.lensType || "",
+                                index: parsed.index || "",
+                                material: parsed.material || "",
+                                coating: parsed.coating || "",
+                                sph: parsed.sph || "",
+                                cyl: parsed.cyl || "",
+                                axis: parsed.axis || "",
+                                add: parsed.add || ""
+                            });
+                        }
+                    } catch (e) {}
+                } else if (categoryType === 'frame') {
+                    try {
+                        const parsed = pendingData.description ? JSON.parse(pendingData.description) : {};
+                        setFrameForm({
+                            modelNo: parsed.modelNo || pendingData.frame_model_no || "",
+                            color: parsed.color || pendingData.frame_color || "",
+                            sizeA: parsed.sizeA || "",
+                            sizeB: parsed.sizeB || "",
+                            dbl: parsed.dbl || "",
+                            templeLength: parsed.templeLength || ""
+                        });
+                    } catch (e) {
+                        setFrameForm({
+                            modelNo: pendingData.frame_model_no || "",
+                            color: pendingData.frame_color || "",
+                            sizeA: "",
+                            sizeB: "",
+                            dbl: "",
+                            templeLength: ""
+                        });
+                    }
+                }
+                POSITIONS.forEach(pos => {
+                    if (images[pos]?.preview) URL.revokeObjectURL(images[pos].preview);
+                    if (images[pos]?.webpPreviewUrl) URL.revokeObjectURL(images[pos].webpPreviewUrl);
+                });
+                setImages({ cover: null, front: null, side: null });
                 return;
             }
 
-            const categoryPath = await fetchCategoryPath(data.category_id);
-            const categoryType = getCategoryType(categoryPath);
+            // Path 2: Look up in product_barcodes and find matching imagine_pool items
+            const { data: barcodeData, error: barcodeError } = await supabase
+                .from("product_barcodes")
+                .select("product_id")
+                .eq("barcode", queryVal)
+                .maybeSingle();
 
-            setScannedProduct(data);
-            setScannedProductCategoryPath(categoryPath);
-            setScannedProductCategoryType(categoryType);
-            setVisualiseStage('input');
+            if (barcodeData) {
+                // Find matching pending imagine_pool item for this product
+                const { data: poolData, error: poolError } = await supabase
+                    .from("imagine_pool")
+                    .select(`
+                        id,
+                        status,
+                        expires_at,
+                        created_at,
+                        products (
+                            id,
+                            name,
+                            sku,
+                            frame_shape,
+                            frame_type,
+                            product_barcodes (
+                                barcode
+                            ),
+                            product_images (
+                                image_url,
+                                position
+                            )
+                        )
+                    `)
+                    .eq("product_id", barcodeData.product_id)
+                    .eq("status", "pending")
+                    .gt("expires_at", new Date().toISOString())
+                    .maybeSingle();
 
-            if (categoryType === 'lens' && data.description) {
-                try {
-                    const parsed = JSON.parse(data.description);
-                    if (parsed.type === 'lens') {
-                        setLensForm({
-                            lensType: parsed.lensType || "",
-                            index: parsed.index || "",
-                            material: parsed.material || "",
-                            coating: parsed.coating || "",
-                            sph: parsed.sph || "",
-                            cyl: parsed.cyl || "",
-                            axis: parsed.axis || "",
-                            add: parsed.add || ""
-                        });
-                    }
-                } catch (e) {}
-            } else if (categoryType === 'frame') {
-                try {
-                    const parsed = data.description ? JSON.parse(data.description) : {};
-                    setFrameForm({
-                        modelNo: parsed.modelNo || data.frame_model_no || "",
-                        color: parsed.color || data.frame_color || "",
-                        sizeA: parsed.sizeA || "",
-                        sizeB: parsed.sizeB || "",
-                        dbl: parsed.dbl || "",
-                        templeLength: parsed.templeLength || ""
-                    });
-                } catch (e) {
-                    setFrameForm({
-                        modelNo: data.frame_model_no || "",
-                        color: data.frame_color || "",
-                        sizeA: "",
-                        sizeB: "",
-                        dbl: "",
-                        templeLength: ""
-                    });
+                if (poolData) {
+                    // Select item from the pool list
+                    handleSelectItem(poolData);
+                    setSuccessMessage(`Found linked product order request: "${poolData.products.name}"! Ready for visualisation uploads.`);
+                    return;
                 }
             }
 
-            POSITIONS.forEach(pos => {
-                if (images[pos]?.preview) URL.revokeObjectURL(images[pos].preview);
-                if (images[pos]?.webpPreviewUrl) URL.revokeObjectURL(images[pos].webpPreviewUrl);
-            });
-            setImages({ cover: null, front: null, side: null });
+            // Path 3: Fallback - Product not found anywhere
+            setErrorMessage(`No pending product or order request found with barcode: ${queryVal}`);
         } catch (err) {
             setErrorMessage("Search failed: " + err.message);
         } finally {

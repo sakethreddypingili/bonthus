@@ -93,11 +93,17 @@ export function usePrintQueue() {
 
       const formatted = data.map((item) => {
         const bcVal = item.pending_product_barcodes?.[0]?.barcode || item.sku;
+        let model = "";
+        try {
+          const parsed = JSON.parse(item.description);
+          if (parsed && parsed.modelNo) model = parsed.modelNo;
+        } catch (e) {}
 
         return {
           id: item.id.toString(),
           barcodeValue: bcVal,
           brandValue: item.brand || "",
+          modelValue: model,
           skuValue: item.sku,
           categoryId: item.category_id,
           categoryName: categoryPathsMap[item.category_id] || "Uncategorized",

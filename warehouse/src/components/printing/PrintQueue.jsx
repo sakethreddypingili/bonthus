@@ -105,7 +105,12 @@ export default function PrintQueue({
 
                     {/* Barcode Value */}
                     <td className="py-3.5 px-4">
-                      <span className="font-mono text-xs font-bold text-gray-800">{item.barcodeValue}</span>
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xs font-bold text-gray-800">{item.barcodeValue}</span>
+                        <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mt-0.5">
+                          {item.brandValue || "Generic"} {item.modelValue ? `| M: ${item.modelValue}` : ""} {item.skuValue ? `| SKU: ${item.skuValue}` : ""}
+                        </span>
+                      </div>
                     </td>
 
                     {/* Category Path */}

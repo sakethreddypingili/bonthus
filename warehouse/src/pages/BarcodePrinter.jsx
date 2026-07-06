@@ -23,9 +23,10 @@ const DEFAULT_SETTINGS = {
   gapMm:           3,     // gap between labels
   direction:        1,    // 0=normal, 1=rotated 180°
   categoryX:       50,    // Shifted right (from 30) to prevent left clipping
-  categoryY1:      35,    // brand/first line Y
-  categoryY2:      85,    // root category/second line Y
-  categoryY3:     135,    // SKU/third line Y
+  categoryY1:      20,    // brand/first line Y
+  categoryY2:      65,    // category/second line Y
+  categoryY3:     110,    // model/third line Y
+  categoryY4:     155,    // SKU/fourth line Y
   categoryFont:   "2",    // TSPL font
   barcodeX:       300,    // Shifted left (from 450) to keep inside the wide rectangular body
   barcodeY:        45,    // Vertically centered to prevent bottom clipping
@@ -38,21 +39,15 @@ export default function BarcodePrinter({ userProfile }) {
   const [barcodeValue, setBarcodeValue]   = useState("1414199999");
   const [brandValue, setBrandValue]       = useState("Ray-Ban");
   const [skuValue, setSkuValue]           = useState("RB3025");
-  const [categories, setCategories]       = useState([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [modelValue, setModelValue]       = useState(""); // Model No text input
+  const [categoryName, setCategoryName]   = useState("Eyeglasses");
   const [printQuantity, setPrintQuantity] = useState(1);
-  const [categoryName, setCategoryName]   = useState("Scanning...");
   const [printingStatus, setPrintingStatus] = useState("IDLE");
 
   // ── Label / TSPL settings ──────────────────────────────────────────────────
   const [settings, setSettings]       = useState(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const setSetting = (key, val) => setSettings((s) => ({ ...s, [key]: val }));
-
-  // ── Category drawer ────────────────────────────────────────────────────────
-  const [showCatDrawer, setShowCatDrawer] = useState(false);
-  const [newCat, setNewCat]               = useState({ name: "", description: "", parent_id: "" });
-  const [creatingCat, setCreatingCat]     = useState(false);
 
   // ── Batch Loader Drawer ─────────────────────────────────────────────────────
   const [showBatchDrawer, setShowBatchDrawer] = useState(false);
@@ -103,72 +98,34 @@ export default function BarcodePrinter({ userProfile }) {
     return () => { active = false; clearTimeout(tid); };
   }, []);
 
-  // ── Fetch categories ────────────────────────────────────────────────────────
-  const fetchCategories = async () => {
-    const { data } = await supabase.from("categories").select("*").order("name");
-    setCategories(data || []);
-  };
-  useEffect(() => { fetchCategories(); }, []);
-
-  const categoryPaths = useMemo(() => {
-    const map = {}; categories.forEach((c) => { map[c.id] = c; });
-    const paths = {};
-    const getPath = (id) => {
-      if (paths[id]) return paths[id];
-      const cat = map[id]; if (!cat) return "";
-      if (!cat.parent_id) { paths[id] = cat.name; return cat.name; }
-      const p = getPath(cat.parent_id);
-      paths[id] = p ? `${p} > ${cat.name}` : cat.name;
-      return paths[id];
-    };
-    categories.forEach((c) => getPath(c.id));
-    return paths;
-  }, [categories]);
-
-  // ── Auto-resolve barcode → category, brand, and SKU ────────────────────────
+  // ── Auto-resolve barcode → category name, brand, SKU, and model no ──────────
   useEffect(() => {
     const resolve = async () => {
-      if (!barcodeValue?.trim()) { setCategoryName("No Barcode"); return; }
+      if (!barcodeValue?.trim()) return;
       try {
         const { data: bc } = await supabase.from("product_barcodes").select("product_id").eq("barcode", barcodeValue).maybeSingle();
         const q = bc?.product_id
-          ? supabase.from("products").select("id, name, sku, brand, category_id, category:categories(name)").eq("id", bc.product_id)
-          : supabase.from("products").select("id, name, sku, brand, category_id, category:categories(name)").or(`sku.eq.${barcodeValue},upc.eq.${barcodeValue}`);
+          ? supabase.from("products").select("id, name, sku, brand, category_id, category:categories(name), description").eq("id", bc.product_id)
+          : supabase.from("products").select("id, name, sku, brand, category_id, category:categories(name), description").or(`sku.eq.${barcodeValue}`);
         const { data: prod } = await q.maybeSingle();
         if (prod) {
-          if (prod.category_id) setSelectedCategoryId(prod.category_id);
           if (prod.brand) setBrandValue(prod.brand);
           if (prod.sku) setSkuValue(prod.sku);
+          if (prod.category?.name) setCategoryName(prod.category.name);
+          
+          try {
+            const descObj = JSON.parse(prod.description);
+            if (descObj && descObj.modelNo) {
+              setModelValue(descObj.modelNo);
+            }
+          } catch (e) {}
+
           addLog("INFO", `Resolved "${barcodeValue}" → "${prod.category?.name || "Uncategorized"}" (${prod.brand || "No Brand"})`);
         }
       } catch (e) { console.error(e); }
     };
     const t = setTimeout(resolve, 400); return () => clearTimeout(t);
   }, [barcodeValue]);
-
-  useEffect(() => {
-    setCategoryName(selectedCategoryId ? (categoryPaths[selectedCategoryId] || "Uncategorized") : "Uncategorized");
-  }, [selectedCategoryId, categoryPaths]);
-
-  const pathParts = useMemo(() => {
-    const parts = categoryName.split(" > ");
-    return { root: parts[0] || "", sub: parts.slice(1).join(" > ") || "" };
-  }, [categoryName]);
-
-  // ── Create category ─────────────────────────────────────────────────────────
-  const handleCreateCategory = async (e) => {
-    e.preventDefault(); setCreatingCat(true);
-    try {
-      const { data, error } = await supabase.from("categories")
-        .insert([{ name: newCat.name, description: newCat.description, parent_id: newCat.parent_id || null }])
-        .select().single();
-      if (error) throw error;
-      addLog("SUCCESS", `Created category "${newCat.name}"`);
-      await fetchCategories(); setSelectedCategoryId(data.id);
-      setShowCatDrawer(false); setNewCat({ name: "", description: "", parent_id: "" });
-    } catch (err) { alert("Failed: " + err.message); }
-    finally { setCreatingCat(false); }
-  };
 
   // ── Add Current Item to Queue ──────────────────────────────────────────────
   const handleAddToQueue = () => {
@@ -177,8 +134,8 @@ export default function BarcodePrinter({ userProfile }) {
       id: Math.random().toString(36).substring(7),
       barcodeValue,
       brandValue,
+      modelValue,
       skuValue,
-      categoryId: selectedCategoryId,
       categoryName,
       quantity: printQuantity,
       status: "pending",
@@ -191,7 +148,7 @@ export default function BarcodePrinter({ userProfile }) {
   // Label: 101.6 mm × 25.4 mm = 812 × 203 dots at 203 DPI
   // Left zone  (x = 0–340 dots):  category, brand and SKU text
   // Right zone (x = 370–812 dots): barcode
-  const buildItemTspl = (itemRoot, itemSub, brand, sku, val, qty) => {
+  const buildItemTspl = (category, brand, model, sku, val, qty) => {
     const s = settings;
     const cmds = [
       `SIZE ${s.widthMm} mm, ${s.heightMm} mm`,
@@ -200,11 +157,13 @@ export default function BarcodePrinter({ userProfile }) {
       `CLS`,
       `REFERENCE 0,0`,
       // Line 1: Brand
-      `TEXT ${s.categoryX},${s.categoryY1},"${s.categoryFont}",0,1,1,"${brand || "No Brand"}"`,
-      // Line 2: Category Root
-      `TEXT ${s.categoryX},${s.categoryY2},"${s.categoryFont}",0,1,1,"${itemRoot || "Uncategorized"}"`,
-      // Line 3: Alphanumeric Code / SKU
-      `TEXT ${s.categoryX},${s.categoryY3},"${s.categoryFont}",0,1,1,"${sku || ""}"`,
+      `TEXT ${s.categoryX},${s.categoryY1},"${s.categoryFont}",0,1,1,"${brand || ""}"`,
+      // Line 2: Category
+      `TEXT ${s.categoryX},${s.categoryY2},"${s.categoryFont}",0,1,1,"${category || ""}"`,
+      // Line 3: Model No
+      `TEXT ${s.categoryX},${s.categoryY3},"${s.categoryFont}",0,1,1,"${model ? "M:" + model : ""}"`,
+      // Line 4: SKU / Alphanumeric Code
+      `TEXT ${s.categoryX},${s.categoryY4},"${s.categoryFont}",0,1,1,"${sku ? "SKU:" + sku : ""}"`,
     ];
     cmds.push(
       `BARCODE ${s.barcodeX},${s.barcodeY},"128",${s.barcodeHeight},1,0,${s.barcodeNarrow},${s.barcodeNarrow},"${val}"`,
@@ -214,7 +173,7 @@ export default function BarcodePrinter({ userProfile }) {
   };
 
   const generateTsplCode = () => {
-    return buildItemTspl(pathParts.root, pathParts.sub, brandValue, skuValue, barcodeValue, printQuantity);
+    return buildItemTspl(categoryName, brandValue, modelValue, skuValue, barcodeValue, printQuantity);
   };
   const tsplOutput = generateTsplCode();
 
@@ -320,10 +279,7 @@ export default function BarcodePrinter({ userProfile }) {
       updateItemStatus(item.id, "printing");
       addLog("INFO", `[Batch] Printing item ${i + 1}/${queue.length}: ${item.barcodeValue}`);
 
-      const parts = (item.categoryName || "").split(" > ");
-      const itemRoot = parts[0] || "";
-      const itemSub = parts.slice(1).join(" > ") || "";
-      const tspl = buildItemTspl(itemRoot, itemSub, item.brandValue || "", item.skuValue || "", item.barcodeValue, item.quantity);
+      const tspl = buildItemTspl(item.categoryName || "", item.brandValue || "", item.modelValue || "", item.skuValue || "", item.barcodeValue, item.quantity);
 
       try {
         if (mode === "USB") {
@@ -488,17 +444,18 @@ export default function BarcodePrinter({ userProfile }) {
                   className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
               </div>
               <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Category</label>
-                  <button onClick={() => setShowCatDrawer(true)} className="text-[9px] font-bold uppercase tracking-wider text-black flex items-center gap-1 hover:underline">
-                    <FolderPlus className="w-3 h-3" /> Quick Add
-                  </button>
-                </div>
-                <select value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all bg-white">
-                  <option value="">Uncategorized</option>
-                  {categories.map((c) => <option key={c.id} value={c.id}>{categoryPaths[c.id] || c.name}</option>)}
-                </select>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Model No</label>
+                <input type="text" value={modelValue}
+                  onChange={(e) => setModelValue(e.target.value)}
+                  placeholder="e.g. RB3025"
+                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Category</label>
+                <input type="text" value={categoryName}
+                  onChange={(e) => setCategoryName(e.target.value)}
+                  placeholder="e.g. Eyeglasses"
+                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Quantity</label>
@@ -669,7 +626,7 @@ export default function BarcodePrinter({ userProfile }) {
                   {brandValue || "No Brand"}
                 </text>
 
-                {/* Category root text (Line 2) */}
+                {/* Category text (Line 2) */}
                 <text
                   x={Math.round((settings.categoryX / 812) * SVG_W) + 4}
                   y={Math.round((settings.categoryY2 / 203) * SVG_H) + 2}
@@ -677,10 +634,10 @@ export default function BarcodePrinter({ userProfile }) {
                   fontSize={settings.categoryFont === "4" ? 10 : settings.categoryFont === "3" ? 8 : settings.categoryFont === "2" ? 7 : 6}
                   fill="#555"
                 >
-                  {pathParts.root || "Uncategorized"}
+                  {categoryName || "Uncategorized"}
                 </text>
 
-                {/* Alphanumeric Code / SKU (Line 3) */}
+                {/* Model No text (Line 3) */}
                 <text
                   x={Math.round((settings.categoryX / 812) * SVG_W) + 4}
                   y={Math.round((settings.categoryY3 / 203) * SVG_H) + 2}
@@ -688,7 +645,18 @@ export default function BarcodePrinter({ userProfile }) {
                   fontSize={7}
                   fill="#444"
                 >
-                  {skuValue || ""}
+                  {modelValue ? "M:" + modelValue : ""}
+                </text>
+
+                {/* Alphanumeric Code / SKU (Line 4) */}
+                <text
+                  x={Math.round((settings.categoryX / 812) * SVG_W) + 4}
+                  y={Math.round((settings.categoryY4 / 203) * SVG_H) + 2}
+                  fontFamily="monospace" fontWeight="700"
+                  fontSize={7}
+                  fill="#444"
+                >
+                  {skuValue ? "SKU:" + skuValue : ""}
                 </text>
 
                 {/* Barcode */}
@@ -770,49 +738,13 @@ export default function BarcodePrinter({ userProfile }) {
         <BatchLoader
           isOpen={showBatchDrawer}
           onClose={() => setShowBatchDrawer(false)}
-          categoryPaths={categoryPaths}
+          categoryPaths={{}}
           onLoadBatch={async (checkpointName) => {
-            const count = await loadBatchFromSupabase(checkpointName, categoryPaths);
+            const count = await loadBatchFromSupabase(checkpointName, {});
             addLog("SUCCESS", `Loaded ${count} items from checkpoint "${checkpointName}" into the queue.`);
             setShowBatchDrawer(false);
           }}
         />
-      </SlideDrawer>
-
-      {/* ── Category Drawer ── */}
-      <SlideDrawer isOpen={showCatDrawer}
-        onClose={() => { setShowCatDrawer(false); setNewCat({ name: "", description: "", parent_id: "" }); }}
-        title="Quick Register Category" subtitle="Append a new category to the database">
-        <form onSubmit={handleCreateCategory} className="space-y-6 flex flex-col h-full">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Classification Name</label>
-            <input type="text" required value={newCat.name} onChange={(e) => setNewCat({ ...newCat, name: e.target.value })}
-              placeholder="E.g. Sunglasses"
-              className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest outline-none focus:border-black focus:bg-white transition-all" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Parent Category</label>
-            <select value={newCat.parent_id} onChange={(e) => setNewCat({ ...newCat, parent_id: e.target.value })}
-              className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest outline-none focus:border-black focus:bg-white transition-all">
-              <option value="">None (Root)</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{categoryPaths[c.id]}</option>)}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Description</label>
-            <textarea rows="3" value={newCat.description} onChange={(e) => setNewCat({ ...newCat, description: e.target.value })}
-              className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-bold uppercase tracking-widest outline-none resize-none focus:border-black focus:bg-white transition-all"
-              placeholder="Define the bounds of this category..." />
-          </div>
-          <div className="pt-6 flex gap-3 border-t border-gray-50 mt-auto">
-            <button type="button" onClick={() => setShowCatDrawer(false)}
-              className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors">Abort</button>
-            <button type="submit" disabled={creatingCat}
-              className="flex-[2] py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-105 active:scale-95 disabled:opacity-50 transition-all">
-              {creatingCat ? "Creating..." : "Create Category"}
-            </button>
-          </div>
-        </form>
       </SlideDrawer>
     </div>
   );
