@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Printer, Terminal, Settings, HelpCircle, FolderPlus,
-  Usb, Unplug, Zap, AlertTriangle, ExternalLink, SlidersHorizontal, ChevronDown, ChevronUp
+  Usb, Unplug, Zap, AlertTriangle, ExternalLink, SlidersHorizontal, ChevronDown, ChevronUp, Layers
 } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import SlideDrawer from "../components/common/SlideDrawer";
+import { usePrintQueue } from "../hooks/usePrintQueue";
+import BatchLoader from "../components/printing/BatchLoader";
+import PrintQueue from "../components/printing/PrintQueue";
 
 /**
  * BarcodePrinter — TSC TE244 @ 203 DPI
@@ -47,6 +50,24 @@ export default function BarcodePrinter({ userProfile }) {
   const [showCatDrawer, setShowCatDrawer] = useState(false);
   const [newCat, setNewCat]               = useState({ name: "", description: "", parent_id: "" });
   const [creatingCat, setCreatingCat]     = useState(false);
+
+  // ── Batch Loader Drawer ─────────────────────────────────────────────────────
+  const [showBatchDrawer, setShowBatchDrawer] = useState(false);
+
+  // ── Print Queue State Hook ─────────────────────────────────────────────────
+  const {
+    queue,
+    addSingleItem,
+    updateItemQty,
+    updateItemStatus,
+    removeItem,
+    clearQueue,
+    clearCompleted,
+    loadBatchFromSupabase,
+  } = usePrintQueue();
+
+  const [isPrintingBatch, setIsPrintingBatch] = useState(false);
+  const [currentBatchIdx, setCurrentBatchIdx] = useState(-1);
 
   // ── Console logs ───────────────────────────────────────────────────────────
   const [logs, setLogs] = useState([
@@ -141,12 +162,26 @@ export default function BarcodePrinter({ userProfile }) {
     finally { setCreatingCat(false); }
   };
 
+  // ── Add Current Item to Queue ──────────────────────────────────────────────
+  const handleAddToQueue = () => {
+    if (!barcodeValue?.trim()) return;
+    addSingleItem({
+      id: Math.random().toString(36).substring(7),
+      barcodeValue,
+      categoryId: selectedCategoryId,
+      categoryName,
+      quantity: printQuantity,
+      status: "pending",
+      addedAt: new Date().toISOString(),
+    });
+    addLog("INFO", `Added "${barcodeValue}" to queue (${printQuantity}x).`);
+  };
+
   // ── TSPL GENERATION ─────────────────────────────────────────────────────────
   // Label: 101.6 mm × 25.4 mm = 812 × 203 dots at 203 DPI
   // Left zone  (x = 0–340 dots):  category text
   // Right zone (x = 370–812 dots): barcode
-  // Code128 for 10-digit number @ narrow=2: ≈ 220 dots wide → x=390+220=610 < 812 ✓
-  const generateTsplCode = () => {
+  const buildItemTspl = (itemRoot, itemSub, val, qty) => {
     const s = settings;
     const cmds = [
       `SIZE ${s.widthMm} mm, ${s.heightMm} mm`,
@@ -154,16 +189,20 @@ export default function BarcodePrinter({ userProfile }) {
       `DIRECTION ${s.direction},0`,
       `CLS`,
       `REFERENCE 0,0`,
-      `TEXT ${s.categoryX},${s.categoryY1},"${s.categoryFont}",0,1,1,"${pathParts.root}"`,
+      `TEXT ${s.categoryX},${s.categoryY1},"${s.categoryFont}",0,1,1,"${itemRoot}"`,
     ];
-    if (pathParts.sub) {
-      cmds.push(`TEXT ${s.categoryX},${s.categoryY2},"${s.categoryFont}",0,1,1,"${pathParts.sub}"`);
+    if (itemSub) {
+      cmds.push(`TEXT ${s.categoryX},${s.categoryY2},"${s.categoryFont}",0,1,1,"${itemSub}"`);
     }
     cmds.push(
-      `BARCODE ${s.barcodeX},${s.barcodeY},"128",${s.barcodeHeight},1,0,${s.barcodeNarrow},${s.barcodeNarrow},"${barcodeValue}"`,
-      `PRINT ${printQuantity},1`
+      `BARCODE ${s.barcodeX},${s.barcodeY},"128",${s.barcodeHeight},1,0,${s.barcodeNarrow},${s.barcodeNarrow},"${val}"`,
+      `PRINT ${qty},1`
     );
     return cmds.join("\r\n");
+  };
+
+  const generateTsplCode = () => {
+    return buildItemTspl(pathParts.root, pathParts.sub, barcodeValue, printQuantity);
   };
   const tsplOutput = generateTsplCode();
 
@@ -242,6 +281,71 @@ export default function BarcodePrinter({ userProfile }) {
     } catch (err) { setPrintingStatus("ERROR"); addLog("ERROR", `Agent: ${err.message}`); }
   };
 
+  // ── Batch Printing Dispatcher (Sequential with Delay) ────────────────────
+  const handlePrintBatch = async () => {
+    const pendingItems = queue.filter((item) => item.status === "pending");
+    if (pendingItems.length === 0) {
+      alert("No pending items in the queue to print.");
+      return;
+    }
+
+    // Determine target transport mode
+    let mode = "";
+    if (usbStatus === "CONNECTED") mode = "USB";
+    else if (agentStatus === "ONLINE") mode = "AGENT";
+    else {
+      alert("No active printer connection (USB or Local Agent). Please connect first.");
+      return;
+    }
+
+    setIsPrintingBatch(true);
+    addLog("PENDING", `Starting batch print queue (${pendingItems.length} items) via ${mode}...`);
+
+    for (let i = 0; i < queue.length; i++) {
+      const item = queue[i];
+      if (item.status !== "pending") continue;
+
+      setCurrentBatchIdx(i);
+      updateItemStatus(item.id, "printing");
+      addLog("INFO", `[Batch] Printing item ${i + 1}/${queue.length}: ${item.barcodeValue}`);
+
+      // Split categories root and sub
+      const parts = item.categoryName.split(" > ");
+      const itemRoot = parts[0] || "";
+      const itemSub = parts.slice(1).join(" > ") || "";
+      const tspl = buildItemTspl(itemRoot, itemSub, item.barcodeValue, item.quantity);
+
+      try {
+        if (mode === "USB") {
+          const data = new TextEncoder().encode(tspl + "\r\n");
+          const result = await usbDeviceRef.current.transferOut(usbEndpointRef.current, data);
+          if (result.status !== "ok") throw new Error(`USB status: ${result.status}`);
+        } else {
+          const res = await fetch("http://localhost:9100/print", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rawTspl: tspl }),
+            signal: AbortSignal.timeout(10000),
+          });
+          if (!res.ok) throw new Error(`Agent returned HTTP ${res.status}`);
+        }
+
+        updateItemStatus(item.id, "done");
+        addLog("SUCCESS", `[Batch] Printed: ${item.barcodeValue}`);
+      } catch (err) {
+        updateItemStatus(item.id, "error");
+        addLog("ERROR", `[Batch] Failed to print ${item.barcodeValue}: ${err.message}`);
+      }
+
+      // Small delay between label prints so they output sequentially
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    setIsPrintingBatch(false);
+    setCurrentBatchIdx(-1);
+    addLog("SUCCESS", "Batch print session completed.");
+  };
+
   // ── Browser print fallback ──────────────────────────────────────────────────
   const handleBrowserPrint = () => {
     try {
@@ -313,6 +417,14 @@ export default function BarcodePrinter({ userProfile }) {
           <span className={`w-1.5 h-1.5 rounded-full ${agentStatus === "ONLINE" ? "bg-green-500 animate-pulse" : "bg-gray-300"}`} />
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Agent: {agentStatus}</span>
         </div>
+        {/* Checkpoint Loader Button */}
+        <button
+          onClick={() => setShowBatchDrawer(true)}
+          className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 active:scale-95 transition-all"
+        >
+          <Layers className="w-3.5 h-3.5 text-black" />
+          Ingestion Checkpoints
+        </button>
         {/* Label size badge */}
         <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-full px-3 py-1.5 ml-auto">
           <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
@@ -378,17 +490,25 @@ export default function BarcodePrinter({ userProfile }) {
               </div>
             </div>
 
-            {/* Print buttons */}
+            {/* Actions */}
             <div className="mt-5 space-y-2">
+              <button
+                onClick={handleAddToQueue}
+                disabled={!barcodeValue?.trim()}
+                className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50"
+              >
+                Add to Print Queue
+              </button>
+              <div className="border-t border-gray-100 my-2 pt-2" />
               <button onClick={handleUsbPrint} disabled={!isUsbConnected || printingStatus.includes("SENDING")}
                 className="w-full flex items-center justify-center gap-2 bg-black hover:bg-neutral-800 text-white font-bold py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 disabled:bg-neutral-300 disabled:cursor-not-allowed">
                 <Zap className="w-4 h-4" />
-                {isUsbConnected ? "Send Raw TSPL (USB)" : "Connect USB Printer First"}
+                {isUsbConnected ? "Print Single Label (USB)" : "Connect USB Printer First"}
               </button>
               <button onClick={handleAgentPrint} disabled={agentStatus !== "ONLINE" || printingStatus.includes("SENDING")}
                 className={`w-full flex items-center justify-center gap-2 border font-bold py-2.5 rounded-xl text-xs transition-all active:scale-95 ${agentStatus === "ONLINE" ? "bg-white hover:bg-gray-50 border-gray-200 text-gray-700" : "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed"}`}>
                 <Settings className="w-3.5 h-3.5" />
-                {agentStatus === "ONLINE" ? "Send via Local Agent" : "Agent Offline — run local-print-agent.js"}
+                {agentStatus === "ONLINE" ? "Print Single via Local Agent" : "Agent Offline — run local-print-agent.js"}
               </button>
               <button onClick={handleBrowserPrint}
                 className="w-full flex items-center justify-center gap-2 border border-gray-100 text-gray-400 font-bold py-2 rounded-xl text-[10px] hover:bg-gray-50 transition-all active:scale-95">
@@ -409,7 +529,6 @@ export default function BarcodePrinter({ userProfile }) {
 
             {showSettings && (
               <div className="px-5 pb-5 space-y-4 border-t border-gray-100">
-                
                 {/* Label Size */}
                 <div>
                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-4 mb-2">Label Size</p>
@@ -460,13 +579,13 @@ export default function BarcodePrinter({ userProfile }) {
           </div>
         </div>
 
-        {/* ════ Right Panel: Preview + Console ════ */}
+        {/* ════ Right Panel: Preview + Queue + Logs ════ */}
         <div className="lg:col-span-8 space-y-4">
 
-          {/* ── Label Preview (real 4:1 rectangle, no dumbbell) ── */}
+          {/* ── Label Preview ── */}
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
             <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-              Live Label Preview — {settings.widthMm}mm × {settings.heightMm}mm (Die-Cut Rectangle)
+              Live Label Preview — {settings.widthMm}mm × {settings.heightMm}mm (Jewelry/Dumbbell Tag)
             </h2>
             <div className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-4 flex items-center justify-center min-h-[120px]">
               <svg
@@ -476,46 +595,43 @@ export default function BarcodePrinter({ userProfile }) {
                 style={{ maxHeight: 140 }}
                 xmlns="http://www.w3.org/2000/svg"
               >
-                {/* Background: simple rounded rectangle (actual die-cut shape) */}
-                <rect x="0" y="0" width={SVG_W} height={SVG_H} rx="8" ry="8" fill="white" stroke="#e5e7eb" strokeWidth="1.5" />
+                {/* Background: jewelry tag style (left rectangular lobe, neck, right tail) */}
+                {/* Lobe width ~180, neck ~70, tail ~150 */}
+                <path
+                  d="M 10,15 H 180 A 15,15 0 0,1 195,30 V 40 A 10,10 0 0,0 205,50 H 260 A 10,10 0 0,0 270,40 V 30 A 15,15 0 0,1 285,15 H 390 A 10,10 0 0,1 400,25 V 75 A 10,10 0 0,1 390,85 H 285 A 15,15 0 0,1 270,70 V 60 A 10,10 0 0,0 260,50 H 205 A 10,10 0 0,0 195,60 V 70 A 15,15 0 0,1 180,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z"
+                  fill="white" stroke="#e5e7eb" strokeWidth="1.5"
+                />
 
-                {/* Category text zone (left ~40%) */}
+                {/* Category text (left lobe) */}
                 <text
-                  x={Math.round((settings.categoryX / 812) * SVG_W) + 8}
-                  y={Math.round((settings.categoryY1 / 203) * SVG_H) + 4}
+                  x={Math.round((settings.categoryX / 812) * SVG_W) + 4}
+                  y={Math.round((settings.categoryY1 / 203) * SVG_H) + 2}
                   fontFamily="'Inter', sans-serif" fontWeight="700"
-                  fontSize={settings.categoryFont === "4" ? 14 : settings.categoryFont === "3" ? 12 : settings.categoryFont === "2" ? 10 : 8}
+                  fontSize={settings.categoryFont === "4" ? 12 : settings.categoryFont === "3" ? 10 : settings.categoryFont === "2" ? 8 : 6}
                   fill="#111"
                 >
                   {pathParts.root}
                 </text>
                 {pathParts.sub && (
                   <text
-                    x={Math.round((settings.categoryX / 812) * SVG_W) + 8}
-                    y={Math.round((settings.categoryY2 / 203) * SVG_H) + 4}
-                    fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={10} fill="#444"
+                    x={Math.round((settings.categoryX / 812) * SVG_W) + 4}
+                    y={Math.round((settings.categoryY2 / 203) * SVG_H) + 2}
+                    fontFamily="'Inter', sans-serif" fontWeight="700"
+                    fontSize={settings.categoryFont === "4" ? 10 : settings.categoryFont === "3" ? 8 : settings.categoryFont === "2" ? 6 : 5}
+                    fill="#555"
                   >
                     {pathParts.sub}
                   </text>
                 )}
 
-                {/* Divider line */}
-                <line
-                  x1={Math.round((settings.barcodeX / 812) * SVG_W) - 6}
-                  y1="8"
-                  x2={Math.round((settings.barcodeX / 812) * SVG_W) - 6}
-                  y2={SVG_H - 8}
-                  stroke="#e5e7eb" strokeWidth="1" strokeDasharray="3,2"
-                />
-
-                {/* Barcode bars (mock) */}
+                {/* Barcode (fits inside left lobe/neck intersection, x=300) */}
                 {renderMockBars(Math.round((settings.barcodeX / 812) * SVG_W), Math.round((220 / 812) * SVG_W))}
 
                 {/* Barcode number */}
                 <text
                   x={Math.round((settings.barcodeX / 812) * SVG_W) + Math.round((220 / 812) * SVG_W) / 2}
-                  y={SVG_H - 6}
-                  fontFamily="monospace" fontSize="8" fill="#333" textAnchor="middle"
+                  y={SVG_H - 18}
+                  fontFamily="monospace" fontSize="7" fill="#333" textAnchor="middle"
                 >
                   {barcodeValue}
                 </text>
@@ -523,30 +639,30 @@ export default function BarcodePrinter({ userProfile }) {
             </div>
           </div>
 
-          {/* ── TSPL Payload ── */}
+          {/* ── Active Review Queue Table ── */}
+          <PrintQueue
+            queue={queue}
+            onUpdateQty={updateItemQty}
+            onRemove={removeItem}
+            onClear={clearQueue}
+            onClearCompleted={clearCompleted}
+            onPrintBatch={handlePrintBatch}
+            isPrinting={isPrintingBatch}
+            currentIndex={currentBatchIdx}
+            activeMode={usbStatus === "CONNECTED" ? "usb" : "agent"}
+          />
+
+          {/* ── TSPL Payload Preview ── */}
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
             <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-              Generated TSPL Payload (live)
+              Generated Single Label TSPL
             </h3>
             <pre className="bg-gray-50 rounded-xl p-4 text-[11px] font-mono text-gray-700 whitespace-pre-wrap leading-relaxed overflow-x-auto">
               {tsplOutput}
             </pre>
           </div>
 
-          {/* ── How it works ── */}
-          <div className="bg-[#F8F9FB] border border-gray-100 rounded-2xl p-4 space-y-2">
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
-              <HelpCircle className="w-3.5 h-3.5 text-gray-400" /> Quick Guide
-            </h3>
-            <ul className="text-xs text-gray-500 space-y-1.5 leading-relaxed">
-              <li>• <strong>Label stock:</strong> 4.00 in × 1.00 in die-cut. Adjust in Custom Settings if your stock differs.</li>
-              <li>• <strong>USB (best):</strong> Connect USB → pick printer → Send Raw TSPL.</li>
-              <li>• <strong>Agent:</strong> Run <code className="bg-gray-100 px-1 rounded">node scripts/local-print-agent.js</code> in project root.</li>
-              <li>• <strong>Alignment off?</strong> Adjust <em>Barcode X</em> or <em>Category X</em> in Custom Settings until aligned.</li>
-            </ul>
-          </div>
-
-          {/* ── Console ── */}
+          {/* ── Console Spooler Logs ── */}
           <div className="bg-black text-white border border-neutral-800 rounded-2xl overflow-hidden">
             <div className="bg-neutral-900 border-b border-neutral-800 px-4 py-2.5 flex items-center justify-between">
               <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -576,6 +692,25 @@ export default function BarcodePrinter({ userProfile }) {
           </div>
         </div>
       </div>
+
+      {/* ── Drawer: Ingestion Checkpoint Loader ── */}
+      <SlideDrawer
+        isOpen={showBatchDrawer}
+        onClose={() => setShowBatchDrawer(false)}
+        title="Checkpoints Batch Loader"
+        subtitle="Load products generated in Product Intake sessions"
+      >
+        <BatchLoader
+          isOpen={showBatchDrawer}
+          onClose={() => setShowBatchDrawer(false)}
+          categoryPaths={categoryPaths}
+          onLoadBatch={async (checkpointName) => {
+            const count = await loadBatchFromSupabase(checkpointName, categoryPaths);
+            addLog("SUCCESS", `Loaded ${count} items from checkpoint "${checkpointName}" into the queue.`);
+            setShowBatchDrawer(false);
+          }}
+        />
+      </SlideDrawer>
 
       {/* ── Category Drawer ── */}
       <SlideDrawer isOpen={showCatDrawer}

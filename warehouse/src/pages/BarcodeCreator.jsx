@@ -102,6 +102,39 @@ export default function BarcodeCreator() {
     }
   };
 
+  const handleSendToPrinter = () => {
+    if (createdBarcodes.length === 0) return;
+    
+    // Format into print queue items
+    const formatted = createdBarcodes.map((vector) => ({
+      id: Math.random().toString(36).substring(7),
+      barcodeValue: vector.barcode,
+      categoryId: "", 
+      categoryName: "Uncategorized",
+      quantity: 1,
+      status: "pending",
+      addedAt: new Date().toISOString(),
+    }));
+
+    try {
+      const saved = localStorage.getItem("bonthus_print_queue");
+      const currentQueue = saved ? JSON.parse(saved) : [];
+      
+      // Avoid duplicate barcodes
+      const existingBarcodes = new Set(currentQueue.map((i) => i.barcodeValue));
+      const filteredNew = formatted.filter((i) => !existingBarcodes.has(i.barcodeValue));
+      
+      const newQueue = [...currentQueue, ...filteredNew];
+      localStorage.setItem("bonthus_print_queue", JSON.stringify(newQueue));
+      
+      alert(`Added ${filteredNew.length} new barcodes to the print queue. Redirecting...`);
+      window.location.href = "/barcode-printer"; // Safe fallback redirect
+    } catch (e) {
+      console.error(e);
+      alert("Failed to queue items.");
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20 animate-fast-slide">
 
@@ -183,7 +216,11 @@ export default function BarcodeCreator() {
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Generated {createdBarcodes.length} vectors successfully</p>
                 </div>
                 <div className="flex gap-2">
-                   <button className="p-3 border border-gray-100 rounded-2xl text-black hover:bg-black hover:text-white">
+                   <button 
+                     onClick={handleSendToPrinter}
+                     className="p-3 border border-gray-100 rounded-2xl text-black hover:bg-black hover:text-white transition-colors"
+                     title="Send Manifest to Print Queue"
+                   >
                      <Printer size={18} strokeWidth={3} />
                    </button>
                    <button className="p-3 bg-black text-white rounded-2xl shadow-lg hover:scale-110">
