@@ -17,26 +17,75 @@ const INITIAL_TEMPLATES = [
   <meta name="color-scheme" content="light">
   <meta name="supported-color-schemes" content="light">
   <style>
-    :root { color-scheme: light only; }
-    body { color-scheme: light only; background-color: #eef0f3 !important; }
-    * { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    :root {
+      color-scheme: light only;
+      supported-color-schemes: light;
+    }
+    body, table, td, p, h1, h2, h3 {
+      color: #111111 !important;
+      font-family: Arial, sans-serif !important;
+    }
+    
+    /* Strict Light Mode Enforcement overrides for dark mode devices */
+    @media (prefers-color-scheme: dark) {
+      body, table.outer-wrapper {
+        background-color: #eef0f3 !important;
+      }
+      table.email-card {
+        background-color: #ffffff !important;
+      }
+      h1, h2, h3, p, td {
+        color: #111111 !important;
+      }
+      td.profile-card-container {
+        background-color: #e8edf5 !important;
+      }
+      table.profile-table {
+        background-color: #ffffff !important;
+      }
+      table.profile-table td {
+        color: #111111 !important;
+        border-color: #e5e7eb !important;
+      }
+      div.step-num {
+        background-color: #ffffff !important;
+        color: #374151 !important;
+        border-color: #9ca3af !important;
+      }
+      td.footer-container {
+        background-color: #f3f4f6 !important;
+        border-top-color: #e5e7eb !important;
+      }
+      td.footer-container p {
+        color: #374151 !important;
+      }
+    }
+
+    /* Gmail App Dark Mode Fixes */
+    [data-ogsc] body, [data-ogsc] table.outer-wrapper { background-color: #eef0f3 !important; }
+    [data-ogsc] table.email-card { background-color: #ffffff !important; }
+    [data-ogsc] h1, [data-ogsc] p, [data-ogsc] td { color: #111111 !important; }
+    [data-ogsc] td.profile-card-container { background-color: #e8edf5 !important; }
+    [data-ogsc] table.profile-table { background-color: #ffffff !important; }
+    [data-ogsc] div.step-num { background-color: #ffffff !important; color: #374151 !important; }
+    [data-ogsc] td.footer-container { background-color: #f3f4f6 !important; }
   </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: #eef0f3;" bgcolor="#eef0f3">
 
   <!-- OUTER WRAPPER TABLE - fixed 600px, never changes -->
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef0f3">
+  <table class="outer-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef0f3">
     <tr>
       <td align="center" style="padding: 32px 0;">
 
         <!-- EMAIL CARD - fixed 580px width -->
-        <table width="580" cellpadding="0" cellspacing="0" border="0" style="border-radius: 20px; overflow: hidden; background-color: #ffffff;" bgcolor="#ffffff">
+        <table class="email-card" width="580" cellpadding="0" cellspacing="0" border="0" style="border-radius: 20px; overflow: hidden; background-color: #ffffff;" bgcolor="#ffffff">
 
           <!-- ===== BLACK HEADER ===== -->
           <tr>
             <td bgcolor="#000000" align="center" style="padding: 36px 40px; background-color: #000000;">
-              <p style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: 8px; text-transform: uppercase; color: #ffffff; font-family: Arial, sans-serif; line-height: 1;">BONTHUS</p>
-              <p style="margin: 8px 0 0 0; font-size: 11px; font-weight: 400; letter-spacing: 3px; color: #9ca3af; font-family: Arial, sans-serif;">Empowering Vision</p>
+              <p style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: 8px; text-transform: uppercase; color: #ffffff !important; font-family: Arial, sans-serif; line-height: 1;">BONTHUS</p>
+              <p style="margin: 8px 0 0 0; font-size: 11px; font-weight: 400; letter-spacing: 3px; color: #9ca3af !important; font-family: Arial, sans-serif;">Empowering Vision</p>
             </td>
           </tr>
 
@@ -45,49 +94,14 @@ const INITIAL_TEMPLATES = [
             <td bgcolor="#ffffff" align="center" style="padding: 44px 40px 20px; background-color: #ffffff;">
 
               <!-- Heading -->
-              <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: 900; color: #111111; line-height: 1.25; letter-spacing: -0.5px; font-family: Arial, sans-serif;">Welcome to the<br>Family, {{NAME}}!</h1>
-              <p style="margin: 0 0 32px 0; font-size: 14px; color: #6b7280; font-family: Arial, sans-serif; line-height: 1.5;">We're excited to have you on board.</p>
+              <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: 900; color: #111111 !important; line-height: 1.25; letter-spacing: -0.5px; font-family: Arial, sans-serif;">Welcome to the<br>Family, {{NAME}}!</h1>
+              <p style="margin: 0 0 32px 0; font-size: 14px; color: #6b7280 !important; font-family: Arial, sans-serif; line-height: 1.5;">We're excited to have you on board.</p>
 
-              <!-- HANDSHAKE SVG - proper clasped hands illustration -->
+              <!-- HANDSHAKE ICON IMAGE -->
               <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin-bottom: 32px;">
                 <tr>
                   <td align="center">
-                    <svg width="160" height="100" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <!-- Left sleeve/arm -->
-                      <rect x="0" y="52" width="44" height="28" rx="6" fill="#dde3ec"/>
-                      <!-- Right sleeve/arm -->
-                      <rect x="116" y="52" width="44" height="28" rx="6" fill="#dde3ec"/>
-                      
-                      <!-- Left hand body -->
-                      <rect x="36" y="44" width="32" height="20" rx="5" fill="#e8edf5"/>
-                      <!-- Left fingers (4 fingers) -->
-                      <rect x="38" y="30" width="7" height="18" rx="3.5" fill="#e8edf5"/>
-                      <rect x="47" y="27" width="7" height="20" rx="3.5" fill="#e8edf5"/>
-                      <rect x="56" y="28" width="7" height="19" rx="3.5" fill="#e8edf5"/>
-                      <!-- Left thumb -->
-                      <rect x="32" y="46" width="8" height="13" rx="4" fill="#dde3ec" transform="rotate(-20 32 46)"/>
-                      
-                      <!-- Right hand body -->
-                      <rect x="92" y="44" width="32" height="20" rx="5" fill="#e8edf5"/>
-                      <!-- Right fingers (4 fingers) -->
-                      <rect x="115" y="30" width="7" height="18" rx="3.5" fill="#e8edf5"/>
-                      <rect x="106" y="27" width="7" height="20" rx="3.5" fill="#e8edf5"/>
-                      <rect x="97" y="28" width="7" height="19" rx="3.5" fill="#e8edf5"/>
-                      <!-- Right thumb -->
-                      <rect x="120" y="46" width="8" height="13" rx="4" fill="#dde3ec" transform="rotate(20 128 46)"/>
-                      
-                      <!-- Clasped / interlocked area in center -->
-                      <rect x="62" y="44" width="36" height="22" rx="5" fill="#d4dbe8"/>
-                      
-                      <!-- Knuckle lines on left hand -->
-                      <line x1="40" y1="44" x2="40" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
-                      <line x1="50" y1="44" x2="50" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
-                      <line x1="60" y1="44" x2="60" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
-                      <!-- Knuckle lines on right hand -->
-                      <line x1="100" y1="44" x2="100" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
-                      <line x1="110" y1="44" x2="110" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
-                      <line x1="120" y1="44" x2="120" y2="52" stroke="#c5cdd9" stroke-width="1" stroke-linecap="round"/>
-                    </svg>
+                    <img src="https://raw.githubusercontent.com/sakethreddypingili/bonthus/main/warehouse/public/assets/images/icon.png" width="130" height="90" alt="Handshake Icon" style="display: block; border: 0; width: 130px; height: 90px;" />
                   </td>
                 </tr>
               </table>
@@ -100,33 +114,33 @@ const INITIAL_TEMPLATES = [
             <td bgcolor="#ffffff" style="padding: 0 40px 28px; background-color: #ffffff;">
               <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #e8edf5; border-radius: 14px;" bgcolor="#e8edf5">
                 <tr>
-                  <td align="center" style="padding: 18px 20px 14px;">
-                    <p style="margin: 0; font-size: 11px; font-weight: 800; color: #374151; text-transform: uppercase; letter-spacing: 2px; font-family: Arial, sans-serif;">YOUR PROFILE</p>
+                  <td class="profile-card-container" align="center" style="padding: 18px 20px 14px;">
+                    <p style="margin: 0; font-size: 11px; font-weight: 800; color: #374151 !important; text-transform: uppercase; letter-spacing: 2px; font-family: Arial, sans-serif;">YOUR PROFILE</p>
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 0 16px 16px;">
+                  <td class="profile-card-container" style="padding: 0 16px 16px;">
                     <!-- Profile rows table -->
-                    <table width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse: collapse; background-color: #ffffff; border-color: #e5e7eb; border-radius: 8px;" bgcolor="#ffffff">
+                    <table class="profile-table" width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse: collapse; background-color: #ffffff; border-color: #e5e7eb; border-radius: 8px;" bgcolor="#ffffff">
                       <tr>
-                        <td width="50%" style="padding: 11px 14px; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Employee ID</td>
-                        <td width="50%" style="padding: 11px 14px; font-size: 13px; color: #111111; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{EMPLOYEE_ID}}</td>
+                        <td width="50%" style="padding: 11px 14px; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Employee ID</td>
+                        <td width="50%" style="padding: 11px 14px; font-size: 13px; color: #111111 !important; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{EMPLOYEE_ID}}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Designation</td>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #111111; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{DESIGNATION}}</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Designation</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #111111 !important; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{DESIGNATION}}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Department</td>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #111111; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{DOMAIN}}</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Department</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #111111 !important; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{DOMAIN}}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Phone</td>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #111111; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">+91 {{PHONE}}</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Phone</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #111111 !important; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">+91 {{PHONE}}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Joined On</td>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #111111; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{JOIN_DATE}}</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Joined On</td>
+                        <td style="padding: 11px 14px; font-size: 13px; color: #111111 !important; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{JOIN_DATE}}</td>
                       </tr>
                     </table>
                   </td>
@@ -137,9 +151,9 @@ const INITIAL_TEMPLATES = [
 
           <!-- ===== WHAT'S NEXT ===== -->
           <tr>
-            <td bgcolor="#ffffff" align="center" style="padding: 0 40px 28px; background-color: #ffffff;">
-              <p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280; font-family: Arial, sans-serif;">What's Next</p>
-              <p style="margin: 0 0 24px 0; font-size: 20px; font-weight: 900; color: #111111; font-family: Arial, sans-serif; letter-spacing: -0.5px;">Your First Steps</p>
+            <td bgcolor="#ffffff" align="center" style="padding: 0 40px 40px; background-color: #ffffff;">
+              <p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif;">What's Next</p>
+              <p style="margin: 0 0 24px 0; font-size: 20px; font-weight: 900; color: #111111 !important; font-family: Arial, sans-serif; letter-spacing: -0.5px;">Your First Steps</p>
 
               <!-- Steps table with connecting lines -->
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -148,10 +162,12 @@ const INITIAL_TEMPLATES = [
                   <td width="33%" align="center" valign="top">
                     <table cellpadding="0" cellspacing="0" border="0" align="center">
                       <tr>
-                        <td align="center" width="34" height="34" style="width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; vertical-align: middle; font-size: 13px; font-weight: 700; color: #374151; font-family: Arial, sans-serif; background-color: #ffffff;" bgcolor="#ffffff">1</td>
+                        <td align="center">
+                          <div class="step-num" style="display: inline-block; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; line-height: 34px; font-size: 13px; font-weight: 700; color: #374151 !important; font-family: Arial, sans-serif; background-color: #ffffff;">1</div>
+                        </td>
                       </tr>
                       <tr>
-                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563; font-family: Arial, sans-serif; line-height: 1.5;">Set up your<br>password</td>
+                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563 !important; font-family: Arial, sans-serif; line-height: 1.5;">Set up your<br>password</td>
                       </tr>
                     </table>
                   </td>
@@ -165,10 +181,12 @@ const INITIAL_TEMPLATES = [
                   <td width="33%" align="center" valign="top">
                     <table cellpadding="0" cellspacing="0" border="0" align="center">
                       <tr>
-                        <td align="center" width="34" height="34" style="width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; vertical-align: middle; font-size: 13px; font-weight: 700; color: #374151; font-family: Arial, sans-serif; background-color: #ffffff;" bgcolor="#ffffff">2</td>
+                        <td align="center">
+                          <div class="step-num" style="display: inline-block; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; line-height: 34px; font-size: 13px; font-weight: 700; color: #374151 !important; font-family: Arial, sans-serif; background-color: #ffffff;">2</div>
+                        </td>
                       </tr>
                       <tr>
-                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563; font-family: Arial, sans-serif; line-height: 1.5;">Explore the<br>portal</td>
+                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563 !important; font-family: Arial, sans-serif; line-height: 1.5;">Explore the<br>portal</td>
                       </tr>
                     </table>
                   </td>
@@ -182,10 +200,12 @@ const INITIAL_TEMPLATES = [
                   <td width="33%" align="center" valign="top">
                     <table cellpadding="0" cellspacing="0" border="0" align="center">
                       <tr>
-                        <td align="center" width="34" height="34" style="width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; vertical-align: middle; font-size: 13px; font-weight: 700; color: #374151; font-family: Arial, sans-serif; background-color: #ffffff;" bgcolor="#ffffff">3</td>
+                        <td align="center">
+                          <div class="step-num" style="display: inline-block; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; line-height: 34px; font-size: 13px; font-weight: 700; color: #374151 !important; font-family: Arial, sans-serif; background-color: #ffffff;">3</div>
+                        </td>
                       </tr>
                       <tr>
-                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563; font-family: Arial, sans-serif; line-height: 1.5;">Connect with<br>your team</td>
+                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563 !important; font-family: Arial, sans-serif; line-height: 1.5;">Connect with<br>your team</td>
                       </tr>
                     </table>
                   </td>
@@ -194,24 +214,11 @@ const INITIAL_TEMPLATES = [
             </td>
           </tr>
 
-          <!-- ===== CTA BUTTON ===== -->
-          <tr>
-            <td bgcolor="#ffffff" align="center" style="padding: 8px 40px 40px; background-color: #ffffff;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td align="center" bgcolor="#000000" style="border-radius: 50px; background-color: #000000;">
-                    <a href="{{PORTAL_URL}}" style="display: inline-block; padding: 16px 48px; font-size: 13px; font-weight: 800; color: #ffffff; text-decoration: none; text-transform: uppercase; letter-spacing: 2px; font-family: Arial, sans-serif; border-radius: 50px;">GET STARTED NOW</a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
           <!-- ===== FOOTER ===== -->
           <tr>
-            <td bgcolor="#f3f4f6" align="center" style="padding: 22px 32px; background-color: #f3f4f6; border-top: 1px solid #e5e7eb;">
-              <p style="margin: 0 0 5px 0; font-size: 12px; color: #374151; font-weight: 500; font-family: Arial, sans-serif;">Bonthus Human Resources Department | bonthusofficial@gmail.com</p>
-              <p style="margin: 0; font-size: 11px; color: #9ca3af; font-family: Arial, sans-serif;">This is an official onboarding communication from Bonthus.</p>
+            <td class="footer-container" bgcolor="#f3f4f6" align="center" style="padding: 22px 32px; background-color: #f3f4f6; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 5px 0; font-size: 12px; color: #374151 !important; font-family: Arial, sans-serif;">Bonthus Human Resources Department | bonthusofficial@gmail.com</p>
+              <p style="margin: 0; font-size: 11px; color: #9ca3af !important; font-family: Arial, sans-serif;">This is an official onboarding communication from Bonthus.</p>
             </td>
           </tr>
 
