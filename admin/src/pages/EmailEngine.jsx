@@ -211,10 +211,10 @@ export default function EmailEngine({ userProfile }) {
       const finalHtml = processTemplateVariables(bodyText);
 
       // EmailJS handles sending through the connected Gmail account
-      // We pass Service ID: service_kbz9fog, Template ID: template_default
+      // We pass Service ID: service_kbz9fog, Template ID: template_3c9lvcn
       const response = await emailjs.send(
         "service_kbz9fog",
-        "template_default",
+        "template_3c9lvcn",
         {
           to_email: selectedUser.email,
           to_name: selectedUser.name,
