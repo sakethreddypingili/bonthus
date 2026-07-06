@@ -326,7 +326,7 @@ function App() {
   }
 
   const role = userProfile?.role;
-  const isEmployee = role === "sales" || role === "optometrist" || role === "employee";
+  const isEmployee = role === "sales" || role === "optometrist" || role === "employee" || role === "warehouse";
   const isAdminOrManager = role === "admin" || role === "manager" || role === "super_admin" || role === "store_manager";
 
   if (!isEmployee && !isAdminOrManager) {

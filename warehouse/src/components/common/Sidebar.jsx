@@ -44,7 +44,7 @@ const navItems = [
 
 export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile, onLogout }) {
   const location = useLocation();
-  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || userProfile?.role === 'warehouse';
   const isEmployee = userProfile?.role === 'employee';
 
   return (
@@ -67,7 +67,14 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
         {!collapsed && (
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 mb-2">Menu</p>
         )}
-        {navItems.filter(item => item.role.includes(userProfile?.role)).map(({ to, label, icon: Icon }) => {
+        {navItems.filter(item => {
+          const userRole = userProfile?.role;
+          const allowedRoles = [...item.role];
+          if (allowedRoles.includes("admin") || allowedRoles.includes("super_admin") || allowedRoles.includes("store_manager")) {
+            allowedRoles.push("warehouse");
+          }
+          return allowedRoles.includes(userRole);
+        }).map(({ to, label, icon: Icon }) => {
           const isActive = to ==="/"
             ? location.pathname ==="/"
             : (to ==="/reminders" 

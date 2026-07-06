@@ -317,10 +317,14 @@ export default function EmailEngine({ userProfile }) {
         })
       : "Not Specified";
 
+    const portalUrl = (selectedUser.role === "warehouse_executive")
+      ? "https://warehouse.bonthus.in/"
+      : "https://warehouse.bonthus.in/"; // Since the user asked specifically to change portal link to this URL in the portal access template, we'll map to this directly.
+
     let result = html
       .replace(/{{NAME}}/g, selectedUser.name)
       .replace(/{{EMAIL}}/g, selectedUser.email)
-      .replace(/{{PORTAL_URL}}/g, window.location.origin)
+      .replace(/{{PORTAL_URL}}/g, portalUrl)
       .replace(/{{DESIGNATION}}/g, selectedUser.designation || "Executive Team Member")
       .replace(/{{ROLE}}/g, selectedUser.role || "sales")
       .replace(/{{EMPLOYEE_ID}}/g, selectedUser.emp_id || selectedUser.id.substring(0, 8).toUpperCase())

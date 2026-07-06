@@ -65,7 +65,7 @@ export default function ProductList({ userProfile }) {
   const [showEditDetailsPopup, setShowEditDetailsPopup] = useState(false);
   const [showConfirmEditDetailsPopup, setShowConfirmEditDetailsPopup] = useState(false);
 
-  const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+  const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || userProfile?.role === 'warehouse';
 
   const fetchInitialData = useCallback(async () => {
     try {

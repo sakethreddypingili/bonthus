@@ -22,7 +22,7 @@ export default function VisualIngest({ userProfile }) {
     stock_quantity: 1, low_stock_threshold: 5
   });
 
-  const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+  const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || userProfile?.role === 'warehouse';
 
   const fetchInitialData = useCallback(async () => {
     try {

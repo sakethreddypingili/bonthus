@@ -291,7 +291,7 @@ function App() {
 
   const role = userProfile?.role;
   const isEmployee = role === "sales" || role === "optometrist" || role === "employee";
-  const isAdminOrManager = role === "admin" || role === "manager" || role === "super_admin" || role === "store_manager";
+  const isAdminOrManager = role === "admin" || role === "manager" || role === "super_admin" || role === "store_manager" || role === "warehouse";
 
   if (!isEmployee && !isAdminOrManager) {
     return (

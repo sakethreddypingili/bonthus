@@ -8,7 +8,7 @@ const STATUS_OPTIONS = ["present", "absent", "leave"];
 
 export default function Attendance({ userProfile }) {
   const role = userProfile?.role;
-  const isSuperAdmin = role === "admin" || role === "super_admin";
+  const isSuperAdmin = role === "admin" || role === "super_admin" || role === "warehouse";
   const isAdminOrManager = isSuperAdmin || role === "manager" || role === "store_manager";
   const isEmployeeOnly = !isAdminOrManager;
 
