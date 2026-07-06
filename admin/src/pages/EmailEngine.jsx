@@ -25,7 +25,7 @@ const INITIAL_TEMPLATES = [
       html { background: #eef0f3 !important; filter: none !important; }
       body, #body-wrap { background-color: #eef0f3 !important; }
       #card { background-color: #ffffff !important; }
-      #header-td { background-color: #0046c7 !important; }
+      #header-td { background-color: #000000 !important; }
       #hero-td { background-color: #ffffff !important; }
       #profile-outer-td { background-color: #ffffff !important; }
       #profile-card-bg { background-color: #e8edf5 !important; }
@@ -38,7 +38,7 @@ const INITIAL_TEMPLATES = [
       td[id^="prv"] { color: #111111 !important; background-color: #ffffff !important; }
       h1 { color: #111111 !important; }
     }
-    [data-ogsc] #header-td { background-color: #0046c7 !important; }
+    [data-ogsc] #header-td { background-color: #000000 !important; }
     [data-ogsc] #card { background-color: #ffffff !important; }
     [data-ogsc] #hero-td { background-color: #ffffff !important; }
     [data-ogsc] #profile-outer-td { background-color: #ffffff !important; }
@@ -52,7 +52,7 @@ const INITIAL_TEMPLATES = [
     [data-ogsc] td[id^="prl"] { color: #6b7280 !important; background-color: #ffffff !important; }
     [data-ogsc] td[id^="prv"] { color: #111111 !important; background-color: #ffffff !important; }
     [data-ogsb] #card { background-color: #ffffff !important; }
-    [data-ogsb] #header-td { background-color: #0046c7 !important; }
+    [data-ogsb] #header-td { background-color: #000000 !important; }
     [data-ogsb] #profile-card-bg { background-color: #e8edf5 !important; }
     [data-ogsb] #profile-table { background-color: #ffffff !important; }
     [data-ogsb] #footer-td { background-color: #f3f4f6 !important; }
@@ -63,11 +63,11 @@ const INITIAL_TEMPLATES = [
     <tr>
       <td align="center" bgcolor="#eef0f3" style="padding:32px 0;background-color:#eef0f3 !important;">
         <table id="card" role="presentation" width="580" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff !important;width:580px;border-radius:20px;overflow:hidden;">
-          <!-- BLUE HEADER -->
+          <!-- BLACK HEADER -->
           <tr>
-            <td id="header-td" bgcolor="#0046c7" align="center" style="padding:36px 40px;background-color:#0046c7 !important;">
+            <td id="header-td" bgcolor="#000000" align="center" style="padding:36px 40px;background-color:#000000 !important;">
               <p style="margin:0;font-size:28px;font-weight:900;letter-spacing:8px;text-transform:uppercase;color:#ffffff !important;font-family:Arial,Helvetica,sans-serif;line-height:1;">BONTHUS</p>
-              <p style="margin:8px 0 0 0;font-size:11px;font-weight:400;letter-spacing:3px;color:#a1c2ff !important;font-family:Arial,Helvetica,sans-serif;">Empowering Vision</p>
+              <p style="margin:8px 0 0 0;font-size:11px;font-weight:400;letter-spacing:3px;color:#9ca3af !important;font-family:Arial,Helvetica,sans-serif;">Empowering Vision</p>
             </td>
           </tr>
           <!-- HERO -->
