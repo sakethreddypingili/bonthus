@@ -14,133 +14,107 @@ const INITIAL_TEMPLATES = [
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="UTF-8">
-  <meta name="color-scheme" content="light">
-  <meta name="supported-color-schemes" content="light">
+  <meta name="viewport" content="width=600">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
   <style>
-    :root {
-      color-scheme: light only;
-      supported-color-schemes: light;
-    }
-    body, table, td, p, h1, h2, h3 {
-      color: #111111 !important;
-      font-family: Arial, sans-serif !important;
-    }
-    
-    /* Strict Light Mode Enforcement overrides for dark mode devices */
+    :root { color-scheme: light only !important; }
+    u + #body-wrap { background-color: #eef0f3 !important; }
+    html, body, #body-wrap { background-color: #eef0f3 !important; color: #111111 !important; }
     @media (prefers-color-scheme: dark) {
-      body, table.outer-wrapper {
-        background-color: #eef0f3 !important;
-      }
-      table.email-card {
-        background-color: #ffffff !important;
-      }
-      h1, h2, h3, p, td {
-        color: #111111 !important;
-      }
-      td.profile-card-container {
-        background-color: #e8edf5 !important;
-      }
-      table.profile-table {
-        background-color: #ffffff !important;
-      }
-      table.profile-table td {
-        color: #111111 !important;
-        border-color: #e5e7eb !important;
-      }
-      div.step-num {
-        background-color: #ffffff !important;
-        color: #374151 !important;
-        border-color: #9ca3af !important;
-      }
-      td.footer-container {
-        background-color: #f3f4f6 !important;
-        border-top-color: #e5e7eb !important;
-      }
-      td.footer-container p {
-        color: #374151 !important;
-      }
+      html { background: #eef0f3 !important; filter: none !important; }
+      body, #body-wrap { background-color: #eef0f3 !important; }
+      #card { background-color: #ffffff !important; }
+      #header-td { background-color: #0046c7 !important; }
+      #hero-td { background-color: #ffffff !important; }
+      #profile-outer-td { background-color: #ffffff !important; }
+      #profile-card-bg { background-color: #e8edf5 !important; }
+      #profile-title-td { background-color: #e8edf5 !important; }
+      #profile-table-td { background-color: #e8edf5 !important; }
+      #profile-table { background-color: #ffffff !important; }
+      #steps-td { background-color: #ffffff !important; }
+      #footer-td { background-color: #f3f4f6 !important; }
+      td[id^="prl"] { color: #6b7280 !important; background-color: #ffffff !important; }
+      td[id^="prv"] { color: #111111 !important; background-color: #ffffff !important; }
+      h1 { color: #111111 !important; }
     }
-
-    /* Gmail App Dark Mode Fixes */
-    [data-ogsc] body, [data-ogsc] table.outer-wrapper { background-color: #eef0f3 !important; }
-    [data-ogsc] table.email-card { background-color: #ffffff !important; }
-    [data-ogsc] h1, [data-ogsc] p, [data-ogsc] td { color: #111111 !important; }
-    [data-ogsc] td.profile-card-container { background-color: #e8edf5 !important; }
-    [data-ogsc] table.profile-table { background-color: #ffffff !important; }
-    [data-ogsc] div.step-num { background-color: #ffffff !important; color: #374151 !important; }
-    [data-ogsc] td.footer-container { background-color: #f3f4f6 !important; }
+    [data-ogsc] #header-td { background-color: #0046c7 !important; }
+    [data-ogsc] #card { background-color: #ffffff !important; }
+    [data-ogsc] #hero-td { background-color: #ffffff !important; }
+    [data-ogsc] #profile-outer-td { background-color: #ffffff !important; }
+    [data-ogsc] #profile-card-bg { background-color: #e8edf5 !important; }
+    [data-ogsc] #profile-title-td { background-color: #e8edf5 !important; }
+    [data-ogsc] #profile-table-td { background-color: #e8edf5 !important; }
+    [data-ogsc] #profile-table { background-color: #ffffff !important; }
+    [data-ogsc] #steps-td { background-color: #ffffff !important; }
+    [data-ogsc] #footer-td { background-color: #f3f4f6 !important; }
+    [data-ogsc] h1 { color: #111111 !important; }
+    [data-ogsc] td[id^="prl"] { color: #6b7280 !important; background-color: #ffffff !important; }
+    [data-ogsc] td[id^="prv"] { color: #111111 !important; background-color: #ffffff !important; }
+    [data-ogsb] #card { background-color: #ffffff !important; }
+    [data-ogsb] #header-td { background-color: #0046c7 !important; }
+    [data-ogsb] #profile-card-bg { background-color: #e8edf5 !important; }
+    [data-ogsb] #profile-table { background-color: #ffffff !important; }
+    [data-ogsb] #footer-td { background-color: #f3f4f6 !important; }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #eef0f3; min-width: 100%;" bgcolor="#eef0f3">
-
-  <!-- OUTER WRAPPER TABLE - fixed 600px, never changes -->
-  <table class="outer-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef0f3" style="min-width: 100%; width: 100%;">
+<body id="body-wrap" style="margin:0;padding:0;background-color:#eef0f3 !important;" bgcolor="#eef0f3">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef0f3" style="background-color:#eef0f3 !important;width:100%;">
     <tr>
-      <td align="center" style="padding: 32px 0;">
-
-        <!-- EMAIL CARD - fixed 580px width -->
-        <table class="email-card" width="580" cellpadding="0" cellspacing="0" border="0" style="border-radius: 20px; overflow: hidden; background-color: #ffffff; width: 580px; min-width: 580px;" bgcolor="#ffffff">
-
-          <!-- ===== BLUE HEADER ===== -->
+      <td align="center" bgcolor="#eef0f3" style="padding:32px 0;background-color:#eef0f3 !important;">
+        <table id="card" role="presentation" width="580" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff !important;width:580px;border-radius:20px;overflow:hidden;">
+          <!-- BLUE HEADER -->
           <tr>
-            <td bgcolor="#0046c7" align="center" style="padding: 36px 40px; background-color: #0046c7 !important;">
-              <p style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: 8px; text-transform: uppercase; color: #ffffff !important; font-family: Arial, sans-serif; line-height: 1;">BONTHUS</p>
-              <p style="margin: 8px 0 0 0; font-size: 11px; font-weight: 400; letter-spacing: 3px; color: #a1c2ff !important; font-family: Arial, sans-serif;">Empowering Vision</p>
+            <td id="header-td" bgcolor="#0046c7" align="center" style="padding:36px 40px;background-color:#0046c7 !important;">
+              <p style="margin:0;font-size:28px;font-weight:900;letter-spacing:8px;text-transform:uppercase;color:#ffffff !important;font-family:Arial,Helvetica,sans-serif;line-height:1;">BONTHUS</p>
+              <p style="margin:8px 0 0 0;font-size:11px;font-weight:400;letter-spacing:3px;color:#a1c2ff !important;font-family:Arial,Helvetica,sans-serif;">Empowering Vision</p>
             </td>
           </tr>
-
-          <!-- ===== WHITE HERO ===== -->
+          <!-- HERO -->
           <tr>
-            <td bgcolor="#ffffff" align="center" style="padding: 44px 40px 20px; background-color: #ffffff;">
-
-              <!-- Heading -->
-              <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: 900; color: #111111 !important; line-height: 1.25; letter-spacing: -0.5px; font-family: Arial, sans-serif;">Welcome to the<br>Family, {{NAME}}!</h1>
-              <p style="margin: 0 0 32px 0; font-size: 14px; color: #6b7280 !important; font-family: Arial, sans-serif; line-height: 1.5;">We're excited to have you on board.</p>
-
-              <!-- HANDSHAKE ICON IMAGE -->
-              <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin-bottom: 32px;">
+            <td id="hero-td" bgcolor="#ffffff" align="center" style="padding:44px 40px 20px;background-color:#ffffff !important;">
+              <h1 style="margin:0 0 10px 0;font-size:28px;font-weight:900;color:#111111 !important;line-height:1.25;letter-spacing:-0.5px;font-family:Arial,Helvetica,sans-serif;">Welcome to the<br>Family, {{NAME}}!</h1>
+              <p style="margin:0 0 32px 0;font-size:14px;color:#6b7280 !important;font-family:Arial,Helvetica,sans-serif;line-height:1.5;">We&#39;re excited to have you on board.</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" bgcolor="#ffffff" style="background-color:#ffffff !important;margin-bottom:32px;">
                 <tr>
-                  <td align="center">
-                    <img src="https://raw.githubusercontent.com/sakethreddypingili/bonthus/main/warehouse/public/assets/images/icon.png" width="130" height="90" alt="Handshake Icon" style="display: block; border: 0; width: 130px; height: 90px;" />
+                  <td bgcolor="#ffffff" align="center" style="background-color:#ffffff !important;padding:8px;border-radius:8px;">
+                    <img src="https://raw.githubusercontent.com/sakethreddypingili/bonthus/main/warehouse/public/assets/images/icon.png" width="130" height="90" alt="Welcome Handshake" style="display:block;border:0;width:130px;height:90px;" />
                   </td>
                 </tr>
               </table>
-
             </td>
           </tr>
-
-          <!-- ===== PROFILE CARD ===== -->
+          <!-- PROFILE CARD -->
           <tr>
-            <td bgcolor="#ffffff" style="padding: 0 40px 28px; background-color: #ffffff;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #e8edf5; border-radius: 14px;" bgcolor="#e8edf5">
+            <td id="profile-outer-td" bgcolor="#ffffff" style="padding:0 40px 28px;background-color:#ffffff !important;">
+              <table id="profile-card-bg" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#e8edf5" style="background-color:#e8edf5 !important;border-radius:14px;">
                 <tr>
-                  <td class="profile-card-container" align="center" style="padding: 18px 20px 14px;">
-                    <p style="margin: 0; font-size: 11px; font-weight: 800; color: #374151 !important; text-transform: uppercase; letter-spacing: 2px; font-family: Arial, sans-serif;">YOUR PROFILE</p>
+                  <td id="profile-title-td" bgcolor="#e8edf5" align="center" style="padding:18px 20px 14px;background-color:#e8edf5 !important;">
+                    <p style="margin:0;font-size:11px;font-weight:800;color:#374151 !important;text-transform:uppercase;letter-spacing:2px;font-family:Arial,Helvetica,sans-serif;">YOUR PROFILE</p>
                   </td>
                 </tr>
                 <tr>
-                  <td class="profile-card-container" style="padding: 0 16px 16px;">
-                    <!-- Profile rows table -->
-                    <table class="profile-table" width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse: collapse; background-color: #ffffff; border-color: #e5e7eb; border-radius: 8px;" bgcolor="#ffffff">
+                  <td id="profile-table-td" bgcolor="#e8edf5" style="padding:0 16px 16px;background-color:#e8edf5 !important;">
+                    <table id="profile-table" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff !important;border-collapse:collapse;border:1px solid #e5e7eb;">
                       <tr>
-                        <td width="50%" style="padding: 11px 14px; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Employee ID</td>
-                        <td width="50%" style="padding: 11px 14px; font-size: 13px; color: #111111 !important; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{EMPLOYEE_ID}}</td>
+                        <td id="prl1" bgcolor="#ffffff" width="50%" style="padding:11px 14px;font-size:13px;color:#6b7280 !important;font-family:Arial,Helvetica,sans-serif;border:1px solid #e5e7eb;background-color:#ffffff !important;">Employee ID</td>
+                        <td id="prv1" bgcolor="#ffffff" width="50%" style="padding:11px 14px;font-size:13px;color:#111111 !important;font-weight:700;font-family:Arial,Helvetica,sans-serif;border:1px solid #e5e7eb;background-color:#ffffff !important;">{{EMPLOYEE_ID}}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Designation</td>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #111111 !important; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{DESIGNATION}}</td>
+                        <td id="prl2" bgcolor="#ffffff" style="padding:11px 14px;font-size:13px;color:#6b7280 !important;font-family:Arial,Helvetica,sans-serif;border:1px solid #e5e7eb;background-color:#ffffff !important;">Designation</td>
+                        <td id="prv2" bgcolor="#ffffff" style="padding:11px 14px;font-size:13px;color:#111111 !important;font-weight:700;font-family:Arial,Helvetica,sans-serif;border:1px solid #e5e7eb;background-color:#ffffff !important;">{{DESIGNATION}}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Department</td>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #111111 !important; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{DOMAIN}}</td>
+                        <td id="prl3" bgcolor="#ffffff" style="padding:11px 14px;font-size:13px;color:#6b7280 !important;font-family:Arial,Helvetica,sans-serif;border:1px solid #e5e7eb;background-color:#ffffff !important;">Department</td>
+                        <td id="prv3" bgcolor="#ffffff" style="padding:11px 14px;font-size:13px;color:#111111 !important;font-weight:700;font-family:Arial,Helvetica,sans-serif;border:1px solid #e5e7eb;background-color:#ffffff !important;">{{DOMAIN}}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Phone</td>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #111111 !important; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">+91 {{PHONE}}</td>
+                        <td id="prl4" bgcolor="#ffffff" style="padding:11px 14px;font-size:13px;color:#6b7280 !important;font-family:Arial,Helvetica,sans-serif;border:1px solid #e5e7eb;background-color:#ffffff !important;">Phone</td>
+                        <td id="prv4" bgcolor="#ffffff" style="padding:11px 14px;font-size:13px;color:#111111 !important;font-weight:700;font-family:Arial,Helvetica,sans-serif;border:1px solid #e5e7eb;background-color:#ffffff !important;">+91 {{PHONE}}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">Joined On</td>
-                        <td style="padding: 11px 14px; font-size: 13px; color: #111111 !important; font-weight: 700; font-family: Arial, sans-serif; border: 1px solid #e5e7eb;">{{JOIN_DATE}}</td>
+                        <td id="prl5" bgcolor="#ffffff" style="padding:11px 14px;font-size:13px;color:#6b7280 !important;font-family:Arial,Helvetica,sans-serif;border:1px solid #e5e7eb;background-color:#ffffff !important;">Joined On</td>
+                        <td id="prv5" bgcolor="#ffffff" style="padding:11px 14px;font-size:13px;color:#111111 !important;font-weight:700;font-family:Arial,Helvetica,sans-serif;border:1px solid #e5e7eb;background-color:#ffffff !important;">{{JOIN_DATE}}</td>
                       </tr>
                     </table>
                   </td>
@@ -148,87 +122,52 @@ const INITIAL_TEMPLATES = [
               </table>
             </td>
           </tr>
-
-          <!-- ===== WHAT'S NEXT ===== -->
+          <!-- WHAT'S NEXT -->
           <tr>
-            <td bgcolor="#ffffff" align="center" style="padding: 0 40px 40px; background-color: #ffffff;">
-              <p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280 !important; font-family: Arial, sans-serif;">What's Next</p>
-              <p style="margin: 0 0 24px 0; font-size: 20px; font-weight: 900; color: #111111 !important; font-family: Arial, sans-serif; letter-spacing: -0.5px;">Your First Steps</p>
-
-              <!-- Steps table with connecting lines -->
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <td id="steps-td" bgcolor="#ffffff" align="center" style="padding:0 40px 40px;background-color:#ffffff !important;">
+              <p style="margin:0 0 4px 0;font-size:13px;color:#6b7280 !important;font-family:Arial,Helvetica,sans-serif;">What&#39;s Next</p>
+              <p style="margin:0 0 24px 0;font-size:20px;font-weight:900;color:#111111 !important;font-family:Arial,Helvetica,sans-serif;letter-spacing:-0.5px;">Your First Steps</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <!-- Step 1 -->
-                  <td width="33%" align="center" valign="top">
-                    <table cellpadding="0" cellspacing="0" border="0" align="center">
-                      <tr>
-                        <td align="center">
-                          <div class="step-num" style="display: inline-block; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; line-height: 34px; font-size: 13px; font-weight: 700; color: #374151 !important; font-family: Arial, sans-serif; background-color: #ffffff;">1</div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563 !important; font-family: Arial, sans-serif; line-height: 1.5;">Set up your<br>password</td>
-                      </tr>
+                  <td width="33%" align="center" valign="top" bgcolor="#ffffff" style="background-color:#ffffff !important;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff !important;">
+                      <tr><td align="center" bgcolor="#ffffff" width="34" height="34" style="width:34px;height:34px;border-radius:50%;border:1.5px solid #9ca3af;text-align:center;vertical-align:middle;font-size:13px;font-weight:700;color:#374151 !important;font-family:Arial,Helvetica,sans-serif;background-color:#ffffff !important;line-height:34px;">1</td></tr>
+                      <tr><td bgcolor="#ffffff" align="center" style="padding-top:8px;font-size:12px;color:#4b5563 !important;font-family:Arial,Helvetica,sans-serif;line-height:1.5;background-color:#ffffff !important;">Set up your<br>password</td></tr>
                     </table>
                   </td>
-                  <!-- Line between 1 and 2 -->
-                  <td valign="top" style="padding-top: 16px;">
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                      <tr><td height="0" style="border-top: 2px dashed #9ca3af; font-size: 0; line-height: 0;">&nbsp;</td></tr>
+                  <td valign="top" bgcolor="#ffffff" style="padding-top:16px;background-color:#ffffff !important;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="0" style="border-top:2px dashed #9ca3af;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+                  </td>
+                  <td width="33%" align="center" valign="top" bgcolor="#ffffff" style="background-color:#ffffff !important;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff !important;">
+                      <tr><td align="center" bgcolor="#ffffff" width="34" height="34" style="width:34px;height:34px;border-radius:50%;border:1.5px solid #9ca3af;text-align:center;vertical-align:middle;font-size:13px;font-weight:700;color:#374151 !important;font-family:Arial,Helvetica,sans-serif;background-color:#ffffff !important;line-height:34px;">2</td></tr>
+                      <tr><td bgcolor="#ffffff" align="center" style="padding-top:8px;font-size:12px;color:#4b5563 !important;font-family:Arial,Helvetica,sans-serif;line-height:1.5;background-color:#ffffff !important;">Explore the<br>portal</td></tr>
                     </table>
                   </td>
-                  <!-- Step 2 -->
-                  <td width="33%" align="center" valign="top">
-                    <table cellpadding="0" cellspacing="0" border="0" align="center">
-                      <tr>
-                        <td align="center">
-                          <div class="step-num" style="display: inline-block; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; line-height: 34px; font-size: 13px; font-weight: 700; color: #374151 !important; font-family: Arial, sans-serif; background-color: #ffffff;">2</div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563 !important; font-family: Arial, sans-serif; line-height: 1.5;">Explore the<br>portal</td>
-                      </tr>
-                    </table>
+                  <td valign="top" bgcolor="#ffffff" style="padding-top:16px;background-color:#ffffff !important;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="0" style="border-top:2px dashed #9ca3af;font-size:0;line-height:0;">&nbsp;</td></tr></table>
                   </td>
-                  <!-- Line between 2 and 3 -->
-                  <td valign="top" style="padding-top: 16px;">
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                      <tr><td height="0" style="border-top: 2px dashed #9ca3af; font-size: 0; line-height: 0;">&nbsp;</td></tr>
-                    </table>
-                  </td>
-                  <!-- Step 3 -->
-                  <td width="33%" align="center" valign="top">
-                    <table cellpadding="0" cellspacing="0" border="0" align="center">
-                      <tr>
-                        <td align="center">
-                          <div class="step-num" style="display: inline-block; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #9ca3af; text-align: center; line-height: 34px; font-size: 13px; font-weight: 700; color: #374151 !important; font-family: Arial, sans-serif; background-color: #ffffff;">3</div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td align="center" style="padding-top: 8px; font-size: 12px; color: #4b5563 !important; font-family: Arial, sans-serif; line-height: 1.5;">Connect with<br>your team</td>
-                      </tr>
+                  <td width="33%" align="center" valign="top" bgcolor="#ffffff" style="background-color:#ffffff !important;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff !important;">
+                      <tr><td align="center" bgcolor="#ffffff" width="34" height="34" style="width:34px;height:34px;border-radius:50%;border:1.5px solid #9ca3af;text-align:center;vertical-align:middle;font-size:13px;font-weight:700;color:#374151 !important;font-family:Arial,Helvetica,sans-serif;background-color:#ffffff !important;line-height:34px;">3</td></tr>
+                      <tr><td bgcolor="#ffffff" align="center" style="padding-top:8px;font-size:12px;color:#4b5563 !important;font-family:Arial,Helvetica,sans-serif;line-height:1.5;background-color:#ffffff !important;">Connect with<br>your team</td></tr>
                     </table>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
-
-          <!-- ===== FOOTER ===== -->
+          <!-- FOOTER -->
           <tr>
-            <td class="footer-container" bgcolor="#f3f4f6" align="center" style="padding: 22px 32px; background-color: #f3f4f6; border-top: 1px solid #e5e7eb;">
-              <p style="margin: 0 0 5px 0; font-size: 12px; color: #374151 !important; font-family: Arial, sans-serif;">Bonthus Human Resources Department | bonthusofficial@gmail.com</p>
-              <p style="margin: 0; font-size: 11px; color: #9ca3af !important; font-family: Arial, sans-serif;">This is an official onboarding communication from Bonthus.</p>
+            <td id="footer-td" bgcolor="#f3f4f6" align="center" style="padding:22px 32px;background-color:#f3f4f6 !important;border-top:1px solid #e5e7eb;">
+              <p style="margin:0 0 5px 0;font-size:12px;color:#374151 !important;font-weight:500;font-family:Arial,Helvetica,sans-serif;">Bonthus Human Resources Department | bonthusofficial@gmail.com</p>
+              <p style="margin:0;font-size:11px;color:#9ca3af !important;font-family:Arial,Helvetica,sans-serif;">This is an official onboarding communication from Bonthus.</p>
             </td>
           </tr>
-
         </table>
-        <!-- END EMAIL CARD -->
-
       </td>
     </tr>
   </table>
-
 </body>
 </html>`
   },
