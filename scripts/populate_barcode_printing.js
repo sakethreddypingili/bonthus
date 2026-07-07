@@ -55,6 +55,15 @@ async function main() {
     return current.name;
   }
 
+  function getCleanBrand(brand) {
+    if (!brand) return null;
+    const trimmed = brand.trim();
+    if (trimmed.toLowerCase() === "jas harlon") {
+      return "Jas Harlan";
+    }
+    return trimmed;
+  }
+
   let insertCount = 0;
 
   // 1. Process pending products
@@ -107,7 +116,7 @@ async function main() {
     `, [
       barcodeRow.barcode || null,
       model_no || null,
-      row.brand || null,
+      getCleanBrand(row.brand),
       rootCategoryName || null,
       row.base_price ? Number(row.base_price) : null,
       row.sku || null,
@@ -170,7 +179,7 @@ async function main() {
     `, [
       barcodeRow.barcode || null,
       model_no || null,
-      row.brand || null,
+      getCleanBrand(row.brand),
       rootCategoryName || null,
       row.base_price ? Number(row.base_price) : null,
       row.sku || null,

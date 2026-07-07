@@ -18,40 +18,40 @@ import PrintQueue from "../components/printing/PrintQueue";
 const TSC_USB_VID = 0x0FE6;
 
 const DEFAULT_SETTINGS = {
-  widthMm:       101.6,   // 101.6 mm full physical roll width
-  heightMm:      15,      // 15 mm height
-  gapMm:         20,      // 20 mm sensor gap (tail)
-  direction:     1,       // 180 deg rotated mapping coordinates for standard feed orientation
-  categoryX:     15,
-  categoryY1:    8,
-  categoryY2:    42,
-  categoryY3:    70,
-  categoryY4:    98,
-  categoryFont:  "1",
-  barcodeX:      265,
-  barcodeY:      45,
+  widthMm: 101.6,   // 101.6 mm full physical roll width
+  heightMm: 15,      // 15 mm height
+  gapMm: 20,      // 20 mm sensor gap (tail)
+  direction: 1,       // 180 deg rotated mapping coordinates for standard feed orientation
+  categoryX: 15,
+  categoryY1: 8,
+  categoryY2: 42,
+  categoryY3: 70,
+  categoryY4: 98,
+  categoryFont: "1",
+  barcodeX: 265,
+  barcodeY: 45,
   barcodeHeight: 40,
   barcodeNarrow: 1,
-  barcodeTextY:  95,
+  barcodeTextY: 95,
 };
 
 export default function BarcodePrinter({ userProfile }) {
   // -- Core state ------------------------------------------------------------ 
-  const [barcodeValue, setBarcodeValue]   = useState("1414199999");
-  const [brandValue, setBrandValue]       = useState("Ray-Ban");
-  const [skuValue, setSkuValue]           = useState("RB3025");
-  const [modelValue, setModelValue]       = useState(""); // Model No text input
-  const [categoryName, setCategoryName]   = useState("Eyeglasses");
-  const [priceValue, setPriceValue]       = useState("1200");
-  const [sizeA, setSizeA]                 = useState("52");
-  const [sizeB, setSizeB]                 = useState("45");
-  const [dbl, setDbl]                     = useState("18");
-  const [templeLength, setTempleLength]   = useState("140");
+  const [barcodeValue, setBarcodeValue] = useState("1414199999");
+  const [brandValue, setBrandValue] = useState("Ray-Ban");
+  const [skuValue, setSkuValue] = useState("RB3025");
+  const [modelValue, setModelValue] = useState(""); // Model No text input
+  const [categoryName, setCategoryName] = useState("Eyeglasses");
+  const [priceValue, setPriceValue] = useState("1200");
+  const [sizeA, setSizeA] = useState("52");
+  const [sizeB, setSizeB] = useState("45");
+  const [dbl, setDbl] = useState("18");
+  const [templeLength, setTempleLength] = useState("140");
   const [printQuantity, setPrintQuantity] = useState(1);
   const [printingStatus, setPrintingStatus] = useState("IDLE");
 
   // -- Label / TSPL settings --------------------------------------------------
-  const [settings, setSettings]       = useState(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const setSetting = (key, val) => setSettings((s) => ({ ...s, [key]: val }));
 
@@ -85,7 +85,7 @@ export default function BarcodePrinter({ userProfile }) {
 
   // -- USB state --------------------------------------------------------------
   const [usbStatus, setUsbStatus] = useState("DISCONNECTED");
-  const usbDeviceRef   = useRef(null);
+  const usbDeviceRef = useRef(null);
   const usbEndpointRef = useRef(null);
   const isUsbSupported = "usb" in navigator;
 
@@ -119,7 +119,7 @@ export default function BarcodePrinter({ userProfile }) {
           if (prod.sku) setSkuValue(prod.sku);
           if (prod.category?.name) setCategoryName(prod.category.name);
           if (prod.base_price) setPriceValue(prod.base_price.toString());
-          
+
           try {
             const descObj = JSON.parse(prod.description);
             if (descObj) {
@@ -129,7 +129,7 @@ export default function BarcodePrinter({ userProfile }) {
               if (descObj.dbl) setDbl(descObj.dbl.toString());
               if (descObj.templeLength) setTempleLength(descObj.templeLength.toString());
             }
-          } catch (e) {}
+          } catch (e) { }
 
           addLog("INFO", `Resolved "${barcodeValue}" -> "${prod.category?.name || "Uncategorized"}" (${prod.brand || "No Brand"})`);
         }
@@ -192,7 +192,7 @@ export default function BarcodePrinter({ userProfile }) {
       `REFERENCE 0,0`,
 
       // ── LEFT FLAP (Shifted down by 10% for vertical centering) ────────
-      `TEXT 110,27,"2",0,1,1,"${brand || ""}"`,
+      `TEXT 110,27,"3",0,1,1,"${brand || ""}"`,
       `TEXT 80,67,"1",0,1,1,"${truncatedCategory}"`,
       `TEXT 180,67,"1",0,1,1,"SKU:${sku || ""}"`,
       `TEXT 80,102,"1",0,1,1,"Rs.${price || ""}"`,
@@ -212,7 +212,7 @@ export default function BarcodePrinter({ userProfile }) {
       // Barcode decreased in height to 32, shifted right to X=350, and down by 5% to Y=62
       `BARCODE 350,62,"128",32,0,0,1,1,"${val}"`,
       // Barcode number centered under barcode at Y=100
-      `TEXT 415,100,"1",0,1,1,2,"${val}"`,
+      `TEXT 350,100,"1",0,1,1,"${val}"`,
 
       // ── TAIL ZONE (X = 440 to 812) ────────
       // Untouched and blank
@@ -260,7 +260,7 @@ export default function BarcodePrinter({ userProfile }) {
       } else { setUsbStatus("ERROR"); addLog("ERROR", `Open failed: ${err.message}`); }
       return;
     }
-    if (device.configuration === null) await device.selectConfiguration(1).catch(() => {});
+    if (device.configuration === null) await device.selectConfiguration(1).catch(() => { });
     let targetIface = null, bulkOut = null;
     for (const iface of device.configuration.interfaces) {
       for (const alt of iface.alternates) {
@@ -271,19 +271,19 @@ export default function BarcodePrinter({ userProfile }) {
     }
     if (bulkOut === null) { targetIface = 0; bulkOut = 1; addLog("WARNING", "Defaulting to interface 0, endpoint 1."); }
     try { await device.claimInterface(targetIface); }
-    catch (err) { setUsbStatus("ERROR"); addLog("ERROR", `Claim interface failed: ${err.message}`); await device.close().catch(() => {}); return; }
+    catch (err) { setUsbStatus("ERROR"); addLog("ERROR", `Claim interface failed: ${err.message}`); await device.close().catch(() => { }); return; }
     usbDeviceRef.current = device; usbEndpointRef.current = bulkOut;
     setUsbStatus("CONNECTED");
     addLog("SUCCESS", `USB connected - interface ${targetIface}, endpoint #${bulkOut}.`);
   };
 
   const disconnectUSB = async () => {
-    try { if (usbDeviceRef.current) await usbDeviceRef.current.close(); } catch (_) {}
+    try { if (usbDeviceRef.current) await usbDeviceRef.current.close(); } catch (_) { }
     usbDeviceRef.current = null; usbEndpointRef.current = null;
     setUsbStatus("DISCONNECTED"); addLog("INFO", "USB disconnected.");
   };
 
-  useEffect(() => () => { if (usbDeviceRef.current) usbDeviceRef.current.close().catch(() => {}); }, []);
+  useEffect(() => () => { if (usbDeviceRef.current) usbDeviceRef.current.close().catch(() => { }); }, []);
 
   // -- Print via USB ---------------------------------------------------------- 
   const handleUsbPrint = async () => {
@@ -613,11 +613,10 @@ export default function BarcodePrinter({ userProfile }) {
               <button
                 onClick={handleAgentPrint}
                 disabled={agentStatus !== "ONLINE" || printingStatus.includes("SENDING")}
-                className={`w-full flex items-center justify-center gap-2 border font-bold py-2.5 rounded-xl text-xs transition-all active:scale-95 ${
-                  agentStatus === "ONLINE"
-                    ? "bg-white hover:bg-gray-50 border-gray-200 text-gray-700"
-                    : "bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed"
-                }`}
+                className={`w-full flex items-center justify-center gap-2 border font-bold py-2.5 rounded-xl text-xs transition-all active:scale-95 ${agentStatus === "ONLINE"
+                  ? "bg-white hover:bg-gray-50 border-gray-200 text-gray-700"
+                  : "bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed"
+                  }`}
               >
                 <Settings className="w-3.5 h-3.5" />
                 {agentStatus === "ONLINE"
@@ -844,13 +843,12 @@ export default function BarcodePrinter({ userProfile }) {
               {logs.map((log, i) => (
                 <div key={i} className="flex items-start gap-2 leading-relaxed">
                   <span className="text-neutral-500 flex-shrink-0">[{log.ts}]</span>
-                  <span className={`flex-shrink-0 font-bold ${
-                    log.status === "INFO"       ? "text-blue-400"   :
-                    log.status === "PENDING"    ? "text-amber-400"  :
-                    log.status === "SUCCESS"    ? "text-green-400"  :
-                    log.status === "WARNING"    ? "text-yellow-400" :
-                    log.status === "DIAGNOSTIC" ? "text-orange-400" : "text-red-400"
-                  }`}>{log.status}:</span>
+                  <span className={`flex-shrink-0 font-bold ${log.status === "INFO" ? "text-blue-400" :
+                    log.status === "PENDING" ? "text-amber-400" :
+                      log.status === "SUCCESS" ? "text-green-400" :
+                        log.status === "WARNING" ? "text-yellow-400" :
+                          log.status === "DIAGNOSTIC" ? "text-orange-400" : "text-red-400"
+                    }`}>{log.status}:</span>
                   <span className="text-neutral-300">{log.msg}</span>
                 </div>
               ))}
