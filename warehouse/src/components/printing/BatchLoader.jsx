@@ -120,7 +120,7 @@ export default function BatchLoader({ isOpen, onClose, categoryPaths, onLoadBatc
   });
 
   return (
-    <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col overflow-y-auto animate-in fade-in duration-200">
       {/* Full Screen Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
@@ -143,7 +143,7 @@ export default function BatchLoader({ isOpen, onClose, categoryPaths, onLoadBatc
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 flex flex-col space-y-6 overflow-hidden">
+      <main className="max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-6">
         {/* Filters Panel */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 flex flex-col sm:flex-row gap-4 items-center">
           {/* Search bar */}
@@ -203,7 +203,7 @@ export default function BatchLoader({ isOpen, onClose, categoryPaths, onLoadBatc
         </div>
 
         {/* Content List Area */}
-        <div className="flex-1 overflow-y-auto bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 min-h-0">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
           {loading ? (
             <div className="py-24 flex flex-col items-center justify-center text-gray-400 gap-3">
               <RefreshCw className="w-8 h-8 animate-spin text-black" />
