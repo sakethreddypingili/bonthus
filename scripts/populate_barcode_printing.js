@@ -52,7 +52,7 @@ async function main() {
       if (!parent) break;
       current = parent;
     }
-    return current.name;
+    return current.name === "frames" ? "Frames" : current.name;
   }
 
   function getCleanBrand(brand) {
