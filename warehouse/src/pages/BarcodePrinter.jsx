@@ -192,7 +192,7 @@ export default function BarcodePrinter({ userProfile }) {
       `REFERENCE 0,0`,
 
       // ── LEFT FLAP (Shifted down by 10% for vertical centering) ────────
-      `TEXT 110,27,"3",0,1,1,"${brand || ""}"`,
+      `TEXT 110,27,"${(brand || '').toLowerCase().trim() === 'bonthus' ? '2' : '3'}",0,1,1,"${brand || ""}"`,
       `TEXT 80,67,"1",0,1,1,"${truncatedCategory}"`,
       `TEXT 180,67,"1",0,1,1,"SKU:${sku || ""}"`,
       `TEXT 80,102,"1",0,1,1,"Rs.${price || ""}"`,
