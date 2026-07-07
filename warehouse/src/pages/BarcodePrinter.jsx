@@ -85,8 +85,27 @@ export default function BarcodePrinter({ userProfile }) {
   // -- USB state --------------------------------------------------------------
   const [usbStatus, setUsbStatus] = useState("DISCONNECTED");
   const usbDeviceRef = useRef(null);
+  const usbInterfaceRef = useRef(null);
   const usbEndpointRef = useRef(null);
   const isUsbSupported = "usb" in navigator;
+
+  // Listen to physical USB connect/disconnect events
+  useEffect(() => {
+    if (!isUsbSupported) return;
+    const handleDisconnect = (e) => {
+      if (e.device === usbDeviceRef.current) {
+        addLog("ERROR", "USB printer physically disconnected.");
+        setUsbStatus("DISCONNECTED");
+        usbDeviceRef.current = null;
+        usbEndpointRef.current = null;
+        usbInterfaceRef.current = null;
+      }
+    };
+    navigator.usb.addEventListener("disconnect", handleDisconnect);
+    return () => {
+      navigator.usb.removeEventListener("disconnect", handleDisconnect);
+    };
+  }, [isUsbSupported]);
 
   // -- Local agent ping ------------------------------------------------------ 
   const [agentStatus, setAgentStatus] = useState("UNKNOWN");
@@ -271,14 +290,39 @@ export default function BarcodePrinter({ userProfile }) {
     if (bulkOut === null) { targetIface = 0; bulkOut = 1; addLog("WARNING", "Defaulting to interface 0, endpoint 1."); }
     try { await device.claimInterface(targetIface); }
     catch (err) { setUsbStatus("ERROR"); addLog("ERROR", `Claim interface failed: ${err.message}`); await device.close().catch(() => { }); return; }
-    usbDeviceRef.current = device; usbEndpointRef.current = bulkOut;
+    usbDeviceRef.current = device;
+    usbInterfaceRef.current = targetIface;
+    usbEndpointRef.current = bulkOut;
     setUsbStatus("CONNECTED");
     addLog("SUCCESS", `USB connected - interface ${targetIface}, endpoint #${bulkOut}.`);
   };
 
+  const reconnectUSB = async () => {
+    const device = usbDeviceRef.current;
+    const iface = usbInterfaceRef.current;
+    if (!device) return false;
+    try {
+      addLog("INFO", "Attempting automatic USB reconnection...");
+      await device.open();
+      if (device.configuration === null) await device.selectConfiguration(1).catch(() => { });
+      if (iface !== null) {
+        await device.claimInterface(iface);
+      }
+      setUsbStatus("CONNECTED");
+      addLog("SUCCESS", "USB connection restored successfully.");
+      return true;
+    } catch (err) {
+      addLog("ERROR", `Auto-reconnect failed: ${err.message}`);
+      setUsbStatus("DISCONNECTED");
+      return false;
+    }
+  };
+
   const disconnectUSB = async () => {
     try { if (usbDeviceRef.current) await usbDeviceRef.current.close(); } catch (_) { }
-    usbDeviceRef.current = null; usbEndpointRef.current = null;
+    usbDeviceRef.current = null;
+    usbEndpointRef.current = null;
+    usbInterfaceRef.current = null;
     setUsbStatus("DISCONNECTED"); addLog("INFO", "USB disconnected.");
   };
 
@@ -286,11 +330,25 @@ export default function BarcodePrinter({ userProfile }) {
 
   // -- Print via USB ---------------------------------------------------------- 
   const handleUsbPrint = async () => {
-    if (usbStatus !== "CONNECTED") { addLog("ERROR", "USB printer not connected."); return; }
+    if (usbStatus !== "CONNECTED" && !usbDeviceRef.current) {
+      addLog("ERROR", "USB printer not connected.");
+      return;
+    }
     setPrintingStatus("SENDING..."); addLog("PENDING", `Spooling ${printQuantity} label(s) via USB...`);
     try {
       const data = new TextEncoder().encode(generateTsplCode() + "\r\n");
-      const result = await usbDeviceRef.current.transferOut(usbEndpointRef.current, data);
+      let result;
+      try {
+        result = await usbDeviceRef.current.transferOut(usbEndpointRef.current, data);
+      } catch (err) {
+        addLog("WARNING", `USB connection lost during transfer: ${err.message}. Attempting reconnect...`);
+        const reconnected = await reconnectUSB();
+        if (reconnected && usbDeviceRef.current) {
+          result = await usbDeviceRef.current.transferOut(usbEndpointRef.current, data);
+        } else {
+          throw err;
+        }
+      }
       if (result.status === "ok") { setPrintingStatus("SUCCESS: USB"); addLog("SUCCESS", `USB: ${result.bytesWritten} bytes sent.`); }
       else throw new Error(`Transfer status: ${result.status}`);
     } catch (err) { setPrintingStatus("ERROR"); addLog("ERROR", `USB print: ${err.message}`); }
@@ -313,6 +371,9 @@ export default function BarcodePrinter({ userProfile }) {
     } catch (err) { setPrintingStatus("ERROR"); addLog("ERROR", `Agent: ${err.message}`); }
   };
 
+  // -- Helper sleep function -------------------------------------------------
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
   // -- Batch Printing Dispatcher (Sequential with Delay) --------------------
   const handlePrintBatch = async () => {
     const pendingItems = queue.filter((item) => item.status === "pending");
@@ -322,7 +383,7 @@ export default function BarcodePrinter({ userProfile }) {
     }
 
     let mode = "";
-    if (usbStatus === "CONNECTED") mode = "USB";
+    if (usbStatus === "CONNECTED" || usbDeviceRef.current) mode = "USB";
     else if (agentStatus === "ONLINE") mode = "AGENT";
     else {
       alert("No active printer connection. Please connect via USB or Local Agent first.");
@@ -357,8 +418,21 @@ export default function BarcodePrinter({ userProfile }) {
       try {
         if (mode === "USB") {
           const data = new TextEncoder().encode(tspl + "\r\n");
-          const result = await usbDeviceRef.current.transferOut(usbEndpointRef.current, data);
+          let result;
+          try {
+            result = await usbDeviceRef.current.transferOut(usbEndpointRef.current, data);
+          } catch (usbErr) {
+            addLog("WARNING", `[Batch] USB error on ${item.barcodeValue}, trying reconnect...`);
+            const ok = await reconnectUSB();
+            if (ok && usbDeviceRef.current) {
+              result = await usbDeviceRef.current.transferOut(usbEndpointRef.current, data);
+            } else {
+              throw usbErr;
+            }
+          }
           if (result.status !== "ok") throw new Error(`USB status: ${result.status}`);
+          // Wait 1200ms to allow physical printer feed and settle before next transfer
+          await sleep(1200);
         } else {
           const res = await fetch("http://localhost:9100/print", {
             method: "POST",
@@ -367,6 +441,8 @@ export default function BarcodePrinter({ userProfile }) {
             signal: AbortSignal.timeout(10000),
           });
           if (!res.ok) throw new Error(`Agent returned HTTP ${res.status}`);
+          // Wait 1200ms for agent print jobs to space out nicely as well
+          await sleep(1200);
         }
 
         updateItemStatus(item.id, "done");
