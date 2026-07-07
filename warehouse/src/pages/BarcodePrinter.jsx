@@ -192,27 +192,27 @@ export default function BarcodePrinter({ userProfile }) {
       `REFERENCE 0,0`,
 
       // ── LEFT FLAP (Shifted down by 10% for vertical centering) ────────
-      `TEXT 110,27,"${(brand || '').toLowerCase().trim() === 'bonthus' ? '2' : '3'}",0,1,1,"${brand || ""}"`,
-      `TEXT 80,67,"1",0,1,1,"${truncatedCategory}"`,
-      `TEXT 180,67,"1",0,1,1,"SKU:${sku || ""}"`,
-      `TEXT 80,102,"1",0,1,1,"Rs.${price || ""}"`,
-      `TEXT 180,102,"1",0,1,1,"M:${model || ""}"`,
+      `TEXT 110,27,"3",0,1,1,"${brand || ""}"`,
+      `TEXT 80,67,"3",0,1,1,"${truncatedCategory}"`,
+      `TEXT 180,67,"3",0,1,1,"SKU:${sku || ""}"`,
+      `TEXT 80,102,"3",0,1,1,"Rs.${price || ""}"`,
+      `TEXT 180,102,"3",0,1,1,"M:${model || ""}"`,
 
       // ── RIGHT FLAP (Specs shifted down by 10%) ────────
-      `TEXT 340,30,"1",0,1,1,"A"`,
-      `TEXT 370,30,"1",0,1,1,"B"`,
-      `TEXT 400,30,"1",0,1,1,"DBL"`,
-      `TEXT 445,30,"1",0,1,1,"Tem"`,
+      `TEXT 340,30,"3",0,1,1,"A"`,
+      `TEXT 370,30,"3",0,1,1,"B"`,
+      `TEXT 400,30,"3",0,1,1,"DBL"`,
+      `TEXT 445,30,"3",0,1,1,"Tem"`,
 
-      `TEXT 340,46,"1",0,1,1,"${sizeAVal || ""}"`,
-      `TEXT 370,46,"1",0,1,1,"${sizeBVal || ""}"`,
-      `TEXT 400,46,"1",0,1,1,"${dblVal || ""}"`,
-      `TEXT 445,46,"1",0,1,1,"${templeLengthVal || ""}"`,
+      `TEXT 340,46,"3",0,1,1,"${sizeAVal || ""}"`,
+      `TEXT 370,46,"3",0,1,1,"${sizeBVal || ""}"`,
+      `TEXT 400,46,"3",0,1,1,"${dblVal || ""}"`,
+      `TEXT 445,46,"3",0,1,1,"${templeLengthVal || ""}"`,
 
       // Barcode decreased in height to 32, shifted right to X=350, and down by 5% to Y=62
       `BARCODE 350,62,"128",32,0,0,1,1,"${val}"`,
       // Barcode number centered under barcode at Y=100
-      `TEXT 350,100,"1",0,1,1,"${val}"`,
+      `TEXT 350,100,"3",0,1,1,"${val}"`,
 
       // ── TAIL ZONE (X = 440 to 812) ────────
       // Untouched and blank
