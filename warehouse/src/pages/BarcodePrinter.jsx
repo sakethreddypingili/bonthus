@@ -193,10 +193,10 @@ export default function BarcodePrinter({ userProfile }) {
 
       // ── LEFT FLAP (Shifted down by 10% for vertical centering) ────────
       `TEXT 110,27,"3",0,1,1,"${brand || ""}"`,
-      `TEXT 80,67,"2",0,1,1,"${truncatedCategory}"`,
-      `TEXT 180,67,"2",0,1,1,"${sku || ""}"`,
-      `TEXT 80,102,"2",0,1,1,"₹ ${price || ""}"`,
-      `TEXT 180,102,"2",0,1,1,"${model || ""}"`,
+      `TEXT 80,67,"1",0,1,1,"${truncatedCategory}"`,
+      `TEXT 180,67,"1",0,1,1,"SKU:${sku || ""}"`,
+      `TEXT 80,102,"1",0,1,1,"Rs.${price || ""}"`,
+      `TEXT 180,102,"1",0,1,1,"M:${model || ""}"`,
 
       // ── RIGHT FLAP (Specs shifted down by 10%) ────────
       `TEXT 340,30,"1",0,1,1,"A"`,
