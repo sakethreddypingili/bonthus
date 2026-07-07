@@ -4,6 +4,58 @@ import { supabase } from "../server/supabase/supabase";
 
 const POSITIONS = ['cover', 'front', 'side'];
 
+const titleCase = (str) => {
+    if (!str) return "";
+    return str
+        .toString()
+        .trim()
+        .split(/\s+/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ");
+};
+
+const cleanColorName = (color) => {
+    if (!color) return "";
+    let clean = color.toUpperCase().trim();
+    
+    clean = clean.replace(/\bBABAY\b/g, "BABY");
+    clean = clean.replace(/\bBALCK\b/g, "BLACK");
+    clean = clean.replace(/\bBLACLK\b/g, "BLACK");
+    clean = clean.replace(/\bBROUN\b/g, "BROWN");
+    clean = clean.replace(/\bROWN\b/g, "BROWN");
+    clean = clean.replace(/\bDRAK\b/g, "DARK");
+    clean = clean.replace(/\bGREAY\b/g, "GREY");
+    clean = clean.replace(/\bMETEL\b/g, "METAL");
+    clean = clean.replace(/\bSLIVER\b/g, "SILVER");
+    clean = clean.replace(/\bSIVER\b/g, "SILVER");
+    clean = clean.replace(/\b(TRANSPRENT|TRANSPRESNT|TRANSPERNT|TRANSPTRENT|TRANSRENT|TRANSPARENT)\b/g, "TRANSPARENT");
+    clean = clean.replace(/\bLITE\b/g, "LIGHT");
+    clean = clean.replace(/\bMATEE\b/g, "MATTE");
+    clean = clean.replace(/\bMEROON\b/g, "MAROON");
+    clean = clean.replace(/\bREB\b/g, "RED");
+    clean = clean.replace(/\bVOILET\b/g, "VIOLET");
+    clean = clean.replace(/\bGREAN\b/g, "GREEN");
+    
+    clean = clean.replace(/\s*&\s*/g, " & ");
+    clean = clean.replace(/\s+/g, " ").trim();
+    
+    return clean;
+};
+
+const getComputedProductName = (name, brand, frameSpecs) => {
+    const isClipOn = name && /clip-on/i.test(name);
+    const brandName = isClipOn ? "Clip On" : (brand || "");
+    const color = cleanColorName(frameSpecs?.color || "");
+    const frameType = frameSpecs?.frameType || "";
+    const frameShape = frameSpecs?.frameShape || "";
+    
+    return [brandName, color, frameType, frameShape]
+        .map(p => p.trim())
+        .filter(Boolean)
+        .map(titleCase)
+        .join(" ");
+};
+
 // Read a File as a Base64 Data URL
 const readFileAsDataURL = (file) => {
     return new Promise((resolve, reject) => {
@@ -355,6 +407,21 @@ export default function Visualise({ userProfile }) {
             if (scannedProductCategoryType === 'frame') {
                 updatePayload.frame_model_no = frameModel;
                 updatePayload.frame_color = frameColor;
+                
+                let existingSpecs = {};
+                try {
+                    existingSpecs = JSON.parse(scannedProduct.description || '{}');
+                } catch (e) {}
+
+                updatePayload.product_name = getComputedProductName(
+                    scannedProduct.name,
+                    scannedProduct.brand,
+                    {
+                        color: frameColor,
+                        frameType: existingSpecs.frameType || '',
+                        frameShape: existingSpecs.frameShape || ''
+                    }
+                );
             }
 
             const { error: updateError } = await supabase

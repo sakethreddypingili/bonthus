@@ -14,6 +14,7 @@ async function main() {
         checkpoint_name TEXT NOT NULL,
         name TEXT NOT NULL,
         sku TEXT NOT NULL,
+        product_name TEXT,
         brand TEXT,
         base_price NUMERIC(12,2) NOT NULL DEFAULT 0.00,
         category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,

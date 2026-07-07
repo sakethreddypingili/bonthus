@@ -78,50 +78,41 @@ export function usePrintQueue() {
    */
   const loadBatchFromSupabase = useCallback(async (checkpointName, categoryPathsMap) => {
     try {
-      const { data, error } = await supabase
+      // 1. Fetch SKUs for the given checkpointName from pending_products
+      const { data: pendingProds, error: pendingErr } = await supabase
         .from("pending_products")
-        .select(`
-          *,
-          pending_product_barcodes (
-            barcode
-          )
-        `)
+        .select("sku")
         .eq("checkpoint_name", checkpointName);
 
-      if (error) throw error;
-      if (!data || data.length === 0) return 0;
+      if (pendingErr) throw pendingErr;
+      if (!pendingProds || pendingProds.length === 0) return 0;
 
-      const formatted = data.map((item) => {
-        const bcVal = item.pending_product_barcodes?.[0]?.barcode || item.sku;
-        let model = "";
-        let sizeA = "";
-        let sizeB = "";
-        let dbl = "";
-        let templeLength = "";
-        try {
-          const parsed = JSON.parse(item.description);
-          if (parsed) {
-            if (parsed.modelNo) model = parsed.modelNo;
-            if (parsed.sizeA) sizeA = parsed.sizeA.toString();
-            if (parsed.sizeB) sizeB = parsed.sizeB.toString();
-            if (parsed.dbl) dbl = parsed.dbl.toString();
-            if (parsed.templeLength) templeLength = parsed.templeLength.toString();
-          }
-        } catch (e) {}
+      const skus = pendingProds.map(p => p.sku);
 
+      // 2. Fetch printing data from barcode_printing table matching those SKUs
+      const { data: printData, error: printErr } = await supabase
+        .from("barcode_printing")
+        .select("*")
+        .in("sku", skus)
+        .eq("status", "pending");
+
+      if (printErr) throw printErr;
+      if (!printData || printData.length === 0) return 0;
+
+      const formatted = printData.map((item) => {
         return {
           id: item.id.toString(),
-          barcodeValue: bcVal,
+          barcodeValue: item.barcode || item.sku,
           brandValue: item.brand || "",
-          modelValue: model,
+          modelValue: item.model_no || "",
           skuValue: item.sku,
-          categoryId: item.category_id,
-          categoryName: categoryPathsMap[item.category_id] || "Uncategorized",
-          priceValue: item.unit_price?.toString() || item.base_price?.toString() || "1200",
-          sizeA,
-          sizeB,
-          dbl,
-          templeLength,
+          categoryId: null,
+          categoryName: item.category_name || "Uncategorized",
+          priceValue: item.price ? item.price.toString() : "1200",
+          sizeA: item.a || "",
+          sizeB: item.b || "",
+          dbl: item.dbl || "",
+          templeLength: item.tem || "",
           quantity: 1, // Default to 1 label per item in the batch
           status: "pending",
           addedAt: new Date().toISOString(),

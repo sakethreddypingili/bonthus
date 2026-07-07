@@ -57,6 +57,7 @@ export default function BarcodePrinter({ userProfile }) {
 
   // -- Batch Loader Drawer ---------------------------------------------------- 
   const [showBatchDrawer, setShowBatchDrawer] = useState(false);
+  const [showDriverHelp, setShowDriverHelp] = useState(false);
 
   // -- Print Queue State Hook ------------------------------------------------ 
   const {
@@ -462,6 +463,18 @@ export default function BarcodePrinter({ userProfile }) {
           <Layers className="w-3.5 h-3.5 text-black" />
           Ingestion Checkpoints
         </button>
+        {/* USB Driver Help Button */}
+        <button
+          onClick={() => setShowDriverHelp(prev => !prev)}
+          className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border transition-all active:scale-95 ${
+            showDriverHelp 
+              ? "bg-orange-100 border-orange-300 text-orange-700 hover:bg-orange-200" 
+              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+          }`}
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+          USB Driver Setup
+        </button>
         {/* Label size badge */}
         <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-full px-3 py-1.5 ml-auto">
           <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
@@ -470,10 +483,19 @@ export default function BarcodePrinter({ userProfile }) {
         </div>
       </div>
 
-      {/* -- Zadig Warning -- */}
-      {isDriverBlocked && (
-        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 text-xs space-y-2">
-          <div className="flex items-center gap-2 font-bold text-orange-800"><AlertTriangle className="w-4 h-4" /> Windows Driver Conflict - swap to WinUSB using Zadig</div>
+      {/* -- Zadig Warning / Driver Help -- */}
+      {(isDriverBlocked || showDriverHelp) && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 text-xs space-y-2 relative">
+          <button
+            onClick={() => setShowDriverHelp(false)}
+            className="absolute top-3 right-3 text-orange-600 hover:text-orange-800 font-bold"
+          >
+            ✕
+          </button>
+          <div className="flex items-center gap-2 font-bold text-orange-800">
+            <AlertTriangle className="w-4 h-4" />
+            {isDriverBlocked ? "Windows Driver Conflict - swap to WinUSB using Zadig" : "USB Driver Setup & Zadig Instructions"}
+          </div>
           <div className="bg-white border border-orange-100 rounded-xl p-3 font-mono text-[11px] space-y-1">
             <p>1. Download <a href="https://zadig.akeo.ie" target="_blank" rel="noreferrer" className="text-blue-600 underline inline-flex items-center gap-0.5">zadig.akeo.ie <ExternalLink className="w-2.5 h-2.5"/></a></p>
             <p>2. Options -> List All Devices -> select <strong>TSC TE244</strong></p>

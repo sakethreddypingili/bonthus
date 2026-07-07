@@ -15,6 +15,58 @@ const generateBarcode = () => {
   return "8901" + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
 };
 
+const titleCase = (str) => {
+  if (!str) return "";
+  return str
+    .toString()
+    .trim()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
+const cleanColorName = (color) => {
+  if (!color) return "";
+  let clean = color.toUpperCase().trim();
+  
+  clean = clean.replace(/\bBABAY\b/g, "BABY");
+  clean = clean.replace(/\bBALCK\b/g, "BLACK");
+  clean = clean.replace(/\bBLACLK\b/g, "BLACK");
+  clean = clean.replace(/\bBROUN\b/g, "BROWN");
+  clean = clean.replace(/\bROWN\b/g, "BROWN");
+  clean = clean.replace(/\bDRAK\b/g, "DARK");
+  clean = clean.replace(/\bGREAY\b/g, "GREY");
+  clean = clean.replace(/\bMETEL\b/g, "METAL");
+  clean = clean.replace(/\bSLIVER\b/g, "SILVER");
+  clean = clean.replace(/\bSIVER\b/g, "SILVER");
+  clean = clean.replace(/\b(TRANSPRENT|TRANSPRESNT|TRANSPERNT|TRANSPTRENT|TRANSRENT|TRANSPARENT)\b/g, "TRANSPARENT");
+  clean = clean.replace(/\bLITE\b/g, "LIGHT");
+  clean = clean.replace(/\bMATEE\b/g, "MATTE");
+  clean = clean.replace(/\bMEROON\b/g, "MAROON");
+  clean = clean.replace(/\bREB\b/g, "RED");
+  clean = clean.replace(/\bVOILET\b/g, "VIOLET");
+  clean = clean.replace(/\bGREAN\b/g, "GREEN");
+  
+  clean = clean.replace(/\s*&\s*/g, " & ");
+  clean = clean.replace(/\s+/g, " ").trim();
+  
+  return clean;
+};
+
+const getComputedProductName = (name, brand, frameSpecs) => {
+  const isClipOn = name && /clip-on/i.test(name);
+  const brandName = isClipOn ? "Clip On" : (brand || "");
+  const color = cleanColorName(frameSpecs?.color || "");
+  const frameType = frameSpecs?.frameType || "";
+  const frameShape = frameSpecs?.frameShape || "";
+  
+  return [brandName, color, frameType, frameShape]
+    .map(p => p.trim())
+    .filter(Boolean)
+    .map(titleCase)
+    .join(" ");
+};
+
 export default function ProductList({ userProfile }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -423,12 +475,14 @@ export default function ProductList({ userProfile }) {
         setActiveTab("stock");
       } else {
         // Quick Add logic (always saves to pending queue under 'Quick Intake')
+        const calculatedName = catType === 'frame' ? getComputedProductName(productData.name, productData.brand, frameFields) : null;
         const { data: quickAddData, error } = await supabase
           .from("pending_products")
           .insert([{
             checkpoint_name: "Quick Intake",
             name: productData.name,
             sku: productData.sku,
+            product_name: calculatedName,
             brand: productData.brand || null,
             base_price: Number(productData.base_price || 0),
             category_id: productData.category_id || null,
@@ -583,10 +637,18 @@ export default function ProductList({ userProfile }) {
         for (let i = 0; i < qty; i++) {
           const uniqueSku = generateSKU();
           const uniqueBarcode = generateBarcode();
+          const recordName = qty > 1 ? `${row.name} #${i + 1}` : row.name;
+          const calculatedName = catType === 'frame' ? getComputedProductName(recordName, row.brand, {
+            color: row.frame_color,
+            frameType: row.frame_type,
+            frameShape: row.frame_shape
+          }) : null;
+
           records.push({
             checkpoint_name: finalCheckpointName,
-            name: qty > 1 ? `${row.name} #${i + 1}` : row.name,
+            name: recordName,
             sku: uniqueSku, // unique 5-character SKU
+            product_name: calculatedName,
             brand: row.brand || null,
             base_price: Number(row.base_price || 0),
             category_id: bulkCategoryId,
