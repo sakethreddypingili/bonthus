@@ -188,6 +188,20 @@ export default function BatchLoader({ isOpen, onClose, categoryPaths, onLoadBatc
           </button>
         </div>
 
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 flex flex-col">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Batches</span>
+            <span className="text-2xl font-black text-gray-900 mt-1">{filteredBatches.length}</span>
+          </div>
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 flex flex-col">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Products</span>
+            <span className="text-2xl font-black text-gray-900 mt-1">
+              {filteredBatches.reduce((acc, b) => acc + b.count, 0)}
+            </span>
+          </div>
+        </div>
+
         {/* Content List Area */}
         <div className="flex-1 overflow-y-auto bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 min-h-0">
           {loading ? (
