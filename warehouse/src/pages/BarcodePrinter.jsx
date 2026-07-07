@@ -4,7 +4,6 @@ import {
   Usb, Unplug, Zap, AlertTriangle, ExternalLink, SlidersHorizontal, ChevronDown, ChevronUp, Layers
 } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
-import SlideDrawer from "../components/common/SlideDrawer";
 import { usePrintQueue } from "../hooks/usePrintQueue";
 import BatchLoader from "../components/printing/BatchLoader";
 import PrintQueue from "../components/printing/PrintQueue";
@@ -858,24 +857,17 @@ export default function BarcodePrinter({ userProfile }) {
         </div>
       </div>
 
-      {/* -- Drawer: Ingestion Checkpoint Loader -- */}
-      <SlideDrawer
+      {/* -- Modal: Ingestion Checkpoint Loader -- */}
+      <BatchLoader
         isOpen={showBatchDrawer}
         onClose={() => setShowBatchDrawer(false)}
-        title="Checkpoints Batch Loader"
-        subtitle="Load products generated in Product Intake sessions"
-      >
-        <BatchLoader
-          isOpen={showBatchDrawer}
-          onClose={() => setShowBatchDrawer(false)}
-          categoryPaths={{}}
-          onLoadBatch={async (checkpointName) => {
-            const count = await loadBatchFromSupabase(checkpointName, {});
-            addLog("SUCCESS", `Loaded ${count} items from checkpoint "${checkpointName}" into the queue.`);
-            setShowBatchDrawer(false);
-          }}
-        />
-      </SlideDrawer>
+        categoryPaths={{}}
+        onLoadBatch={async (checkpointName) => {
+          const count = await loadBatchFromSupabase(checkpointName, {});
+          addLog("SUCCESS", `Loaded ${count} items from checkpoint "${checkpointName}" into the queue.`);
+          setShowBatchDrawer(false);
+        }}
+      />
     </div>
   );
 }
