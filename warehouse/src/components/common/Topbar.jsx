@@ -12,6 +12,7 @@ const titles = {
 "/settings": { title:"Settings", subtitle:"Configure your store preferences" },
 "/reminders": { title:"Reminders", subtitle:"Manage your tasks and upcoming events" },
 "/notifications": { title:"Notifications", subtitle:"Stay updated with the latest alerts" },
+"/visualise": { title:"Visualise", subtitle:"Scan and ingest products with web cameras" },
 };
 
 export default function Topbar({ onToggleSidebar, userProfile, onLogout }) {

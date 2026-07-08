@@ -69,6 +69,15 @@ const formatBytes = (bytes) => {
     return `${(bytes / 1024).toFixed(1)} KB`;
 };
 
+const safeJsonParse = (str) => {
+    try {
+        const val = JSON.parse(str || "{}");
+        return val && typeof val === "object" ? val : {};
+    } catch (_) {
+        return {};
+    }
+};
+
 // ─── Image processing helpers ─────────────────────────────────────────────────
 
 /**
@@ -190,6 +199,11 @@ export default function Visualise({ userProfile }) {
 
     const [showConfirmPopup, setShowConfirmPopup] = useState(false);
 
+    // ── In-App Camera state ────────────────────────────────────────────────
+    const [activeCaptureSlot, setActiveCaptureSlot] = useState(null); // 'cover' | 'front' | 'side' | null
+    const [captureFacingMode, setCaptureFacingMode] = useState("environment");
+    const activeStreamRef = useRef(null);
+
     // ── Gallery / History state ────────────────────────────────────────────
     const [uploadedProducts, setUploadedProducts] = useState([]);
     const [loadingUploaded, setLoadingUploaded] = useState(false);
@@ -271,7 +285,7 @@ export default function Visualise({ userProfile }) {
 
     const populateForms = (product, catType) => {
         let parsed = {};
-        try { parsed = JSON.parse(product.description || "{}"); } catch (_) {}
+        try { parsed = safeJsonParse(product.description); } catch (_) {}
 
         if (catType === "frame") {
             setFrameForm({
@@ -387,6 +401,62 @@ export default function Visualise({ userProfile }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // ─── In-App Camera Effects & Handlers ────────────────────────────────────
+
+    useEffect(() => {
+        if (!activeCaptureSlot) {
+            if (activeStreamRef.current) {
+                try {
+                    activeStreamRef.current.getTracks().forEach((track) => track.stop());
+                } catch (_) {}
+                activeStreamRef.current = null;
+            }
+            return;
+        }
+
+        let active = true;
+        const startStream = async () => {
+            try {
+                if (activeStreamRef.current) {
+                    try {
+                        activeStreamRef.current.getTracks().forEach((track) => track.stop());
+                    } catch (_) {}
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: captureFacingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                    },
+                    audio: false,
+                });
+
+                if (!active) {
+                    stream.getTracks().forEach((track) => track.stop());
+                    return;
+                }
+
+                activeStreamRef.current = stream;
+                const videoEl = document.getElementById("in-app-video-preview");
+                if (videoEl) {
+                    videoEl.srcObject = stream;
+                }
+            } catch (err) {
+                console.error("[InAppCamera] getUserMedia failed:", err);
+                setErrorMessage("Failed to access camera for in-app photo capture.");
+                setActiveCaptureSlot(null);
+            }
+        };
+
+        const timer = setTimeout(startStream, 150);
+
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [activeCaptureSlot, captureFacingMode]);
+
     const startScanner = useCallback(async () => {
         if (!mountedRef.current) return;
         setScannerError("");
@@ -463,8 +533,9 @@ export default function Visualise({ userProfile }) {
             if (e) e.preventDefault();
             const q = barcodeQuery.trim();
             if (!q) return;
-            destroyScanner();
-            searchProduct(q);
+            destroyScanner().then(() => {
+                searchProduct(q);
+            });
         },
         [barcodeQuery, destroyScanner, searchProduct]
     );
@@ -594,6 +665,40 @@ export default function Visualise({ userProfile }) {
         }
     }, []);
 
+    const handleCaptureSnapshot = useCallback(async () => {
+        const videoEl = document.getElementById("in-app-video-preview");
+        if (!videoEl || !activeCaptureSlot) return;
+
+        try {
+            const canvas = document.createElement("canvas");
+            canvas.width = videoEl.videoWidth || 640;
+            canvas.height = videoEl.videoHeight || 480;
+
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return;
+
+            // Draw current video frame
+            ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+            const blob = dataURLToBlob(dataUrl);
+            const file = new File([blob], `${activeCaptureSlot}.jpg`, { type: "image/jpeg" });
+
+            // Process file using existing handler
+            await processImage(file, activeCaptureSlot);
+
+            // Cleanup stream
+            if (activeStreamRef.current) {
+                activeStreamRef.current.getTracks().forEach((track) => track.stop());
+                activeStreamRef.current = null;
+            }
+            setActiveCaptureSlot(null);
+        } catch (err) {
+            console.error("[handleCaptureSnapshot] error:", err);
+            setErrorMessage("Failed to capture snapshot.");
+        }
+    }, [activeCaptureSlot, processImage]);
+
     const triggerBgRemoval = useCallback(async (position) => {
         const imgData = images[position];
         if (!imgData || !imgData.file) return;
@@ -694,7 +799,7 @@ export default function Visualise({ userProfile }) {
             // Filter products that contain uploaded imageUrls in their description
             const withImages = (data || []).filter((prod) => {
                 try {
-                    const parsed = JSON.parse(prod.description || "{}");
+                    const parsed = safeJsonParse(prod.description);
                     return (
                         (parsed.imageUrls && Object.keys(parsed.imageUrls).length > 0) ||
                         parsed.coverUrl ||
@@ -776,7 +881,7 @@ export default function Visualise({ userProfile }) {
                 frameColor = frameForm.color;
 
                 let existingDesc = {};
-                try { existingDesc = JSON.parse(scannedProduct.description || "{}"); } catch (_) {}
+                try { existingDesc = safeJsonParse(scannedProduct.description); } catch (_) {}
 
                 finalDesc = JSON.stringify({
                     ...existingDesc,
@@ -817,7 +922,7 @@ export default function Visualise({ userProfile }) {
                 payload.frame_color = frameColor;
 
                 let existingSpecs = {};
-                try { existingSpecs = JSON.parse(scannedProduct.description || "{}"); } catch (_) {}
+                try { existingSpecs = safeJsonParse(scannedProduct.description || "{}"); } catch (_) {}
 
                 payload.product_name = getComputedProductName(
                     scannedProduct.name,
@@ -963,7 +1068,7 @@ export default function Visualise({ userProfile }) {
                                     let coverUrl = null;
                                     let imgCount = 0;
                                     try {
-                                        const parsed = JSON.parse(prod.description || "{}");
+                                        const parsed = safeJsonParse(prod.description);
                                         coverUrl = parsed.coverUrl || parsed.imageUrls?.cover || prod.image_url;
                                         if (parsed.imageUrls) imgCount = Object.keys(parsed.imageUrls).length;
                                     } catch (_) {}
@@ -1033,7 +1138,7 @@ export default function Visualise({ userProfile }) {
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         {(() => {
                                             let parsed = {};
-                                            try { parsed = JSON.parse(selectedUploaded.description || "{}"); } catch (_) {}
+                                            try { parsed = safeJsonParse(selectedUploaded.description); } catch (_) {}
                                             const urls = parsed.imageUrls || {};
 
                                             return POSITIONS.map((pos) => {
@@ -1073,7 +1178,7 @@ export default function Visualise({ userProfile }) {
 
                                     {(() => {
                                         let parsed = {};
-                                        try { parsed = JSON.parse(selectedUploaded.description || "{}"); } catch (_) {}
+                                        try { parsed = safeJsonParse(selectedUploaded.description); } catch (_) {}
 
                                         if (parsed.type === "frame") {
                                             return (
@@ -1354,19 +1459,32 @@ export default function Visualise({ userProfile }) {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <label className={`aspect-video w-full border-2 border-dashed rounded-xl cursor-pointer flex flex-col items-center justify-center p-4 transition-all gap-1 text-center ${loading ? "opacity-40 pointer-events-none border-gray-200" : "border-gray-300 hover:border-black"}`}>
-                                                <Upload size={18} className="text-gray-400" />
-                                                <span className="text-[8px] font-black uppercase tracking-widest text-gray-500">
-                                                    Capture / Upload
+                                            <div className={`aspect-video w-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-4 transition-all gap-2 text-center border-gray-300 ${loading ? "opacity-40 pointer-events-none" : ""}`}>
+                                                <span className="text-[8px] font-black uppercase tracking-widest text-gray-400 block mb-1">
+                                                    Acquire {pos} View
                                                 </span>
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    capture="environment"
-                                                    onChange={(e) => handleFileChange(e, pos)}
-                                                    className="hidden"
-                                                />
-                                            </label>
+                                                <div className="flex flex-col gap-2 w-full max-w-[160px]">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setCaptureFacingMode("environment");
+                                                            setActiveCaptureSlot(pos);
+                                                        }}
+                                                        className="py-2 px-3 bg-black hover:bg-neutral-800 text-white rounded-xl text-[9px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                                    >
+                                                        <Camera size={11} /> Take Photo (In-App)
+                                                    </button>
+                                                    <label className="py-2 px-3 border border-gray-300 hover:border-black text-gray-700 rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer bg-white hover:bg-gray-50">
+                                                        <Upload size={11} /> Choose File
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            onChange={(e) => handleFileChange(e, pos)}
+                                                            className="hidden"
+                                                        />
+                                                    </label>
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
                                 );
@@ -1549,6 +1667,83 @@ export default function Visualise({ userProfile }) {
                             >
                                 {submitting ? "Confirming…" : "Confirm"}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* ── IN-APP CAMERA CAPTURE OVERLAY ────────────────────────────── */}
+            {activeCaptureSlot && (
+                <div className="fixed inset-0 z-50 flex flex-col bg-black text-white animate-in fade-in duration-200">
+                    {/* Top Bar */}
+                    <div className="flex justify-between items-center px-6 py-4 bg-black/90 border-b border-neutral-900 z-10">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">
+                            Capture Mode: {activeCaptureSlot.toUpperCase()} VIEW
+                        </span>
+                        <button
+                            onClick={() => setActiveCaptureSlot(null)}
+                            className="text-xs font-black uppercase tracking-wider text-neutral-400 hover:text-white"
+                        >
+                            ✕ Close
+                        </button>
+                    </div>
+
+                    {/* Live Video Viewport */}
+                    <div className="flex-1 flex items-center justify-center bg-neutral-950 relative overflow-hidden">
+                        <video
+                            id="in-app-video-preview"
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full h-full object-contain max-h-[80vh]"
+                        />
+
+                        {/* Centered square guides for lining up frames */}
+                        <div className="absolute inset-0 border-[3px] border-dashed border-white/20 pointer-events-none m-8 rounded-2xl flex items-center justify-center">
+                            <div className="w-48 h-48 border-2 border-dashed border-amber-500/30 rounded-full" />
+                        </div>
+                    </div>
+
+                    {/* Bottom Action Controls */}
+                    <div className="px-6 py-6 bg-black/95 border-t border-neutral-900 flex flex-col items-center gap-4 z-10 pb-8">
+                        <div className="flex items-center justify-center gap-8 w-full max-w-xs">
+                            {/* Toggle Facing Mode */}
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setCaptureFacingMode((prev) =>
+                                        prev === "environment" ? "user" : "environment"
+                                    )
+                                }
+                                className="p-3 bg-neutral-900 hover:bg-neutral-800 rounded-full transition-colors"
+                                title="Flip Camera"
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                                </svg>
+                            </button>
+
+                            {/* Shutter Button */}
+                            <button
+                                type="button"
+                                onClick={handleCaptureSnapshot}
+                                className="w-16 h-16 bg-white hover:bg-neutral-100 active:scale-95 rounded-full border-4 border-neutral-800 transition-all flex items-center justify-center shadow-lg cursor-pointer"
+                                title="Capture Snapshot"
+                            >
+                                <div className="w-10 h-10 bg-red-600 rounded-full" />
+                            </button>
+
+                            {/* Place holder to balance layout */}
+                            <div className="w-12 h-12" />
                         </div>
                     </div>
                 </div>
