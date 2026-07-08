@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Camera, Upload, Check, QrCode, ChevronLeft, Sparkles } from "lucide-react";
+import { Camera, Upload, Check, QrCode, ChevronLeft, Sparkles, RotateCw, Trash2, RefreshCw } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { supabase } from "../server/supabase/supabase";
@@ -9,7 +9,7 @@ import {
 } from "html5-qrcode";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const POSITIONS = ["cover", "front", "side"];
+const POSITIONS = ["front", "side"];
 
 // Only scan common 1D linear barcodes (EAN, Code 128, UPC) — skips heavy 2D/QR checks for instant lock speed
 const BARCODE_FORMATS = typeof Html5QrcodeSupportedFormats !== "undefined" && Html5QrcodeSupportedFormats
@@ -541,6 +541,14 @@ export default function Visualise({ userProfile }) {
         [barcodeQuery, destroyScanner, searchProduct]
     );
 
+    const handleScannerToggle = useCallback(async () => {
+        setScannerError("");
+        if (isScanning) {
+            await destroyScanner();
+        }
+        await startScanner();
+    }, [isScanning, destroyScanner, startScanner]);
+
     // ─── Image handling & compositing ─────────────────────────────────────────
 
     /**
@@ -1011,6 +1019,15 @@ export default function Visualise({ userProfile }) {
                             )}
                         </div>
 
+                        {/* Scanner Action Button to Start/Restart */}
+                        <button
+                            type="button"
+                            onClick={handleScannerToggle}
+                            className="w-full py-3 bg-black hover:bg-neutral-800 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-sm"
+                        >
+                            <Camera size={14} /> {isScanning ? "Restart Camera" : "Start Camera"}
+                        </button>
+
                         {scannerError && (
                             <div className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold rounded-xl px-3 py-2">
                                 {scannerError}
@@ -1394,7 +1411,33 @@ export default function Visualise({ userProfile }) {
                                                     <div className="space-y-3">
                                                         <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center relative">
                                                             <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
-                                                            <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5">
+                                                            
+                                                            {/* Rotate Button at Top Right */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const rot = ((img.rotation || 0) + 90) % 360;
+                                                                    composeImage(pos, img.foregroundUrl, rot, img.scale || 1);
+                                                                }}
+                                                                className="absolute top-2 right-2 p-1.5 bg-black/75 hover:bg-black text-white rounded-lg transition-colors flex items-center justify-center shadow-md z-10"
+                                                                title="Rotate 90°"
+                                                            >
+                                                                <RotateCw size={12} />
+                                                            </button>
+
+                                                            {/* Reupload / Delete Button at Top Left */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setImages((prev) => ({ ...prev, [pos]: null }));
+                                                                }}
+                                                                className="absolute top-2 left-2 p-1.5 bg-black/75 hover:bg-black text-white rounded-lg transition-colors flex items-center justify-center shadow-md z-10"
+                                                                title="Reupload Image"
+                                                            >
+                                                                <RefreshCw size={12} />
+                                                            </button>
+
+                                                            <div className="absolute bottom-2 left-2 flex flex-col items-start gap-0.5">
                                                                 <span className="bg-black/70 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
                                                                     WebP · {formatBytes(img.processedSize)}
                                                                 </span>
@@ -1404,59 +1447,6 @@ export default function Visualise({ userProfile }) {
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                        </div>
-
-                                                        {/* Alignment Controls */}
-                                                        <div className="bg-gray-50 border border-gray-150 rounded-xl p-3 space-y-3 text-left">
-                                                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest block">Alignment</span>
-                                                            <div className="space-y-2">
-                                                                <div>
-                                                                    <div className="flex justify-between text-[9px] font-bold text-gray-500 mb-0.5">
-                                                                        <span>Rotation</span>
-                                                                        <span className="font-mono text-black">{img.rotation || 0}°</span>
-                                                                    </div>
-                                                                    <input
-                                                                        type="range"
-                                                                        min="-180"
-                                                                        max="180"
-                                                                        value={img.rotation || 0}
-                                                                        onChange={(e) => {
-                                                                            const rot = Number(e.target.value);
-                                                                            composeImage(pos, img.foregroundUrl, rot, img.scale || 1);
-                                                                        }}
-                                                                        className="w-full h-1 bg-gray-250 rounded-lg appearance-none cursor-pointer accent-black"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <div className="flex justify-between text-[9px] font-bold text-gray-500 mb-0.5">
-                                                                        <span>Scale</span>
-                                                                        <span className="font-mono text-black">{Math.round((img.scale || 1) * 100)}%</span>
-                                                                    </div>
-                                                                    <input
-                                                                        type="range"
-                                                                        min="0.5"
-                                                                        max="1.5"
-                                                                        step="0.05"
-                                                                        value={img.scale || 1}
-                                                                        onChange={(e) => {
-                                                                            const scl = Number(e.target.value);
-                                                                            composeImage(pos, img.foregroundUrl, img.rotation || 0, scl);
-                                                                        }}
-                                                                        className="w-full h-1 bg-gray-250 rounded-lg appearance-none cursor-pointer accent-black"
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            {pos === "cover" && !img.isBgRemoved && (
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={loading}
-                                                                    onClick={() => triggerBgRemoval("cover")}
-                                                                    className="w-full mt-2 py-2.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                                                                >
-                                                                    <Sparkles size={12} /> Remove BG (1:1 Square)
-                                                                </button>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 ) : (
