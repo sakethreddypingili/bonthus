@@ -1425,18 +1425,6 @@ export default function Visualise({ userProfile }) {
                                                                 <RotateCw size={12} />
                                                             </button>
 
-                                                            {/* Reupload / Delete Button at Top Left */}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setImages((prev) => ({ ...prev, [pos]: null }));
-                                                                }}
-                                                                className="absolute top-2 left-2 p-1.5 bg-black/75 hover:bg-black text-white rounded-lg transition-colors flex items-center justify-center shadow-md z-10"
-                                                                title="Reupload Image"
-                                                            >
-                                                                <RefreshCw size={12} />
-                                                            </button>
-
                                                             <div className="absolute bottom-2 left-2 flex flex-col items-start gap-0.5">
                                                                 <span className="bg-black/70 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
                                                                     WebP · {formatBytes(img.processedSize)}
@@ -1448,6 +1436,18 @@ export default function Visualise({ userProfile }) {
                                                                 )}
                                                             </div>
                                                         </div>
+
+                                                        {/* Reupload / Delete Button at Bottom (in Red) */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setImages((prev) => ({ ...prev, [pos]: null }));
+                                                            }}
+                                                            className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-250 rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                                            title="Clear and Re-acquire Image"
+                                                        >
+                                                            <Trash2 size={12} /> Clear &amp; Re-upload
+                                                        </button>
                                                     </div>
                                                 ) : (
                                                     <div className="aspect-video w-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-4 transition-all gap-2 text-center border-gray-300">
