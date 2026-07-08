@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Camera, Upload, Check, QrCode, ChevronLeft } from "lucide-react";
+import { Camera, Upload, Check, QrCode, ChevronLeft, Sparkles } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../server/supabase/supabase";
 import {
     Html5Qrcode,
     Html5QrcodeSupportedFormats,
 } from "html5-qrcode";
-import { removeBackground } from "@imgly/background-removal";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const POSITIONS = ["cover", "front", "side"];
@@ -105,63 +105,37 @@ const convertToWebP = (file) =>
     });
 
 /**
- * Draw a transparent-PNG blob on a solid white canvas, return WebP data URL.
- * Used after @imgly/background-removal which outputs a PNG with transparent BG.
+ * Threshold-based background removal fallback (no AI, pure canvas).
+ * Makes close-to-white pixels transparent, returning a PNG data URL.
  */
-const compositeOnWhite = (blob) =>
+const thresholdRemoveBg = (file, threshold = 215) =>
     new Promise((resolve, reject) => {
-        const url = URL.createObjectURL(blob);
-        const img = new Image();
-        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
-        img.onload = () => {
-            const canvas = Object.assign(document.createElement("canvas"), {
-                width: img.width,
-                height: img.height,
-            });
-            const ctx = canvas.getContext("2d");
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
-            URL.revokeObjectURL(url);
-            resolve(canvas.toDataURL("image/webp", 0.82));
-        };
-        img.src = url;
-    });
-
-/**
- * Threshold-based white background removal fallback (no AI, pure canvas).
- */
-const thresholdRemoveBg = (webpDataUrl, threshold = 215) =>
-    new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onerror = reject;
-        img.onload = () => {
-            const canvas = Object.assign(document.createElement("canvas"), {
-                width: img.width, height: img.height,
-            });
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0);
-            try {
-                const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const d = id.data;
-                for (let i = 0; i < d.length; i += 4) {
-                    if (d[i] > threshold && d[i + 1] > threshold && d[i + 2] > threshold) {
-                        d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = 255;
-                    }
-                }
-                ctx.putImageData(id, 0, 0);
-                // Fill a new canvas with white THEN draw result to ensure solid BG
-                const out = Object.assign(document.createElement("canvas"), {
-                    width: canvas.width, height: canvas.height,
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("FileReader failed for threshold BG removal"));
+        reader.onload = ({ target }) => {
+            const img = new Image();
+            img.onerror = () => reject(new Error("Failed to load source image for threshold BG removal"));
+            img.onload = () => {
+                const canvas = Object.assign(document.createElement("canvas"), {
+                    width: img.width, height: img.height,
                 });
-                const octx = out.getContext("2d");
-                octx.fillStyle = "#FFFFFF";
-                octx.fillRect(0, 0, out.width, out.height);
-                octx.drawImage(canvas, 0, 0);
-                resolve(out.toDataURL("image/webp", 0.82));
-            } catch (e) { reject(e); }
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0);
+                try {
+                    const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const d = id.data;
+                    for (let i = 0; i < d.length; i += 4) {
+                        if (d[i] > threshold && d[i + 1] > threshold && d[i + 2] > threshold) {
+                            d[i + 3] = 0; // Make matching background pixels transparent
+                        }
+                    }
+                    ctx.putImageData(id, 0, 0);
+                    resolve(canvas.toDataURL("image/png"));
+                } catch (e) { reject(e); }
+            };
+            img.src = target.result;
         };
-        img.src = webpDataUrl;
+        reader.readAsDataURL(file);
     });
 
 /** data URL → Blob (no fetch) */
@@ -177,13 +151,16 @@ const dataURLToBlob = (dataUrl) => {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Visualise({ userProfile }) {
+    const location = useLocation();
+    const navigate = useNavigate();
+
     // General UI state
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
 
-    // Workflow stages: 'scan' | 'details' | 'images' | 'summary'
+    // Workflow stages: 'scan' | 'details' | 'images' | 'summary' | 'gallery'
     const [stage, setStage] = useState("scan");
 
     // ── Scanner state ──────────────────────────────────────────────────────
@@ -212,11 +189,16 @@ export default function Visualise({ userProfile }) {
     });
 
     // ── Image state ────────────────────────────────────────────────────────
-    // Each slot: { file, previewDataUrl, webpDataUrl, webpBlob, originalSize, processedSize, isBgRemoved }
+    // Each slot: { file, foregroundUrl, webpDataUrl, webpBlob, originalSize, processedSize, isBgRemoved, rotation, scale }
     const [images, setImages] = useState({ cover: null, front: null, side: null });
     const [bgProgress, setBgProgress] = useState(null); // { message, percent }
 
     const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+
+    // ── Gallery / History state ────────────────────────────────────────────
+    const [uploadedProducts, setUploadedProducts] = useState([]);
+    const [loadingUploaded, setLoadingUploaded] = useState(false);
+    const [selectedUploaded, setSelectedUploaded] = useState(null);
 
     // ── Cleanup on unmount ─────────────────────────────────────────────────
     useEffect(() => {
@@ -263,6 +245,63 @@ export default function Visualise({ userProfile }) {
             return { facingMode: "environment" };
         }
     }, []);
+
+    // ─── Product search ───────────────────────────────────────────────────────
+
+    const fetchCategoryPath = async (categoryId) => {
+        if (!categoryId) return "";
+        const path = [];
+        let currentId = categoryId;
+        // Max depth 10 to prevent infinite loop on bad data
+        for (let i = 0; i < 10 && currentId; i++) {
+            const { data, error } = await supabase
+                .from("categories")
+                .select("id, name, parent_id")
+                .eq("id", currentId)
+                .single();
+            if (error || !data) break;
+            path.unshift(data.name);
+            currentId = data.parent_id;
+        }
+        return path.join(" > ");
+    };
+
+    const resolveCategoryType = (path) => {
+        if (!path) return null;
+        const lower = path.toLowerCase();
+        if (lower.includes("frame")) return "frame";
+        if (lower.includes("lens")) return "lens";
+        return null;
+    };
+
+    const populateForms = (product, catType) => {
+        let parsed = {};
+        try { parsed = JSON.parse(product.description || "{}"); } catch (_) {}
+
+        if (catType === "frame") {
+            setFrameForm({
+                modelNo: parsed.modelNo || product.frame_model_no || "",
+                color: parsed.color || product.frame_color || "",
+                sizeA: parsed.sizeA || "",
+                sizeB: parsed.sizeB || "",
+                dbl: parsed.dbl || "",
+                templeLength: parsed.templeLength || "",
+                frameShape: parsed.frameShape || product.frame_shape || "",
+                frameType: parsed.frameType || product.frame_type || "",
+            });
+        } else if (catType === "lens") {
+            setLensForm({
+                lensType: parsed.lensType || "",
+                index: parsed.index || "",
+                material: parsed.material || "",
+                coating: parsed.coating || "",
+                sph: parsed.sph || "",
+                cyl: parsed.cyl || "",
+                axis: parsed.axis || "",
+                add: parsed.add || "",
+            });
+        }
+    };
 
     const searchProduct = useCallback(async (query) => {
         if (!query) return;
@@ -346,78 +385,12 @@ export default function Visualise({ userProfile }) {
                 );
             }
         } finally {
-            if (mountedRef.current) setLoading(false);
+            if (mountedRef.current) {
+                setLoading(false);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    // ─── Product search helpers ───────────────────────────────────────────────
-
-    const fetchCategoryPath = async (categoryId) => {
-        if (!categoryId) return "";
-        const path = [];
-        let currentId = categoryId;
-        // Max depth 10 to prevent infinite loop on bad data
-        for (let i = 0; i < 10 && currentId; i++) {
-            const { data, error } = await supabase
-                .from("categories")
-                .select("id, name, parent_id")
-                .eq("id", currentId)
-                .single();
-            if (error || !data) break;
-            path.unshift(data.name);
-            currentId = data.parent_id;
-        }
-        return path.join(" > ");
-    };
-
-    const resolveCategoryType = (path) => {
-        if (!path) return null;
-        const lower = path.toLowerCase();
-        if (lower.includes("frame")) return "frame";
-        if (lower.includes("lens")) return "lens";
-        return null;
-    };
-
-    const populateForms = (product, catType) => {
-        let parsed = {};
-        try { parsed = JSON.parse(product.description || "{}"); } catch (_) {}
-
-        if (catType === "frame") {
-            setFrameForm({
-                modelNo: parsed.modelNo || product.frame_model_no || "",
-                color: parsed.color || product.frame_color || "",
-                sizeA: parsed.sizeA || "",
-                sizeB: parsed.sizeB || "",
-                dbl: parsed.dbl || "",
-                templeLength: parsed.templeLength || "",
-                frameShape: parsed.frameShape || product.frame_shape || "",
-                frameType: parsed.frameType || product.frame_type || "",
-            });
-        } else if (catType === "lens") {
-            setLensForm({
-                lensType: parsed.lensType || "",
-                index: parsed.index || "",
-                material: parsed.material || "",
-                coating: parsed.coating || "",
-                sph: parsed.sph || "",
-                cyl: parsed.cyl || "",
-                axis: parsed.axis || "",
-                add: parsed.add || "",
-            });
-        }
-    };
-
-    const handleManualSearch = useCallback(
-        (e) => {
-            if (e) e.preventDefault();
-            const q = barcodeQuery.trim();
-            if (!q) return;
-            destroyScanner();
-            searchProduct(q);
-        },
-        [barcodeQuery, destroyScanner, searchProduct]
-    );
 
     const startScanner = useCallback(async () => {
         if (!mountedRef.current) return;
@@ -491,17 +464,73 @@ export default function Visualise({ userProfile }) {
         }, 150); // 150 ms is enough for React to flush DOM
     }, [destroyScanner, resolveCamera, searchProduct]);
 
-    // Auto-start scanner when we enter 'scan' stage
-    useEffect(() => {
-        if (stage === "scan") {
-            startScanner();
-        } else {
+    const handleManualSearch = useCallback(
+        (e) => {
+            if (e) e.preventDefault();
+            const q = barcodeQuery.trim();
+            if (!q) return;
             destroyScanner();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [stage]);
+            searchProduct(q);
+        },
+        [barcodeQuery, destroyScanner, searchProduct]
+    );
 
-    // ─── Image handling ───────────────────────────────────────────────────────
+    // ─── Image handling & compositing ─────────────────────────────────────────
+
+    /**
+     * Composites foregroundUrl centered on a square (1:1) white canvas applying scale and rotation.
+     */
+    const composeImage = useCallback(async (position, foregroundUrl, rotation, scale) => {
+        if (!foregroundUrl) return;
+        try {
+            const img = new Image();
+            img.src = foregroundUrl;
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+            });
+
+            const canvas = document.createElement("canvas");
+            // Generate a square 1:1 image by using the largest dimension
+            const size = Math.max(img.width, img.height);
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return;
+
+            // Fill solid white background
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Apply rotation and scale, centering on the square canvas
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate((rotation * Math.PI) / 180);
+            ctx.scale(scale, scale);
+            ctx.drawImage(img, -img.width / 2, -img.height / 2);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+            const webpDataUrl = canvas.toDataURL("image/webp", 0.82);
+            const webpBlob = dataURLToBlob(webpDataUrl);
+
+            setImages((prev) => {
+                const current = prev[position];
+                if (!current) return prev;
+                return {
+                    ...prev,
+                    [position]: {
+                        ...current,
+                        webpDataUrl,
+                        webpBlob,
+                        processedSize: webpBlob.size,
+                        rotation,
+                        scale,
+                    },
+                };
+            });
+        } catch (err) {
+            console.error("[composeImage] error:", err);
+        }
+    }, []);
 
     const processImage = useCallback(async (file, position) => {
         setLoading(true);
@@ -511,48 +540,33 @@ export default function Visualise({ userProfile }) {
         const originalSize = file.size;
 
         try {
-            let webpDataUrl;
+            // Initially, we convert directly to WebP and bypass immediate background removal
+            const foregroundUrl = await convertToWebP(file);
 
-            if (position === "cover") {
-                // ── AI background removal ──────────────────────────────────
-                setBgProgress({ message: "Initialising AI model…", percent: 0 });
-
-                let succeeded = false;
-                try {
-                    const cleanBlob = await removeBackground(file, {
-                        progress: (key, current, total) => {
-                            if (!total) return;
-                            const pct = Math.min(99, Math.round((current / total) * 100));
-                            const phase = key.includes("fetch")
-                                ? "Downloading AI assets"
-                                : "Removing background";
-                            setBgProgress({ message: `${phase}…`, percent: pct });
-                        },
-                        // Force model cache — reduces repeated downloads
-                        model: "small",
-                    });
-                    setBgProgress({ message: "Compositing white background…", percent: 100 });
-                    webpDataUrl = await compositeOnWhite(cleanBlob);
-                    succeeded = true;
-                } catch (aiErr) {
-                    console.error("[BgRemoval] AI failed, using threshold fallback:", aiErr);
-                    setBgProgress({ message: "Using fallback method…", percent: 50 });
-                    // Fallback: convert to WebP first, then threshold filter
-                    const base = await convertToWebP(file);
-                    webpDataUrl = await thresholdRemoveBg(base, 215);
-                    succeeded = true;
-                }
-
-                setBgProgress(null);
-
-                if (!succeeded || !webpDataUrl) {
-                    throw new Error("Background removal produced no output");
-                }
-            } else {
-                // ── Standard WebP conversion ───────────────────────────────
-                webpDataUrl = await convertToWebP(file);
+            if (!foregroundUrl) {
+                throw new Error("Failed to load source image");
             }
 
+            // Initial alignment composition (rotation = 0, scale = 1, Square 1:1)
+            const img = new Image();
+            img.src = foregroundUrl;
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+            });
+
+            const canvas = document.createElement("canvas");
+            const size = Math.max(img.width, img.height);
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) throw new Error("Could not get 2D context");
+
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, (size - img.width) / 2, (size - img.height) / 2);
+
+            const webpDataUrl = canvas.toDataURL("image/webp", 0.82);
             const webpBlob = dataURLToBlob(webpDataUrl);
 
             if (mountedRef.current) {
@@ -560,25 +574,19 @@ export default function Visualise({ userProfile }) {
                     ...prev,
                     [position]: {
                         file,
-                        previewDataUrl: webpDataUrl,
+                        foregroundUrl,
                         webpDataUrl,
                         webpBlob,
                         originalSize,
                         processedSize: webpBlob.size,
-                        isBgRemoved: position === "cover",
+                        isBgRemoved: false, // background removal is triggered on-demand by button
+                        rotation: 0,
+                        scale: 1,
                     },
                 }));
 
                 const label = position.charAt(0).toUpperCase() + position.slice(1);
-                if (position === "cover") {
-                    setSuccessMessage(
-                        `Cover image processed — background removed, saved as WebP (${formatBytes(webpBlob.size)}).`
-                    );
-                } else {
-                    setSuccessMessage(
-                        `${label} image converted to WebP (${formatBytes(webpBlob.size)}).`
-                    );
-                }
+                setSuccessMessage(`${label} image uploaded, prepared in 1:1 layout.`);
             }
         } catch (err) {
             console.error("[processImage] failed:", err);
@@ -588,10 +596,82 @@ export default function Visualise({ userProfile }) {
         } finally {
             if (mountedRef.current) {
                 setLoading(false);
-                setBgProgress(null);
             }
         }
     }, []);
+
+    const triggerBgRemoval = useCallback(async (position) => {
+        const imgData = images[position];
+        if (!imgData || !imgData.file) return;
+
+        setLoading(true);
+        setErrorMessage("");
+        setSuccessMessage("");
+        setBgProgress({ message: "Removing background via local server…", percent: 30 });
+
+        try {
+            let foregroundUrl = "";
+
+            try {
+                const formData = new FormData();
+                formData.append("file", imgData.file);
+
+                const res = await fetch("http://localhost:5001/remove-bg", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(text || `Server returned status code ${res.status}`);
+                }
+
+                setBgProgress({ message: "Reading transparent image data…", percent: 70 });
+
+                const cleanBlob = await res.blob();
+                foregroundUrl = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(cleanBlob);
+                });
+            } catch (serverErr) {
+                console.error("[BgRemoval] Local server failed, using threshold fallback:", serverErr);
+                setBgProgress({ message: "Using fallback method…", percent: 50 });
+                foregroundUrl = await thresholdRemoveBg(imgData.file, 215);
+            }
+
+            setBgProgress(null);
+
+            if (!foregroundUrl) {
+                throw new Error("Background removal failed to yield output.");
+            }
+
+            // Update local state foreground source
+            setImages((prev) => {
+                const current = prev[position];
+                if (!current) return prev;
+                return {
+                    ...prev,
+                    [position]: {
+                        ...current,
+                        foregroundUrl,
+                        isBgRemoved: true,
+                    },
+                };
+            });
+
+            // Recompose with new transparent foreground using active rotation & scale
+            await composeImage(position, foregroundUrl, imgData.rotation || 0, imgData.scale || 1);
+            setSuccessMessage("Background removed and aligned in square 1:1 canvas.");
+        } catch (err) {
+            console.error("[triggerBgRemoval] failed:", err);
+            setErrorMessage(`Background removal failed: ${err.message}`);
+        } finally {
+            setLoading(false);
+            setBgProgress(null);
+        }
+    }, [images, composeImage]);
 
     const handleFileChange = useCallback(
         (e, position) => {
@@ -603,6 +683,57 @@ export default function Visualise({ userProfile }) {
         },
         [processImage]
     );
+
+    // ─── Gallery / History fetch ────────────────────────────────────────────
+
+    const fetchUploadedProducts = useCallback(async () => {
+        setLoadingUploaded(true);
+        setErrorMessage("");
+        try {
+            const { data, error } = await supabase
+                .from("pending_products")
+                .select("*")
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+
+            // Filter products that contain uploaded imageUrls in their description
+            const withImages = (data || []).filter((prod) => {
+                try {
+                    const parsed = JSON.parse(prod.description || "{}");
+                    return (
+                        (parsed.imageUrls && Object.keys(parsed.imageUrls).length > 0) ||
+                        parsed.coverUrl ||
+                        prod.image_url
+                    );
+                } catch (_) {
+                    return false;
+                }
+            });
+
+            setUploadedProducts(withImages);
+        } catch (err) {
+            console.error("[fetchUploadedProducts] error:", err);
+            setErrorMessage("Failed to load uploaded products list.");
+        } finally {
+            setLoadingUploaded(false);
+        }
+    }, []);
+
+    // ─── Sub-menu Navigation Effect ────────────────────────────────────────
+
+    useEffect(() => {
+        const queryParams = new URLSearchParams(location.search);
+        const tab = queryParams.get("tab");
+        if (tab === "history") {
+            setStage("gallery");
+            fetchUploadedProducts();
+        } else {
+            setStage("scan");
+            startScanner();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.search]);
 
     // ─── Final submission ─────────────────────────────────────────────────────
 
@@ -719,13 +850,14 @@ export default function Visualise({ userProfile }) {
             setImages({ cover: null, front: null, side: null });
             setBarcodeQuery("");
             setStage("scan");
+            navigate("/visualise?tab=scan");
         } catch (err) {
             console.error("[handleFinalConfirm]", err);
             setErrorMessage(err?.message || "Submission failed. Please try again.");
         } finally {
             setSubmitting(false);
         }
-    }, [scannedProduct, categoryType, frameForm, lensForm, images]);
+    }, [scannedProduct, categoryType, frameForm, lensForm, images, navigate]);
 
     // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -745,7 +877,7 @@ export default function Visualise({ userProfile }) {
             )}
 
             {/* ── STAGE 1: SCAN ───────────────────────────────────────────── */}
-            {stage === "scan" && (
+            {stage === "scan" && !scannedProduct && (
                 <div className="space-y-6 max-w-lg mx-auto">
                     <div className="bg-white rounded-3xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
                         <div className="text-center space-y-1.5">
@@ -801,6 +933,197 @@ export default function Visualise({ userProfile }) {
                             </button>
                         </form>
                     </div>
+                </div>
+            )}
+
+            {/* ── STAGE: GALLERY / HISTORY ─────────────────────────────────── */}
+            {stage === "gallery" && (
+                <div className="max-w-4xl mx-auto space-y-6">
+                    <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-6">
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                            <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2">
+                                🖼️ Upload History
+                            </h3>
+                            <button
+                                onClick={() => navigate("/visualise?tab=scan")}
+                                className="text-[10px] font-black uppercase text-gray-500 hover:text-black flex items-center gap-1"
+                            >
+                                <ChevronLeft size={14} /> Back to Scanner
+                            </button>
+                        </div>
+
+                        {loadingUploaded ? (
+                            <div className="flex flex-col items-center justify-center py-12 space-y-2">
+                                <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
+                                <span className="text-[10px] font-black uppercase text-gray-400">Loading history…</span>
+                            </div>
+                        ) : uploadedProducts.length === 0 ? (
+                            <div className="text-center py-12 text-gray-400 text-xs font-bold uppercase tracking-wider">
+                                No products found with uploaded images.
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {uploadedProducts.map((prod) => {
+                                    let coverUrl = null;
+                                    let imgCount = 0;
+                                    try {
+                                        const parsed = JSON.parse(prod.description || "{}");
+                                        coverUrl = parsed.coverUrl || parsed.imageUrls?.cover || prod.image_url;
+                                        if (parsed.imageUrls) imgCount = Object.keys(parsed.imageUrls).length;
+                                    } catch (_) {}
+
+                                    return (
+                                        <div
+                                            key={prod.id}
+                                            onClick={() => setSelectedUploaded(prod)}
+                                            className="bg-white border-2 border-gray-150 hover:border-black rounded-2xl p-4 cursor-pointer transition-all duration-150 hover:shadow-md space-y-3"
+                                        >
+                                            <div className="aspect-square w-full bg-gray-50 border border-gray-100 rounded-xl overflow-hidden flex items-center justify-center relative">
+                                                {coverUrl ? (
+                                                    <img src={coverUrl} alt={prod.product_name} className="max-h-full max-w-full object-contain" />
+                                                ) : (
+                                                    <span className="text-[10px] text-gray-300 font-bold uppercase">No Image</span>
+                                                )}
+                                                {imgCount > 0 && (
+                                                    <span className="absolute top-2 right-2 bg-black text-[7px] font-black text-white px-1.5 py-0.5 rounded-full">
+                                                        {imgCount} views
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1">
+                                                <h4 className="text-xs font-black text-black uppercase truncate">
+                                                    {prod.product_name || prod.name}
+                                                </h4>
+                                                <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase">
+                                                    <span>SKU: {prod.sku}</span>
+                                                    <span>{prod.brand}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Detailed Product viewer popup from Gallery */}
+                    {selectedUploaded && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                            <div
+                                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                                onClick={() => setSelectedUploaded(null)}
+                            />
+                            <div className="relative bg-white border-2 border-black rounded-[24px] p-6 shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                                <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+                                    <div>
+                                        <h3 className="text-base font-black text-black uppercase tracking-tight">
+                                            {selectedUploaded.product_name || selectedUploaded.name}
+                                        </h3>
+                                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                                            SKU: {selectedUploaded.sku} | Brand: {selectedUploaded.brand}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setSelectedUploaded(null)}
+                                        className="text-gray-400 hover:text-black font-black text-xs uppercase"
+                                    >
+                                        ✕ Close
+                                    </button>
+                                </div>
+
+                                {/* Images */}
+                                <div className="space-y-2">
+                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Uploaded Views</span>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        {(() => {
+                                            let parsed = {};
+                                            try { parsed = JSON.parse(selectedUploaded.description || "{}"); } catch (_) {}
+                                            const urls = parsed.imageUrls || {};
+
+                                            return POSITIONS.map((pos) => {
+                                                const url = urls[pos] || (pos === "cover" ? selectedUploaded.image_url : null);
+                                                return (
+                                                    <div key={pos} className="bg-gray-50 border border-gray-200 rounded-2xl p-3 flex flex-col justify-between">
+                                                        <span className="text-[8px] font-black text-black uppercase tracking-widest mb-1.5 block text-center">
+                                                            {pos} View
+                                                        </span>
+                                                        <div className="aspect-square w-full rounded-xl overflow-hidden bg-white border border-gray-100 flex items-center justify-center">
+                                                            {url ? (
+                                                                <img src={url} alt={pos} className="max-h-full max-w-full object-contain" />
+                                                            ) : (
+                                                                <span className="text-[9px] text-gray-300 font-bold uppercase">Not Uploaded</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
+                                </div>
+
+                                {/* Full Specs */}
+                                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100 text-xs">
+                                    {[
+                                        ["Checkpoint", selectedUploaded.checkpoint_name || "Quick Intake"],
+                                        ["Base Price", selectedUploaded.base_price ? `Rs. ${selectedUploaded.base_price}` : null],
+                                        ["Confirmed At", selectedUploaded.confirmed_at ? new Date(selectedUploaded.confirmed_at).toLocaleString() : null],
+                                        ["Status", selectedUploaded.status],
+                                    ].map(([label, val]) => (
+                                        <div key={label} className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                            <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
+                                            <span className="text-[11px] font-black text-black uppercase">{val || "—"}</span>
+                                        </div>
+                                    ))}
+
+                                    {(() => {
+                                        let parsed = {};
+                                        try { parsed = JSON.parse(selectedUploaded.description || "{}"); } catch (_) {}
+
+                                        if (parsed.type === "frame") {
+                                            return (
+                                                <>
+                                                    {[
+                                                        ["Frame Model No", parsed.modelNo || selectedUploaded.frame_model_no],
+                                                        ["Colour", parsed.color || selectedUploaded.frame_color],
+                                                        ["Frame Shape", parsed.frameShape || selectedUploaded.frame_shape],
+                                                        ["Frame Type", parsed.frameType || selectedUploaded.frame_type],
+                                                        ["Dimensions (A / B / DBL / Temple)",
+                                                            `${parsed.sizeA || "—"} / ${parsed.sizeB || "—"} / ${parsed.dbl || "—"} / ${parsed.templeLength || "—"}`],
+                                                    ].map(([label, val]) => (
+                                                        <div key={label} className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                                            <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
+                                                            <span className="text-[11px] font-black text-black uppercase">{val || "—"}</span>
+                                                        </div>
+                                                    ))}
+                                                </>
+                                            );
+                                        } else if (parsed.type === "lens") {
+                                            return (
+                                                <>
+                                                    {[
+                                                        ["Lens Type", parsed.lensType],
+                                                        ["Index", parsed.index],
+                                                        ["Material", parsed.material],
+                                                        ["Coating", parsed.coating],
+                                                        ["SPH", parsed.sph],
+                                                        ["CYL", parsed.cyl],
+                                                        ["Axis", parsed.axis],
+                                                        ["Add", parsed.add],
+                                                    ].map(([label, val]) => (
+                                                        <div key={label} className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                                            <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
+                                                            <span className="text-[11px] font-black text-black uppercase">{val || "—"}</span>
+                                                        </div>
+                                                    ))}
+                                                </>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -903,7 +1226,7 @@ export default function Visualise({ userProfile }) {
 
                     <div className="flex gap-4">
                         <button
-                            onClick={() => { setScannedProduct(null); setStage("scan"); }}
+                            onClick={() => { setScannedProduct(null); navigate("/visualise?tab=scan"); }}
                             className="flex-1 py-4 border-2 border-black text-black text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5"
                         >
                             <ChevronLeft size={14} /> Back
@@ -966,16 +1289,71 @@ export default function Visualise({ userProfile }) {
                                                 </span>
                                             </div>
                                         ) : img?.webpDataUrl ? (
-                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center relative">
-                                                <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
-                                                <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5">
-                                                    <span className="bg-black/70 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
-                                                        WebP · {formatBytes(img.processedSize)}
-                                                    </span>
-                                                    {img.originalSize && img.processedSize && (
-                                                        <span className="bg-green-700/80 text-[7px] font-black text-white px-2 py-0.5 rounded">
-                                                            {Math.round((1 - img.processedSize / img.originalSize) * 100)}% smaller
+                                            <div className="space-y-3">
+                                                <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center relative">
+                                                    <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
+                                                    <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5">
+                                                        <span className="bg-black/70 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
+                                                            WebP · {formatBytes(img.processedSize)}
                                                         </span>
+                                                        {img.originalSize && img.processedSize && (
+                                                            <span className="bg-green-700/80 text-[7px] font-black text-white px-2 py-0.5 rounded">
+                                                                {Math.round((1 - img.processedSize / img.originalSize) * 100)}% smaller
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Alignment Controls */}
+                                                <div className="bg-gray-50 border border-gray-150 rounded-xl p-3 space-y-3 text-left">
+                                                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest block">Alignment</span>
+                                                    <div className="space-y-2">
+                                                        <div>
+                                                            <div className="flex justify-between text-[9px] font-bold text-gray-500 mb-0.5">
+                                                                <span>Rotation</span>
+                                                                <span className="font-mono text-black">{img.rotation || 0}°</span>
+                                                            </div>
+                                                            <input
+                                                                type="range"
+                                                                min="-180"
+                                                                max="180"
+                                                                value={img.rotation || 0}
+                                                                onChange={(e) => {
+                                                                    const rot = Number(e.target.value);
+                                                                    composeImage(pos, img.foregroundUrl, rot, img.scale || 1);
+                                                                }}
+                                                                className="w-full h-1 bg-gray-250 rounded-lg appearance-none cursor-pointer accent-black"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex justify-between text-[9px] font-bold text-gray-500 mb-0.5">
+                                                                <span>Scale</span>
+                                                                <span className="font-mono text-black">{Math.round((img.scale || 1) * 100)}%</span>
+                                                            </div>
+                                                            <input
+                                                                type="range"
+                                                                min="0.5"
+                                                                max="1.5"
+                                                                step="0.05"
+                                                                value={img.scale || 1}
+                                                                onChange={(e) => {
+                                                                    const scl = Number(e.target.value);
+                                                                    composeImage(pos, img.foregroundUrl, img.rotation || 0, scl);
+                                                                }}
+                                                                className="w-full h-1 bg-gray-250 rounded-lg appearance-none cursor-pointer accent-black"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {pos === "cover" && !img.isBgRemoved && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={loading}
+                                                            onClick={() => triggerBgRemoval("cover")}
+                                                            className="w-full mt-2 py-2.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                                        >
+                                                            <Sparkles size={12} /> Remove BG (1:1 Square)
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>
@@ -1101,7 +1479,7 @@ export default function Visualise({ userProfile }) {
                                     const img = images[pos];
                                     if (!img?.webpDataUrl) return null;
                                     return (
-                                        <div key={pos} className="bg-white border border-gray-200 p-3 rounded-2xl space-y-1">
+                                        <div key={pos} className="bg-white border border-gray-250 p-3 rounded-2xl space-y-1">
                                             <div className="flex justify-between items-center">
                                                 <span className="text-[8px] font-black text-black uppercase tracking-widest">{pos} View</span>
                                                 {img.isBgRemoved && (

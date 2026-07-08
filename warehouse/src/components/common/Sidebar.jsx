@@ -182,6 +182,39 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 </div>
               )}
 
+              {/* Sub-menu for Visualise */}
+              {label ==="Visualise" && isActive && (
+                <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
+                  {[
+                    { to:"/visualise?tab=scan", label:"Scan", icon: QrCode },
+                    { to:"/visualise?tab=history", label:"History", icon: ClipboardList }
+                  ].map((sub) => {
+                    const isSubActive = sub.to === "/visualise?tab=scan" 
+                      ? (location.search === "" || location.search.includes("tab=scan"))
+                      : location.search.includes("tab=history");
+                    const SubIcon = sub.icon;
+                    return (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={`
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold w-full
+                          ${isSubActive
+                            ?"bg-black text-white shadow-sm"
+                            :"text-gray-500 hover:text-black hover:bg-gray-50"
+                          }
+                          ${collapsed ?"justify-center" :""}
+                        `}
+                        title={collapsed ? sub.label : undefined}
+                      >
+                        <SubIcon size={15} className="flex-shrink-0" />
+                        {!collapsed && <span>{sub.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Sub-menu for Shipments */}
               {label ==="Shipments" && isActive && (
                 <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
