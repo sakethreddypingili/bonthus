@@ -1344,70 +1344,16 @@ export default function Visualise({ userProfile }) {
 
             {/* ── STAGE 3: IMAGES ─────────────────────────────────────────── */}
             {stage === "images" && scannedProduct && (
-                <div className="max-w-4xl mx-auto space-y-6">
+                <div className="max-w-3xl mx-auto space-y-6">
                     <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
-                        {activeCaptureSlot ? (
-                            /* Large full width inline camera capture panel */
-                            <div className="space-y-4 animate-in fade-in duration-200">
-                                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                                    <div>
-                                        <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2">
-                                            <Camera size={16} /> Capturing {activeCaptureSlot.toUpperCase()} VIEW
-                                        </h3>
-                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
-                                            Lining up the product frame or lens for high-resolution ingestion
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveCaptureSlot(null)}
-                                        className="py-2 px-4 border border-gray-300 hover:border-black text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                    >
-                                        ✕ Cancel
-                                    </button>
-                                </div>
+                        <div className="space-y-1">
+                            <h3 className="text-sm font-black text-black uppercase tracking-widest">Image Acquisition</h3>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                Cover image background will be automatically removed. Front &amp; Side get WebP compression.
+                            </p>
+                        </div>
 
-                                <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black relative flex flex-col justify-end border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-h-[55vh]">
-                                    <video
-                                        id="in-app-video-preview"
-                                        autoPlay
-                                        playsInline
-                                        muted
-                                        className="absolute inset-0 w-full h-full object-cover"
-                                    />
-                                    {/* Centered square guides for lining up frames */}
-                                    <div className="absolute inset-0 border-[3px] border-dashed border-white/20 pointer-events-none m-8 rounded-2xl flex items-center justify-center">
-                                        <div className="w-48 h-48 border-2 border-dashed border-amber-500/30 rounded-full" />
-                                    </div>
-                                    <div className="absolute bottom-4 inset-x-4 flex gap-3 justify-center z-10">
-                                        <button
-                                            type="button"
-                                            onClick={handleCaptureSnapshot}
-                                            className="py-3 px-8 bg-amber-500 hover:bg-amber-600 text-black font-black uppercase text-xs rounded-xl tracking-widest shadow-md transition-all active:scale-95"
-                                        >
-                                            Snap Photo
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setActiveCaptureSlot(null)}
-                                            className="py-3 px-8 bg-neutral-900 hover:bg-neutral-800 text-white font-black uppercase text-xs rounded-xl tracking-widest shadow-md transition-all active:scale-95"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            /* Original 3-column view grid */
-                            <>
-                                <div className="space-y-1">
-                                    <h3 className="text-sm font-black text-black uppercase tracking-widest">Image Acquisition</h3>
-                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                                        Cover image background will be automatically removed. Front &amp; Side get WebP compression.
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3">
                                     {POSITIONS.map((pos) => {
                                         const img = images[pos];
                                         const showProgress = pos === "cover" && bgProgress && loading;
@@ -1544,9 +1490,7 @@ export default function Visualise({ userProfile }) {
                                         );
                                     })}
                                 </div>
-                            </>
-                        )}
-                    </div>
+                            </div>
 
                     <div className="flex gap-4">
                         <button
@@ -1723,6 +1667,83 @@ export default function Visualise({ userProfile }) {
                             >
                                 {submitting ? "Confirming…" : "Confirm"}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* ── IN-APP CAMERA CAPTURE OVERLAY ────────────────────────────── */}
+            {activeCaptureSlot && (
+                <div className="fixed inset-0 z-[9999] flex flex-col bg-black text-white animate-in fade-in duration-200 w-screen h-screen">
+                    {/* Top Bar */}
+                    <div className="flex justify-between items-center px-6 py-4 bg-black/90 border-b border-neutral-900 z-10">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">
+                            Capture Mode: {activeCaptureSlot.toUpperCase()} VIEW
+                        </span>
+                        <button
+                            onClick={() => setActiveCaptureSlot(null)}
+                            className="text-xs font-black uppercase tracking-wider text-neutral-400 hover:text-white"
+                        >
+                            ✕ Close
+                        </button>
+                    </div>
+
+                    {/* Live Video Viewport */}
+                    <div className="flex-1 flex items-center justify-center bg-neutral-950 relative overflow-hidden">
+                        <video
+                            id="in-app-video-preview"
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full h-full object-contain max-h-[85vh]"
+                        />
+
+                        {/* Centered square guides for lining up frames */}
+                        <div className="absolute inset-0 border-[3px] border-dashed border-white/20 pointer-events-none m-8 rounded-2xl flex items-center justify-center">
+                            <div className="w-48 h-48 border-2 border-dashed border-amber-500/30 rounded-full" />
+                        </div>
+                    </div>
+
+                    {/* Bottom Action Controls */}
+                    <div className="px-6 py-6 bg-black/95 border-t border-neutral-900 flex flex-col items-center gap-4 z-10 pb-8">
+                        <div className="flex items-center justify-center gap-8 w-full max-w-xs">
+                            {/* Toggle Facing Mode */}
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setCaptureFacingMode((prev) =>
+                                        prev === "environment" ? "user" : "environment"
+                                    )
+                                }
+                                className="p-3 bg-neutral-900 hover:bg-neutral-800 rounded-full transition-colors"
+                                title="Flip Camera"
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                                </svg>
+                            </button>
+
+                            {/* Shutter Button */}
+                            <button
+                                type="button"
+                                onClick={handleCaptureSnapshot}
+                                className="w-16 h-16 bg-white hover:bg-neutral-100 active:scale-95 rounded-full border-4 border-neutral-800 transition-all flex items-center justify-center shadow-lg cursor-pointer"
+                                title="Capture Snapshot"
+                            >
+                                <div className="w-10 h-10 bg-red-600 rounded-full" />
+                            </button>
+
+                            {/* Place holder to balance layout */}
+                            <div className="w-12 h-12" />
                         </div>
                     </div>
                 </div>
