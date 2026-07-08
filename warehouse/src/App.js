@@ -26,6 +26,7 @@ import BarcodePrinter from "./pages/BarcodePrinter";
 import Visualise from "./pages/Visualise";
 import VisualIngest from "./pages/VisualIngest";
 import Labs from "./pages/Labs";
+import ErrorBoundary from "./components/common/ErrorBoundary";
 
 function App() {
   const location = useLocation();
@@ -326,7 +327,7 @@ function App() {
       <Route path="/reminders" element={<Reminders userProfile={userProfile} />} />
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
-      <Route path="/visualise" element={<Visualise userProfile={userProfile} />} />
+      <Route path="/visualise" element={<ErrorBoundary><Visualise userProfile={userProfile} /></ErrorBoundary>} />
       <Route path="/labs" element={<Labs userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/attendance" replace />} />
     </Routes>
@@ -354,7 +355,7 @@ function App() {
       <Route path="/notifications" element={<Notifications userProfile={userProfile} />} />
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
       <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
-      <Route path="/visualise" element={<Visualise userProfile={userProfile} />} />
+      <Route path="/visualise" element={<ErrorBoundary><Visualise userProfile={userProfile} /></ErrorBoundary>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
