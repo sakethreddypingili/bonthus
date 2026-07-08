@@ -1,10 +1,34 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Camera, Upload, Check, QrCode, ChevronLeft } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
-import { Html5Qrcode } from "html5-qrcode";
+import {
+    Html5Qrcode,
+    Html5QrcodeSupportedFormats,
+} from "html5-qrcode";
 import { removeBackground } from "@imgly/background-removal";
 
-const POSITIONS = ['cover', 'front', 'side'];
+// ─── Constants ───────────────────────────────────────────────────────────────
+const POSITIONS = ["cover", "front", "side"];
+
+// Only scan 1D linear barcodes + common 2D — skips heavy QR-only formats for speed
+const BARCODE_FORMATS = typeof Html5QrcodeSupportedFormats !== "undefined" && Html5QrcodeSupportedFormats
+    ? [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.DATA_MATRIX,
+      ]
+    : [9, 10, 5, 3, 4, 14, 15, 8, 0, 6];
+
+const SCANNER_CONTAINER_ID = "visualise-camera-reader";
+
+// ─── Pure utility functions (no React) ───────────────────────────────────────
 
 const titleCase = (str) => {
     if (!str) return "";
@@ -12,36 +36,23 @@ const titleCase = (str) => {
         .toString()
         .trim()
         .split(/\s+/)
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join(" ");
 };
 
 const cleanColorName = (color) => {
     if (!color) return "";
-    let clean = color.toUpperCase().trim();
-    
-    clean = clean.replace(/\bBABAY\b/g, "BABY");
-    clean = clean.replace(/\bBALCK\b/g, "BLACK");
-    clean = clean.replace(/\bBLACLK\b/g, "BLACK");
-    clean = clean.replace(/\bBROUN\b/g, "BROWN");
-    clean = clean.replace(/\bROWN\b/g, "BROWN");
-    clean = clean.replace(/\bDRAK\b/g, "DARK");
-    clean = clean.replace(/\bGREAY\b/g, "GREY");
-    clean = clean.replace(/\bMETEL\b/g, "METAL");
-    clean = clean.replace(/\bSLIVER\b/g, "SILVER");
-    clean = clean.replace(/\bSIVER\b/g, "SILVER");
-    clean = clean.replace(/\b(TRANSPRENT|TRANSPRESNT|TRANSPERNT|TRANSPTRENT|TRANSRENT|TRANSPARENT)\b/g, "TRANSPARENT");
-    clean = clean.replace(/\bLITE\b/g, "LIGHT");
-    clean = clean.replace(/\bMATEE\b/g, "MATTE");
-    clean = clean.replace(/\bMEROON\b/g, "MAROON");
-    clean = clean.replace(/\bREB\b/g, "RED");
-    clean = clean.replace(/\bVOILET\b/g, "VIOLET");
-    clean = clean.replace(/\bGREAN\b/g, "GREEN");
-    
-    clean = clean.replace(/\s*&\s*/g, " & ");
-    clean = clean.replace(/\s+/g, " ").trim();
-    
-    return clean;
+    let c = color.toUpperCase().trim();
+    const fixes = [
+        [/\bBABAY\b/g, "BABY"], [/\bBALCK\b/g, "BLACK"], [/\bBLACLK\b/g, "BLACK"],
+        [/\bBROUN\b/g, "BROWN"], [/\bROWN\b/g, "BROWN"], [/\bDRAK\b/g, "DARK"],
+        [/\bGREAY\b/g, "GREY"], [/\bMETEL\b/g, "METAL"], [/\bSLIVER\b/g, "SILVER"],
+        [/\bSIVER\b/g, "SILVER"], [/\b(TRANSPRENT|TRANSPRESNT|TRANSPERNT|TRANSPTRENT|TRANSRENT|TRANSPARENT)\b/g, "TRANSPARENT"],
+        [/\bLITE\b/g, "LIGHT"], [/\bMATEE\b/g, "MATTE"], [/\bMEROON\b/g, "MAROON"],
+        [/\bREB\b/g, "RED"], [/\bVOILET\b/g, "VIOLET"], [/\bGREAN\b/g, "GREEN"],
+    ];
+    fixes.forEach(([re, rep]) => { c = c.replace(re, rep); });
+    return c.replace(/\s*&\s*/g, " & ").replace(/\s+/g, " ").trim();
 };
 
 const getComputedProductName = (name, brand, frameSpecs) => {
@@ -50,489 +61,599 @@ const getComputedProductName = (name, brand, frameSpecs) => {
     const color = cleanColorName(frameSpecs?.color || "");
     const frameType = frameSpecs?.frameType || "";
     const frameShape = frameSpecs?.frameShape || "";
-    
     return [brandName, color, frameType, frameShape]
-        .map(p => p.trim())
+        .map((p) => p.trim())
         .filter(Boolean)
         .map(titleCase)
         .join(" ");
 };
 
-// Helper to convert any image file to a WebP data URL (Base64)
-const convertToWebP = (file) => {
-    return new Promise((resolve, reject) => {
+const formatBytes = (bytes) => {
+    if (!bytes) return "—";
+    if (bytes < 1024) return `${bytes} B`;
+    return `${(bytes / 1024).toFixed(1)} KB`;
+};
+
+// ─── Image processing helpers ─────────────────────────────────────────────────
+
+/**
+ * Convert any image File → WebP data URL.
+ * Max dimension 1200 px, quality 0.82.
+ */
+const convertToWebP = (file) =>
+    new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onerror = () => reject(new Error("FileReader failed"));
+        reader.onload = ({ target }) => {
             const img = new Image();
+            img.onerror = () => reject(new Error("Image decode failed"));
             img.onload = () => {
-                const canvas = document.createElement("canvas");
-                const maxDim = 1200;
-                let width = img.width;
-                let height = img.height;
-                if (width > maxDim || height > maxDim) {
-                    if (width > height) {
-                        height = Math.round((height * maxDim) / width);
-                        width = maxDim;
-                    } else {
-                        width = Math.round((width * maxDim) / height);
-                        height = maxDim;
-                    }
+                const MAX = 1200;
+                let { width, height } = img;
+                if (width > MAX || height > MAX) {
+                    if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+                    else { width = Math.round((width * MAX) / height); height = MAX; }
                 }
-                canvas.width = width;
-                canvas.height = height;
-
-                const ctx = canvas.getContext("2d");
-                ctx.drawImage(img, 0, 0, width, height);
-
+                const canvas = Object.assign(document.createElement("canvas"), { width, height });
+                canvas.getContext("2d").drawImage(img, 0, 0, width, height);
                 const dataUrl = canvas.toDataURL("image/webp", 0.82);
-                if (dataUrl) {
-                    resolve(dataUrl);
-                } else {
-                    reject(new Error("Failed to convert image to WebP"));
-                }
+                dataUrl ? resolve(dataUrl) : reject(new Error("toDataURL returned empty"));
             };
-            img.onerror = () => reject(new Error("Failed to load image element"));
-            img.src = event.target.result;
+            img.src = target.result;
         };
-        reader.onerror = () => reject(new Error("Failed to read file"));
         reader.readAsDataURL(file);
     });
-};
 
-// Background removal helper using HTML5 Canvas white thresholding
-const removeWhiteBackground = (webpDataUrl, threshold = 210) => {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0);
-
-            try {
-                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imgData.data;
-
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
-
-                    // If pixel is very close to white/light gray, force to pure solid white
-                    if (r > threshold && g > threshold && b > threshold) {
-                        data[i] = 255;     // R
-                        data[i + 1] = 255; // G
-                        data[i + 2] = 255; // B
-                        data[i + 3] = 255; // A (Fully opaque white background)
-                    }
-                }
-
-                ctx.putImageData(imgData, 0, 0);
-                resolve(canvas.toDataURL("image/webp", 0.82));
-            } catch (err) {
-                reject(err);
-            }
-        };
-        img.onerror = (e) => reject(e);
-        img.src = webpDataUrl;
-    });
-};
-
-// Helper to draw transparent background blob output from @imgly on top of solid white canvas background
-const drawTransparentBlobOnWhiteBackground = (blob) => {
-    return new Promise((resolve, reject) => {
+/**
+ * Draw a transparent-PNG blob on a solid white canvas, return WebP data URL.
+ * Used after @imgly/background-removal which outputs a PNG with transparent BG.
+ */
+const compositeOnWhite = (blob) =>
+    new Promise((resolve, reject) => {
         const url = URL.createObjectURL(blob);
         const img = new Image();
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
         img.onload = () => {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
+            const canvas = Object.assign(document.createElement("canvas"), {
+                width: img.width,
+                height: img.height,
+            });
             const ctx = canvas.getContext("2d");
-            
-            // Fill background with solid white
             ctx.fillStyle = "#FFFFFF";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw transparent image
             ctx.drawImage(img, 0, 0);
-            
+            URL.revokeObjectURL(url);
             resolve(canvas.toDataURL("image/webp", 0.82));
-            URL.revokeObjectURL(url);
-        };
-        img.onerror = (e) => {
-            URL.revokeObjectURL(url);
-            reject(e);
         };
         img.src = url;
     });
+
+/**
+ * Threshold-based white background removal fallback (no AI, pure canvas).
+ */
+const thresholdRemoveBg = (webpDataUrl, threshold = 215) =>
+    new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+            const canvas = Object.assign(document.createElement("canvas"), {
+                width: img.width, height: img.height,
+            });
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            try {
+                const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const d = id.data;
+                for (let i = 0; i < d.length; i += 4) {
+                    if (d[i] > threshold && d[i + 1] > threshold && d[i + 2] > threshold) {
+                        d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = 255;
+                    }
+                }
+                ctx.putImageData(id, 0, 0);
+                // Fill a new canvas with white THEN draw result to ensure solid BG
+                const out = Object.assign(document.createElement("canvas"), {
+                    width: canvas.width, height: canvas.height,
+                });
+                const octx = out.getContext("2d");
+                octx.fillStyle = "#FFFFFF";
+                octx.fillRect(0, 0, out.width, out.height);
+                octx.drawImage(canvas, 0, 0);
+                resolve(out.toDataURL("image/webp", 0.82));
+            } catch (e) { reject(e); }
+        };
+        img.src = webpDataUrl;
+    });
+
+/** data URL → Blob (no fetch) */
+const dataURLToBlob = (dataUrl) => {
+    const [header, b64] = dataUrl.split(",");
+    const mime = header.match(/:(.*?);/)[1];
+    const binary = atob(b64);
+    const buf = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
+    return new Blob([buf], { type: mime });
 };
 
-// Convert a data URL back to a Blob synchronously (eliminating fetch dependencies)
-const dataURLToBlob = (dataUrl) => {
-    const arr = dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
-};
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Visualise({ userProfile }) {
+    // General UI state
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
 
-    // Step state: 'scan' | 'details' | 'images' | 'summary'
-    const [visualiseStage, setVisualiseStage] = useState('scan');
-    
-    // Scanner control states
+    // Workflow stages: 'scan' | 'details' | 'images' | 'summary'
+    const [stage, setStage] = useState("scan");
+
+    // ── Scanner state ──────────────────────────────────────────────────────
     const [isScanning, setIsScanning] = useState(false);
-    const html5QrCodeRef = useRef(null);
-    const isProcessingBarcodeRef = useRef(false);
-
-    // Scanned product details
+    const [scannerError, setScannerError] = useState("");
     const [barcodeQuery, setBarcodeQuery] = useState("");
-    const [scannedProduct, setScannedProduct] = useState(null);
-    const [scannedProductCategoryPath, setScannedProductCategoryPath] = useState("");
-    const [scannedProductCategoryType, setScannedProductCategoryType] = useState(null);
 
-    const [lensForm, setLensForm] = useState({
-        lensType: "",
-        index: "",
-        material: "",
-        coating: "",
-        sph: "",
-        cyl: "",
-        axis: "",
-        add: ""
-    });
+    // Internal refs — these must NOT be React state to avoid re-render loops
+    const html5QrRef = useRef(null);       // Html5Qrcode instance
+    const isProcessingRef = useRef(false); // debounce flag
+    const mountedRef = useRef(true);       // unmount guard
+    const startTimerRef = useRef(null);    // delayed start timer
+
+    // ── Product state ──────────────────────────────────────────────────────
+    const [scannedProduct, setScannedProduct] = useState(null);
+    const [categoryPath, setCategoryPath] = useState("");
+    const [categoryType, setCategoryType] = useState(null); // 'frame' | 'lens' | null
 
     const [frameForm, setFrameForm] = useState({
-        modelNo: "",
-        color: "",
-        sizeA: "",
-        sizeB: "",
-        dbl: "",
-        templeLength: "",
-        frameShape: "",
-        frameType: ""
+        modelNo: "", color: "", sizeA: "", sizeB: "",
+        dbl: "", templeLength: "", frameShape: "", frameType: "",
+    });
+    const [lensForm, setLensForm] = useState({
+        lensType: "", index: "", material: "", coating: "",
+        sph: "", cyl: "", axis: "", add: "",
     });
 
-    // Ingested images state
-    const [images, setImages] = useState({
-        cover: null, // { file, previewDataUrl, webpDataUrl, webpBlob, isBgRemoved }
-        front: null,
-        side: null
-    });
-
-    // Browser-based AI background removal progress tracking state
-    const [bgRemovalProgress, setBgRemovalProgress] = useState(null);
+    // ── Image state ────────────────────────────────────────────────────────
+    // Each slot: { file, previewDataUrl, webpDataUrl, webpBlob, originalSize, processedSize, isBgRemoved }
+    const [images, setImages] = useState({ cover: null, front: null, side: null });
+    const [bgProgress, setBgProgress] = useState(null); // { message, percent }
 
     const [showConfirmPopup, setShowConfirmPopup] = useState(false);
 
+    // ── Cleanup on unmount ─────────────────────────────────────────────────
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            clearTimeout(startTimerRef.current);
+            destroyScanner();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ─── Scanner helpers ──────────────────────────────────────────────────────
+
+    const destroyScanner = useCallback(async () => {
+        clearTimeout(startTimerRef.current);
+        if (html5QrRef.current) {
+            try {
+                if (html5QrRef.current.isScanning) {
+                    await html5QrRef.current.stop();
+                }
+            } catch (_) { /* always swallow stop errors */ }
+            try { html5QrRef.current.clear(); } catch (_) {}
+            html5QrRef.current = null;
+        }
+        if (mountedRef.current) setIsScanning(false);
+        isProcessingRef.current = false;
+    }, []);
+
+    /**
+     * Attempt to enumerate cameras and pick back-facing one.
+     * Falls back to `{ facingMode: "environment" }` if enumeration fails.
+     */
+    const resolveCamera = useCallback(async () => {
+        try {
+            const devices = await Html5Qrcode.getCameras();
+            if (!devices || devices.length === 0) throw new Error("No cameras found");
+            // Prefer environment/back camera by label keyword
+            const back = devices.find((d) =>
+                /back|rear|environment/i.test(d.label)
+            );
+            return back ? { deviceId: { exact: back.id } } : { facingMode: "environment" };
+        } catch (_) {
+            return { facingMode: "environment" };
+        }
+    }, []);
+
+    const searchProduct = useCallback(async (query) => {
+        if (!query) return;
+        if (!mountedRef.current) return;
+
+        setLoading(true);
+        setErrorMessage("");
+        setSuccessMessage("");
+        setScannerError("");
+
+        try {
+            let product = null;
+
+            // 1. Try barcode table first
+            const { data: barcodeRow, error: bErr } = await supabase
+                .from("pending_product_barcodes")
+                .select("pending_product_id")
+                .eq("barcode", query)
+                .maybeSingle();
+
+            if (bErr) console.warn("[Search] barcode lookup error:", bErr.message);
+
+            if (barcodeRow?.pending_product_id) {
+                const { data: prod, error: pErr } = await supabase
+                    .from("pending_products")
+                    .select("*")
+                    .eq("id", barcodeRow.pending_product_id)
+                    .eq("status", "pending")
+                    .maybeSingle();
+                if (pErr) console.warn("[Search] product by barcode id error:", pErr.message);
+                product = prod || null;
+            }
+
+            // 2. Try SKU direct match
+            if (!product) {
+                const { data: prod, error: sErr } = await supabase
+                    .from("pending_products")
+                    .select("*")
+                    .eq("sku", query)
+                    .eq("status", "pending")
+                    .maybeSingle();
+                if (sErr) console.warn("[Search] sku lookup error:", sErr.message);
+                product = prod || null;
+            }
+
+            // 3. Try name/barcode partial match as last resort
+            if (!product) {
+                const { data: rows, error: nErr } = await supabase
+                    .from("pending_products")
+                    .select("*")
+                    .ilike("sku", `%${query}%`)
+                    .eq("status", "pending")
+                    .limit(1);
+                if (nErr) console.warn("[Search] partial lookup error:", nErr.message);
+                product = rows?.[0] || null;
+            }
+
+            if (!mountedRef.current) return;
+
+            if (product) {
+                const catPath = await fetchCategoryPath(product.category_id);
+                const catType = resolveCategoryType(catPath);
+                setScannedProduct(product);
+                setCategoryPath(catPath);
+                setCategoryType(catType);
+                populateForms(product, catType);
+                setImages({ cover: null, front: null, side: null });
+                setStage("details");
+            } else {
+                isProcessingRef.current = false;
+                setErrorMessage(
+                    `No pending product found for "${query}". Check the barcode or try manual entry.`
+                );
+            }
+        } catch (err) {
+            console.error("[Search] unexpected error:", err);
+            if (mountedRef.current) {
+                isProcessingRef.current = false;
+                setErrorMessage(
+                    `Search failed: ${err?.message || "Network error. Check your connection."}`
+                );
+            }
+        } finally {
+            if (mountedRef.current) setLoading(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ─── Product search helpers ───────────────────────────────────────────────
+
     const fetchCategoryPath = async (categoryId) => {
         if (!categoryId) return "";
-        let path = [];
+        const path = [];
         let currentId = categoryId;
-        try {
-            while (currentId) {
-                const { data, error } = await supabase
-                    .from('categories')
-                    .select('id, name, parent_id')
-                    .eq('id', currentId)
-                    .single();
-                if (error || !data) break;
-                path.unshift(data.name);
-                currentId = data.parent_id;
-            }
-        } catch (e) {}
+        // Max depth 10 to prevent infinite loop on bad data
+        for (let i = 0; i < 10 && currentId; i++) {
+            const { data, error } = await supabase
+                .from("categories")
+                .select("id, name, parent_id")
+                .eq("id", currentId)
+                .single();
+            if (error || !data) break;
+            path.unshift(data.name);
+            currentId = data.parent_id;
+        }
         return path.join(" > ");
     };
 
-    const getCategoryType = (categoryPath) => {
-        if (!categoryPath) return null;
-        const path = categoryPath.toLowerCase();
-        if (path.includes("frame")) return "frame";
-        if (path.includes("lens")) return "lens";
+    const resolveCategoryType = (path) => {
+        if (!path) return null;
+        const lower = path.toLowerCase();
+        if (lower.includes("frame")) return "frame";
+        if (lower.includes("lens")) return "lens";
         return null;
     };
 
-    // Camera scanner start/stop helpers
-    const stopScanner = useCallback(async () => {
-        if (html5QrCodeRef.current) {
-            try {
-                if (html5QrCodeRef.current.isScanning) {
-                    await html5QrCodeRef.current.stop();
-                }
-            } catch (err) {
-                console.warn("Scanner stop cleanup:", err);
-            }
-            html5QrCodeRef.current = null;
+    const populateForms = (product, catType) => {
+        let parsed = {};
+        try { parsed = JSON.parse(product.description || "{}"); } catch (_) {}
+
+        if (catType === "frame") {
+            setFrameForm({
+                modelNo: parsed.modelNo || product.frame_model_no || "",
+                color: parsed.color || product.frame_color || "",
+                sizeA: parsed.sizeA || "",
+                sizeB: parsed.sizeB || "",
+                dbl: parsed.dbl || "",
+                templeLength: parsed.templeLength || "",
+                frameShape: parsed.frameShape || product.frame_shape || "",
+                frameType: parsed.frameType || product.frame_type || "",
+            });
+        } else if (catType === "lens") {
+            setLensForm({
+                lensType: parsed.lensType || "",
+                index: parsed.index || "",
+                material: parsed.material || "",
+                coating: parsed.coating || "",
+                sph: parsed.sph || "",
+                cyl: parsed.cyl || "",
+                axis: parsed.axis || "",
+                add: parsed.add || "",
+            });
         }
-        setIsScanning(false);
-        isProcessingBarcodeRef.current = false;
-    }, []);
+    };
 
-    const searchProductByBarcode = useCallback(async (queryVal) => {
-        setLoading(true);
-        setErrorMessage("");
-        setSuccessMessage("");
-        try {
-            let pendingData = null;
-
-            // Search pending_products
-            const { data: pBarData } = await supabase
-                .from("pending_product_barcodes")
-                .select("pending_product_id")
-                .eq("barcode", queryVal)
-                .maybeSingle();
-
-            if (pBarData) {
-                const { data: pProd } = await supabase
-                    .from("pending_products")
-                    .select("*")
-                    .eq("id", pBarData.pending_product_id)
-                    .eq("status", "pending")
-                    .maybeSingle();
-                pendingData = pProd;
-            }
-
-            if (!pendingData) {
-                const { data: pProd } = await supabase
-                    .from("pending_products")
-                    .select("*")
-                    .eq("sku", queryVal)
-                    .eq("status", "pending")
-                    .maybeSingle();
-                pendingData = pProd;
-            }
-
-            if (pendingData) {
-                const categoryPath = await fetchCategoryPath(pendingData.category_id);
-                const categoryType = getCategoryType(categoryPath);
-
-                setScannedProduct(pendingData);
-                setScannedProductCategoryPath(categoryPath);
-                setScannedProductCategoryType(categoryType);
-                setVisualiseStage('details');
-
-                // Populate specs forms
-                if (categoryType === 'lens' && pendingData.description) {
-                    try {
-                        const parsed = JSON.parse(pendingData.description);
-                        setLensForm({
-                            lensType: parsed.lensType || "",
-                            index: parsed.index || "",
-                            material: parsed.material || "",
-                            coating: parsed.coating || "",
-                            sph: parsed.sph || "",
-                            cyl: parsed.cyl || "",
-                            axis: parsed.axis || "",
-                            add: parsed.add || ""
-                        });
-                    } catch (e) {}
-                } else if (categoryType === 'frame') {
-                    try {
-                        const parsed = pendingData.description ? JSON.parse(pendingData.description) : {};
-                        setFrameForm({
-                            modelNo: parsed.modelNo || pendingData.frame_model_no || "",
-                            color: parsed.color || pendingData.frame_color || "",
-                            sizeA: parsed.sizeA || "",
-                            sizeB: parsed.sizeB || "",
-                            dbl: parsed.dbl || "",
-                            templeLength: parsed.templeLength || "",
-                            frameShape: parsed.frameShape || pendingData.frame_shape || "",
-                            frameType: parsed.frameType || pendingData.frame_type || ""
-                        });
-                    } catch (e) {
-                        setFrameForm({
-                            modelNo: pendingData.frame_model_no || "",
-                            color: pendingData.frame_color || "",
-                            sizeA: "", sizeB: "", dbl: "", templeLength: "", frameShape: "", frameType: ""
-                        });
-                    }
-                }
-                setImages({ cover: null, front: null, side: null });
-            } else {
-                setErrorMessage(`Product with barcode "${queryVal}" was not found in pending inventory.`);
-                isProcessingBarcodeRef.current = false;
-            }
-        } catch (err) {
-            setErrorMessage("Search error: " + err.message);
-            isProcessingBarcodeRef.current = false;
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    const handleBarcodeFound = useCallback(async (barcodeVal) => {
-        if (isProcessingBarcodeRef.current) return;
-        isProcessingBarcodeRef.current = true;
-        await stopScanner();
-        await searchProductByBarcode(barcodeVal);
-    }, [stopScanner, searchProductByBarcode]);
+    const handleManualSearch = useCallback(
+        (e) => {
+            if (e) e.preventDefault();
+            const q = barcodeQuery.trim();
+            if (!q) return;
+            destroyScanner();
+            searchProduct(q);
+        },
+        [barcodeQuery, destroyScanner, searchProduct]
+    );
 
     const startScanner = useCallback(async () => {
+        if (!mountedRef.current) return;
+        setScannerError("");
         setErrorMessage("");
-        setSuccessMessage("");
-        try {
-            await stopScanner();
-            const qrCode = new Html5Qrcode("visualise-camera-reader");
-            html5QrCodeRef.current = qrCode;
-            setIsScanning(true);
-            await qrCode.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 180 } },
-                (decodedText) => {
-                    handleBarcodeFound(decodedText);
-                },
-                () => {}
-            );
-        } catch (err) {
-            setErrorMessage("Failed to access device camera: " + err.message);
-            setIsScanning(false);
-        }
-    }, [stopScanner, handleBarcodeFound]);
 
-    const handleManualSearch = useCallback((e) => {
-        if (e) e.preventDefault();
-        if (!barcodeQuery.trim()) return;
-        stopScanner();
-        searchProductByBarcode(barcodeQuery.trim());
-    }, [barcodeQuery, stopScanner, searchProductByBarcode]);
+        // Ensure previous instance is fully cleaned up
+        await destroyScanner();
 
-    // Auto-start camera when stage is 'scan'
+        // Small delay so React can commit the DOM node before Html5Qrcode looks for it
+        startTimerRef.current = setTimeout(async () => {
+            if (!mountedRef.current) return;
+
+            const el = document.getElementById(SCANNER_CONTAINER_ID);
+            if (!el) {
+                setScannerError("Camera viewport not ready. Please try again.");
+                return;
+            }
+
+            try {
+                const cameraConfig = await resolveCamera();
+                const qr = new Html5Qrcode(SCANNER_CONTAINER_ID, {
+                    formatsToSupport: BARCODE_FORMATS,
+                    verbose: false, // silence console spam
+                });
+                html5QrRef.current = qr;
+
+                await qr.start(
+                    cameraConfig,
+                    {
+                        fps: 12,
+                        qrbox: (vw, vh) => ({
+                            width: Math.min(280, Math.round(vw * 0.8)),
+                            height: Math.min(140, Math.round(vh * 0.5)),
+                        }),
+                        aspectRatio: 1.777, // 16:9
+                        disableFlip: false,
+                    },
+                    (decodedText) => {
+                        if (isProcessingRef.current) return;
+                        isProcessingRef.current = true;
+                        destroyScanner().then(() => {
+                            if (mountedRef.current) searchProduct(decodedText.trim());
+                        });
+                    },
+                    // Suppress per-frame "not found" errors — they are normal noise
+                    (_errorMsg) => {}
+                );
+
+                if (mountedRef.current) setIsScanning(true);
+            } catch (err) {
+                console.error("[Scanner] start failed:", err);
+                if (mountedRef.current) {
+                    const msg = err?.message || String(err);
+                    // Parse friendly message from common Html5Qrcode errors
+                    if (/permission/i.test(msg)) {
+                        setScannerError("Camera permission denied. Please allow access and try again.");
+                    } else if (/not found|no camera/i.test(msg)) {
+                        setScannerError("No camera found on this device.");
+                    } else if (/already/i.test(msg)) {
+                        // Scanner was already running — cleanup and retry once
+                        setScannerError("");
+                        html5QrRef.current = null;
+                        setTimeout(() => { if (mountedRef.current) startScanner(); }, 400);
+                    } else {
+                        setScannerError(`Camera error: ${msg}`);
+                    }
+                    setIsScanning(false);
+                }
+            }
+        }, 150); // 150 ms is enough for React to flush DOM
+    }, [destroyScanner, resolveCamera, searchProduct]);
+
+    // Auto-start scanner when we enter 'scan' stage
     useEffect(() => {
-        if (visualiseStage === 'scan') {
+        if (stage === "scan") {
             startScanner();
+        } else {
+            destroyScanner();
         }
-        return () => {
-            stopScanner();
-        };
-    }, [visualiseStage, startScanner, stopScanner]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stage]);
 
-    // Automatically convert to WebP & remove background of cover image synchronously on file load
-    const handleFileChange = async (e, position) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    // ─── Image handling ───────────────────────────────────────────────────────
 
+    const processImage = useCallback(async (file, position) => {
         setLoading(true);
         setErrorMessage("");
         setSuccessMessage("");
-        try {
-            let webpDataUrl = null;
 
-            if (position === 'cover') {
-                setBgRemovalProgress({ message: "Loading AI model...", percent: 0 });
+        const originalSize = file.size;
+
+        try {
+            let webpDataUrl;
+
+            if (position === "cover") {
+                // ── AI background removal ──────────────────────────────────
+                setBgProgress({ message: "Initialising AI model…", percent: 0 });
+
+                let succeeded = false;
                 try {
-                    // Execute browser-based AI segmentation
                     const cleanBlob = await removeBackground(file, {
                         progress: (key, current, total) => {
-                            const percent = Math.round((current / total) * 100);
-                            const phase = key.includes("fetch") ? "Downloading AI assets" : "Processing segmentation";
-                            setBgRemovalProgress({
-                                message: `${phase}...`,
-                                percent
-                            });
-                        }
+                            if (!total) return;
+                            const pct = Math.min(99, Math.round((current / total) * 100));
+                            const phase = key.includes("fetch")
+                                ? "Downloading AI assets"
+                                : "Removing background";
+                            setBgProgress({ message: `${phase}…`, percent: pct });
+                        },
+                        // Force model cache — reduces repeated downloads
+                        model: "small",
                     });
-
-                    setBgRemovalProgress({ message: "Adding white background...", percent: 100 });
-                    // Draw output from AI on canvas with solid white background
-                    webpDataUrl = await drawTransparentBlobOnWhiteBackground(cleanBlob);
-                } catch (aiError) {
-                    console.error("AI background removal failed, falling back to color filter:", aiError);
-                    webpDataUrl = await convertToWebP(file);
-                    webpDataUrl = await removeWhiteBackground(webpDataUrl, 210);
+                    setBgProgress({ message: "Compositing white background…", percent: 100 });
+                    webpDataUrl = await compositeOnWhite(cleanBlob);
+                    succeeded = true;
+                } catch (aiErr) {
+                    console.error("[BgRemoval] AI failed, using threshold fallback:", aiErr);
+                    setBgProgress({ message: "Using fallback method…", percent: 50 });
+                    // Fallback: convert to WebP first, then threshold filter
+                    const base = await convertToWebP(file);
+                    webpDataUrl = await thresholdRemoveBg(base, 215);
+                    succeeded = true;
                 }
-                setBgRemovalProgress(null);
+
+                setBgProgress(null);
+
+                if (!succeeded || !webpDataUrl) {
+                    throw new Error("Background removal produced no output");
+                }
             } else {
-                // Front/side views just get WebP conversion
+                // ── Standard WebP conversion ───────────────────────────────
                 webpDataUrl = await convertToWebP(file);
             }
 
             const webpBlob = dataURLToBlob(webpDataUrl);
 
-            setImages(prev => ({
-                ...prev,
-                [position]: {
-                    file,
-                    previewDataUrl: webpDataUrl,
-                    webpDataUrl,
-                    webpBlob,
-                    isBgRemoved: position === 'cover'
+            if (mountedRef.current) {
+                setImages((prev) => ({
+                    ...prev,
+                    [position]: {
+                        file,
+                        previewDataUrl: webpDataUrl,
+                        webpDataUrl,
+                        webpBlob,
+                        originalSize,
+                        processedSize: webpBlob.size,
+                        isBgRemoved: position === "cover",
+                    },
+                }));
+
+                const label = position.charAt(0).toUpperCase() + position.slice(1);
+                if (position === "cover") {
+                    setSuccessMessage(
+                        `Cover image processed — background removed, saved as WebP (${formatBytes(webpBlob.size)}).`
+                    );
+                } else {
+                    setSuccessMessage(
+                        `${label} image converted to WebP (${formatBytes(webpBlob.size)}).`
+                    );
                 }
-            }));
-            
-            if (position === 'cover') {
-                setSuccessMessage("Cover image background removed and saved successfully.");
-            } else {
-                setSuccessMessage(`${position.charAt(0).toUpperCase() + position.slice(1)} image uploaded and compressed to WebP.`);
             }
         } catch (err) {
-            setErrorMessage("Image processing failed: " + err.message);
+            console.error("[processImage] failed:", err);
+            if (mountedRef.current) {
+                setErrorMessage(`Image processing failed: ${err?.message || "Unknown error"}`);
+            }
         } finally {
-            setLoading(false);
-            setBgRemovalProgress(null);
+            if (mountedRef.current) {
+                setLoading(false);
+                setBgProgress(null);
+            }
         }
-    };
+    }, []);
 
-    // Final confirmation submission
-    const handleFinalConfirmSubmission = async () => {
+    const handleFileChange = useCallback(
+        (e, position) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            // Reset input value so same file can be re-picked after failure
+            e.target.value = "";
+            processImage(file, position);
+        },
+        [processImage]
+    );
+
+    // ─── Final submission ─────────────────────────────────────────────────────
+
+    const handleFinalConfirm = useCallback(async () => {
         setShowConfirmPopup(false);
         setSubmitting(true);
         setErrorMessage("");
         setSuccessMessage("");
 
         try {
-            if (!scannedProduct) throw new Error("No scanned product selected.");
+            if (!scannedProduct) throw new Error("No product selected.");
 
-            let finalDesc = scannedProduct.description;
+            let finalDesc = scannedProduct.description || "{}";
             let frameModel = null;
             let frameColor = null;
 
-            if (scannedProductCategoryType === 'frame') {
-                let coverUrl = null;
+            if (categoryType === "frame") {
                 const uploadedUrls = {};
+                let coverUrl = null;
 
-                // Upload WebP images to storage
-                for (const position of POSITIONS) {
-                    const imgData = images[position];
+                for (const pos of POSITIONS) {
+                    const imgData = images[pos];
                     if (!imgData?.webpBlob) continue;
 
-                    const fileName = `${scannedProduct.id}/${position}.webp`;
-
-                    const { error: uploadError } = await supabase.storage
-                        .from('imagine-uploads')
-                        .upload(fileName, imgData.webpBlob, { 
-                            cacheControl: '3600', 
-                            contentType: 'image/webp',
-                            upsert: true 
+                    const path = `${scannedProduct.id}/${pos}.webp`;
+                    const { error: upErr } = await supabase.storage
+                        .from("imagine-uploads")
+                        .upload(path, imgData.webpBlob, {
+                            cacheControl: "3600",
+                            contentType: "image/webp",
+                            upsert: true,
                         });
-
-                    if (uploadError) throw uploadError;
+                    if (upErr) throw new Error(`Image upload failed (${pos}): ${upErr.message}`);
 
                     const { data: urlData } = supabase.storage
-                        .from('imagine-uploads')
-                        .getPublicUrl(fileName);
+                        .from("imagine-uploads")
+                        .getPublicUrl(path);
 
-                    uploadedUrls[position] = urlData.publicUrl;
-
-                    if (position === 'cover') {
-                        coverUrl = urlData.publicUrl;
-                    }
+                    uploadedUrls[pos] = urlData.publicUrl;
+                    if (pos === "cover") coverUrl = urlData.publicUrl;
                 }
 
                 frameModel = frameForm.modelNo;
                 frameColor = frameForm.color;
 
+                let existingDesc = {};
+                try { existingDesc = JSON.parse(scannedProduct.description || "{}"); } catch (_) {}
+
                 finalDesc = JSON.stringify({
-                    ...JSON.parse(scannedProduct.description || '{}'),
-                    type: 'frame',
+                    ...existingDesc,
+                    type: "frame",
                     modelNo: frameForm.modelNo,
                     color: frameForm.color,
                     sizeA: frameForm.sizeA,
@@ -542,11 +663,11 @@ export default function Visualise({ userProfile }) {
                     frameShape: frameForm.frameShape,
                     frameType: frameForm.frameType,
                     imageUrls: uploadedUrls,
-                    coverUrl: coverUrl || scannedProduct.image_url
+                    coverUrl: coverUrl || scannedProduct.image_url || null,
                 });
-            } else if (scannedProductCategoryType === 'lens') {
+            } else if (categoryType === "lens") {
                 finalDesc = JSON.stringify({
-                    type: 'lens',
+                    type: "lens",
                     lensType: lensForm.lensType,
                     index: lensForm.index,
                     material: lensForm.material,
@@ -554,60 +675,64 @@ export default function Visualise({ userProfile }) {
                     sph: lensForm.sph,
                     cyl: lensForm.cyl,
                     axis: lensForm.axis,
-                    add: lensForm.add
+                    add: lensForm.add,
                 });
             }
 
-            const updatePayload = { 
-                status: 'confirmed', 
+            const payload = {
+                status: "confirmed",
                 description: finalDesc,
-                confirmed_at: new Date().toISOString() 
+                confirmed_at: new Date().toISOString(),
             };
 
-            if (scannedProductCategoryType === 'frame') {
-                updatePayload.frame_model_no = frameModel;
-                updatePayload.frame_color = frameColor;
-                
-                let existingSpecs = {};
-                try {
-                    existingSpecs = JSON.parse(scannedProduct.description || '{}');
-                } catch (e) {}
+            if (categoryType === "frame") {
+                payload.frame_model_no = frameModel;
+                payload.frame_color = frameColor;
 
-                updatePayload.product_name = getComputedProductName(
+                let existingSpecs = {};
+                try { existingSpecs = JSON.parse(scannedProduct.description || "{}"); } catch (_) {}
+
+                payload.product_name = getComputedProductName(
                     scannedProduct.name,
                     scannedProduct.brand,
                     {
                         color: frameColor,
-                        frameType: existingSpecs.frameType || '',
-                        frameShape: existingSpecs.frameShape || ''
+                        frameType: frameForm.frameType || existingSpecs.frameType || "",
+                        frameShape: frameForm.frameShape || existingSpecs.frameShape || "",
                     }
                 );
             }
 
-            const { error: updateError } = await supabase
+            const { error: updErr } = await supabase
                 .from("pending_products")
-                .update(updatePayload)
-                .eq('id', scannedProduct.id);
+                .update(payload)
+                .eq("id", scannedProduct.id);
 
-            if (updateError) throw updateError;
+            if (updErr) throw new Error(`Database update failed: ${updErr.message}`);
 
-            setSuccessMessage(`Successfully confirmed and ingested product: "${scannedProduct.name}"!`);
-            
-            // Reset state
-            setImages({ cover: null, front: null, side: null });
+            setSuccessMessage(
+                `✓ Product "${scannedProduct.name || scannedProduct.product_name}" confirmed and ingested.`
+            );
+
+            // Reset
             setScannedProduct(null);
-            setVisualiseStage('scan');
+            setImages({ cover: null, front: null, side: null });
             setBarcodeQuery("");
+            setStage("scan");
         } catch (err) {
-            setErrorMessage(err.message || "Failed to finalize submission.");
+            console.error("[handleFinalConfirm]", err);
+            setErrorMessage(err?.message || "Submission failed. Please try again.");
         } finally {
             setSubmitting(false);
         }
-    };
+    }, [scannedProduct, categoryType, frameForm, lensForm, images]);
+
+    // ─── Render ───────────────────────────────────────────────────────────────
 
     return (
         <div className="space-y-6 pb-28 pt-2 animate-fast-slide">
-            
+
+            {/* Global messages */}
             {successMessage && (
                 <div className="bg-green-50 border border-green-200 text-green-700 text-[11px] font-bold rounded-xl px-3.5 py-2.5 flex items-center gap-2 animate-in fade-in duration-150">
                     <Check size={14} /> {successMessage}
@@ -619,8 +744,8 @@ export default function Visualise({ userProfile }) {
                 </div>
             )}
 
-            {/* STAGE 1: SCAN BARCODE (No other distractions on the page) */}
-            {visualiseStage === 'scan' && (
+            {/* ── STAGE 1: SCAN ───────────────────────────────────────────── */}
+            {stage === "scan" && (
                 <div className="space-y-6 max-w-lg mx-auto">
                     <div className="bg-white rounded-3xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
                         <div className="text-center space-y-1.5">
@@ -628,130 +753,163 @@ export default function Visualise({ userProfile }) {
                                 <QrCode size={18} /> Point at Barcode
                             </h3>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                                Hold barcode within scanner area
+                                Hold barcode within the scanner area
                             </p>
                         </div>
 
-                        {/* Scanner Reader Viewport */}
+                        {/* Camera viewport */}
                         <div className="relative aspect-video w-full rounded-2xl border-2 border-dashed border-gray-300 overflow-hidden bg-black flex items-center justify-center">
-                            <div id="visualise-camera-reader" className="w-full h-full object-cover" />
-                            {!isScanning && (
+                            {/* Html5Qrcode mounts into this div */}
+                            <div id={SCANNER_CONTAINER_ID} className="w-full h-full" />
+
+                            {!isScanning && !loading && (
                                 <button
                                     onClick={startScanner}
-                                    className="absolute inset-0 bg-black/60 text-white text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-black/50 transition-all"
+                                    className="absolute inset-0 bg-black/70 text-white text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-black/60 transition-all"
                                 >
                                     <Camera size={16} /> Start Camera
                                 </button>
                             )}
+                            {loading && !isScanning && (
+                                <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                                    <div className="w-7 h-7 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            )}
                         </div>
 
+                        {scannerError && (
+                            <div className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold rounded-xl px-3 py-2">
+                                {scannerError}
+                            </div>
+                        )}
+
+                        {/* Manual fallback */}
                         <form onSubmit={handleManualSearch} className="flex gap-2">
-                            <input 
+                            <input
                                 type="text"
                                 value={barcodeQuery}
-                                onChange={e => setBarcodeQuery(e.target.value)}
-                                placeholder="Or type barcode/SKU manually..."
-                                className="flex-1 px-4 py-3 bg-gray-50 border-2 border-gray-150 rounded-2xl text-[12px] font-bold text-black outline-none focus:border-black placeholder:text-gray-300"
+                                onChange={(e) => setBarcodeQuery(e.target.value)}
+                                placeholder="Or type barcode / SKU manually…"
+                                className="flex-1 px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl text-[12px] font-bold text-black outline-none focus:border-black placeholder:text-gray-300"
                             />
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="px-5 bg-black hover:bg-neutral-800 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                                className="px-5 bg-black hover:bg-neutral-800 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50"
                             >
-                                {loading ? "Searching..." : "Search"}
+                                {loading ? "Searching…" : "Search"}
                             </button>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* STAGE 2: PRODUCT DETAILS */}
-            {visualiseStage === 'details' && scannedProduct && (
+            {/* ── STAGE 2: DETAILS ────────────────────────────────────────── */}
+            {stage === "details" && scannedProduct && (
                 <div className="max-w-2xl mx-auto space-y-6">
                     <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
+                        {/* Header row */}
                         <div className="border-b border-gray-100 pb-3 flex flex-wrap justify-between items-center gap-2">
                             <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
                                 {scannedProduct.checkpoint_name || "Quick Intake"}
                             </span>
-                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">SKU: {scannedProduct.sku}</span>
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                                SKU: {scannedProduct.sku}
+                            </span>
                         </div>
 
+                        {/* Product name + category */}
                         <div className="space-y-1">
-                            <h3 className="text-base font-black text-black uppercase tracking-tight">{scannedProduct.name || scannedProduct.product_name}</h3>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{scannedProductCategoryPath}</p>
+                            <h3 className="text-base font-black text-black uppercase tracking-tight">
+                                {scannedProduct.name || scannedProduct.product_name}
+                            </h3>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                {categoryPath}
+                            </p>
                         </div>
 
-                        {/* Specs Grid */}
+                        {/* Core specs grid */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-3 border-t border-gray-100 text-xs">
-                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
-                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Brand</span>
-                                <span className="text-[11px] font-black text-black uppercase">{scannedProduct.brand || "—"}</span>
-                            </div>
-                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
-                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Base Price</span>
-                                <span className="text-[11px] font-black text-black uppercase">{scannedProduct.base_price ? `Rs. ${scannedProduct.base_price}` : "—"}</span>
-                            </div>
-                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
-                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Created At</span>
-                                <span className="text-[10px] font-bold text-black uppercase">{scannedProduct.created_at ? new Date(scannedProduct.created_at).toLocaleString() : "—"}</span>
-                            </div>
+                            {[
+                                ["Brand", scannedProduct.brand],
+                                ["Base Price", scannedProduct.base_price ? `Rs. ${scannedProduct.base_price}` : null],
+                                ["Created At", scannedProduct.created_at ? new Date(scannedProduct.created_at).toLocaleDateString() : null],
+                            ].map(([label, value]) => (
+                                <div key={label} className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                    <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
+                                    <span className="text-[11px] font-black text-black uppercase">{value || "—"}</span>
+                                </div>
+                            ))}
                         </div>
 
-                        {scannedProductCategoryType === 'frame' && (
+                        {/* Frame-specific specs */}
+                        {categoryType === "frame" && (
                             <div className="space-y-4">
                                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-150 space-y-3">
-                                    <h4 className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-1">Frame Dimensions</h4>
+                                    <h4 className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-1">
+                                        Frame Dimensions
+                                    </h4>
                                     <div className="grid grid-cols-4 gap-2 text-center">
-                                        <div>
-                                            <span className="text-[7px] font-black text-gray-400 block uppercase">A Size</span>
-                                            <span className="text-xs font-black text-black">{frameForm.sizeA || "—"}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-[7px] font-black text-gray-400 block uppercase">B Size</span>
-                                            <span className="text-xs font-black text-black">{frameForm.sizeB || "—"}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-[7px] font-black text-gray-400 block uppercase">DBL</span>
-                                            <span className="text-xs font-black text-black">{frameForm.dbl || "—"}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-[7px] font-black text-gray-400 block uppercase">Temple</span>
-                                            <span className="text-xs font-black text-black">{frameForm.templeLength || "—"}</span>
-                                        </div>
+                                        {[
+                                            ["A", frameForm.sizeA],
+                                            ["B", frameForm.sizeB],
+                                            ["DBL", frameForm.dbl],
+                                            ["Temple", frameForm.templeLength],
+                                        ].map(([label, val]) => (
+                                            <div key={label}>
+                                                <span className="text-[7px] font-black text-gray-400 block uppercase">{label}</span>
+                                                <span className="text-xs font-black text-black">{val || "—"}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Frame Shape</span>
-                                        <span className="text-[11px] font-black text-black uppercase">{frameForm.frameShape || "—"}</span>
-                                    </div>
-                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Frame Type</span>
-                                        <span className="text-[11px] font-black text-black uppercase">{frameForm.frameType || "—"}</span>
-                                    </div>
-                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Frame Model No</span>
-                                        <span className="text-[11px] font-black text-black uppercase">{frameForm.modelNo || "—"}</span>
-                                    </div>
-                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Color</span>
-                                        <span className="text-[11px] font-black text-black uppercase">{frameForm.color || "—"}</span>
-                                    </div>
+                                    {[
+                                        ["Frame Model No", frameForm.modelNo],
+                                        ["Colour", frameForm.color],
+                                        ["Frame Shape", frameForm.frameShape],
+                                        ["Frame Type", frameForm.frameType],
+                                    ].map(([label, val]) => (
+                                        <div key={label} className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                            <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
+                                            <span className="text-[11px] font-black text-black uppercase">{val || "—"}</span>
+                                        </div>
+                                    ))}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Lens-specific specs */}
+                        {categoryType === "lens" && (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {[
+                                    ["Lens Type", lensForm.lensType],
+                                    ["Index", lensForm.index],
+                                    ["Material", lensForm.material],
+                                    ["Coating", lensForm.coating],
+                                    ["SPH", lensForm.sph],
+                                    ["CYL", lensForm.cyl],
+                                    ["Axis", lensForm.axis],
+                                    ["Add", lensForm.add],
+                                ].map(([label, val]) => (
+                                    <div key={label} className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
+                                        <span className="text-[11px] font-black text-black uppercase">{val || "—"}</span>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
 
                     <div className="flex gap-4">
                         <button
-                            onClick={() => { setScannedProduct(null); setVisualiseStage('scan'); }}
+                            onClick={() => { setScannedProduct(null); setStage("scan"); }}
                             className="flex-1 py-4 border-2 border-black text-black text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5"
                         >
                             <ChevronLeft size={14} /> Back
                         </button>
                         <button
-                            onClick={() => setVisualiseStage('images')}
+                            onClick={() => setStage("images")}
                             className="flex-1 py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg hover:bg-neutral-800 transition-all"
                         >
                             Proceed
@@ -760,54 +918,80 @@ export default function Visualise({ userProfile }) {
                 </div>
             )}
 
-            {/* STAGE 3: ACQUIRE IMAGES */}
-            {visualiseStage === 'images' && scannedProduct && (
+            {/* ── STAGE 3: IMAGES ─────────────────────────────────────────── */}
+            {stage === "images" && scannedProduct && (
                 <div className="max-w-3xl mx-auto space-y-6">
                     <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
                         <div className="space-y-1">
                             <h3 className="text-sm font-black text-black uppercase tracking-widest">Image Acquisition</h3>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Provide Cover, Front, and Side product perspectives</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                Cover image background will be automatically removed. Front &amp; Side get WebP compression.
+                            </p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3">
                             {POSITIONS.map((pos) => {
                                 const img = images[pos];
+                                const showProgress = pos === "cover" && bgProgress && loading;
+
                                 return (
                                     <div key={pos} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-3">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[10px] font-black text-black uppercase tracking-widest">{pos} view</span>
+                                            <span className="text-[10px] font-black text-black uppercase tracking-widest">
+                                                {pos} view
+                                            </span>
+                                            {pos === "cover" && (
+                                                <span className="text-[8px] font-black text-purple-500 bg-purple-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                    AI BG Remove
+                                                </span>
+                                            )}
                                         </div>
 
-                                        {pos === 'cover' && bgRemovalProgress ? (
-                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border-2 border-black flex flex-col items-center justify-center p-4 relative space-y-2">
+                                        {showProgress ? (
+                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border-2 border-black flex flex-col items-center justify-center p-4 space-y-2">
                                                 <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
                                                 <span className="text-[9px] font-black uppercase text-black tracking-widest text-center">
-                                                    {bgRemovalProgress.message}
+                                                    {bgProgress.message}
                                                 </span>
-                                                {bgRemovalProgress.percent > 0 && (
+                                                {bgProgress.percent > 0 && (
                                                     <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                                                        <div 
+                                                        <div
                                                             className="bg-black h-full transition-all duration-300"
-                                                            style={{ width: `${bgRemovalProgress.percent}%` }}
+                                                            style={{ width: `${bgProgress.percent}%` }}
                                                         />
                                                     </div>
                                                 )}
                                                 <span className="text-[8px] font-black text-gray-400">
-                                                    {bgRemovalProgress.percent}% Completed
+                                                    {bgProgress.percent}%
                                                 </span>
                                             </div>
                                         ) : img?.webpDataUrl ? (
                                             <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center relative">
                                                 <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
-                                                <span className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
-                                                    WEBP | {img.webpBlob ? `${(img.webpBlob.size / 1024).toFixed(1)} KB` : "—"}
-                                                </span>
+                                                <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5">
+                                                    <span className="bg-black/70 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
+                                                        WebP · {formatBytes(img.processedSize)}
+                                                    </span>
+                                                    {img.originalSize && img.processedSize && (
+                                                        <span className="bg-green-700/80 text-[7px] font-black text-white px-2 py-0.5 rounded">
+                                                            {Math.round((1 - img.processedSize / img.originalSize) * 100)}% smaller
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         ) : (
-                                            <label className="aspect-video w-full border-2 border-dashed border-gray-300 hover:border-black rounded-xl cursor-pointer flex flex-col items-center justify-center p-4 transition-all gap-1 text-center">
+                                            <label className={`aspect-video w-full border-2 border-dashed rounded-xl cursor-pointer flex flex-col items-center justify-center p-4 transition-all gap-1 text-center ${loading ? "opacity-40 pointer-events-none border-gray-200" : "border-gray-300 hover:border-black"}`}>
                                                 <Upload size={18} className="text-gray-400" />
-                                                <span className="text-[8px] font-black uppercase tracking-widest text-gray-500">Capture / Upload</span>
-                                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
+                                                <span className="text-[8px] font-black uppercase tracking-widest text-gray-500">
+                                                    Capture / Upload
+                                                </span>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    capture="environment"
+                                                    onChange={(e) => handleFileChange(e, pos)}
+                                                    className="hidden"
+                                                />
                                             </label>
                                         )}
                                     </div>
@@ -818,105 +1002,124 @@ export default function Visualise({ userProfile }) {
 
                     <div className="flex gap-4">
                         <button
-                            onClick={() => setVisualiseStage('details')}
+                            onClick={() => setStage("details")}
                             className="flex-1 py-4 border-2 border-black text-black text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5"
                         >
                             <ChevronLeft size={14} /> Back
                         </button>
                         <button
+                            disabled={loading}
                             onClick={() => {
-                                const hasAny = POSITIONS.some(pos => images[pos]?.webpBlob);
+                                const hasAny = POSITIONS.some((p) => images[p]?.webpBlob);
                                 if (!hasAny) {
-                                    setErrorMessage("Please capture or upload at least one image to proceed.");
+                                    setErrorMessage("Upload at least one image to proceed.");
                                     return;
                                 }
-                                setVisualiseStage('summary');
+                                setErrorMessage("");
+                                setStage("summary");
                             }}
-                            className="flex-1 py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg hover:bg-neutral-800 transition-all"
+                            className="flex-1 py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg hover:bg-neutral-800 transition-all disabled:opacity-50"
                         >
-                            Proceed
+                            {loading ? "Processing…" : "Proceed"}
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* STAGE 4: SUMMARY & CONFIRMATION */}
-            {visualiseStage === 'summary' && scannedProduct && (
+            {/* ── STAGE 4: SUMMARY ────────────────────────────────────────── */}
+            {stage === "summary" && scannedProduct && (
                 <div className="max-w-3xl mx-auto space-y-6">
                     <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-6">
                         <div className="space-y-1">
                             <h3 className="text-sm font-black text-black uppercase tracking-widest">Ingest Summary Review</h3>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Review all catalog specifications and image renders before finalizing</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                Verify all specifications and images before finalising
+                            </p>
                         </div>
 
-                        {/* specs summary */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-gray-50 p-5 rounded-2xl border border-gray-150 text-xs">
-                            <div className="space-y-1">
-                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Checkpoint</span>
-                                <span className="font-black text-black uppercase">{scannedProduct.checkpoint_name || "Quick Intake"}</span>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Product Display Name</span>
-                                <span className="font-black text-black uppercase">{scannedProduct.name || scannedProduct.product_name}</span>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Barcode / SKU</span>
-                                <span className="font-black text-black uppercase">{scannedProduct.sku}</span>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Brand</span>
-                                <span className="font-black text-black uppercase">{scannedProduct.brand || "—"}</span>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Base Price</span>
-                                <span className="font-black text-black uppercase">{scannedProduct.base_price ? `Rs. ${scannedProduct.base_price}` : "—"}</span>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Category</span>
-                                <span className="font-black text-black uppercase">{scannedProductCategoryPath}</span>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Created At</span>
-                                <span className="font-bold text-black uppercase">{scannedProduct.created_at ? new Date(scannedProduct.created_at).toLocaleString() : "—"}</span>
-                            </div>
+                        {/* Specs summary */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-5 rounded-2xl border border-gray-150 text-xs">
+                            {[
+                                ["Checkpoint", scannedProduct.checkpoint_name || "Quick Intake"],
+                                ["Product Name", scannedProduct.name || scannedProduct.product_name],
+                                ["SKU", scannedProduct.sku],
+                                ["Brand", scannedProduct.brand],
+                                ["Base Price", scannedProduct.base_price ? `Rs. ${scannedProduct.base_price}` : null],
+                                ["Category", categoryPath],
+                                ["Created At", scannedProduct.created_at ? new Date(scannedProduct.created_at).toLocaleString() : null],
+                            ].map(([label, val]) => (
+                                <div key={label} className="space-y-1">
+                                    <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
+                                    <span className="font-black text-black uppercase text-[11px]">{val || "—"}</span>
+                                </div>
+                            ))}
 
-                            {scannedProductCategoryType === 'frame' && (
+                            {categoryType === "frame" && (
                                 <>
-                                    <div className="space-y-1">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Frame Model No</span>
-                                        <span className="font-black text-black uppercase">{frameForm.modelNo || "—"}</span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Color</span>
-                                        <span className="font-black text-black uppercase">{frameForm.color || "—"}</span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Frame Shape</span>
-                                        <span className="font-black text-black uppercase">{frameForm.frameShape || "—"}</span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Dimensions (A / B / DBL / Temple)</span>
-                                        <span className="font-black text-black uppercase">{`${frameForm.sizeA || "—"} / ${frameForm.sizeB || "—"} / ${frameForm.dbl || "—"} / ${frameForm.templeLength || "—"}`}</span>
-                                    </div>
+                                    {[
+                                        ["Frame Model No", frameForm.modelNo],
+                                        ["Colour", frameForm.color],
+                                        ["Frame Shape", frameForm.frameShape],
+                                        ["Frame Type", frameForm.frameType],
+                                        ["Dimensions (A / B / DBL / Temple)",
+                                            `${frameForm.sizeA || "—"} / ${frameForm.sizeB || "—"} / ${frameForm.dbl || "—"} / ${frameForm.templeLength || "—"}`],
+                                    ].map(([label, val]) => (
+                                        <div key={label} className="space-y-1">
+                                            <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
+                                            <span className="font-black text-black uppercase text-[11px]">{val || "—"}</span>
+                                        </div>
+                                    ))}
+                                </>
+                            )}
+
+                            {categoryType === "lens" && (
+                                <>
+                                    {[
+                                        ["Lens Type", lensForm.lensType],
+                                        ["Index", lensForm.index],
+                                        ["Material", lensForm.material],
+                                        ["Coating", lensForm.coating],
+                                        ["SPH", lensForm.sph],
+                                        ["CYL", lensForm.cyl],
+                                        ["Axis", lensForm.axis],
+                                        ["Add", lensForm.add],
+                                    ].map(([label, val]) => (
+                                        <div key={label} className="space-y-1">
+                                            <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
+                                            <span className="font-black text-black uppercase text-[11px]">{val || "—"}</span>
+                                        </div>
+                                    ))}
                                 </>
                             )}
                         </div>
 
-                        {/* images summary */}
+                        {/* Images summary */}
                         <div className="space-y-2">
                             <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Processed Images</span>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {POSITIONS.map(pos => {
+                                {POSITIONS.map((pos) => {
                                     const img = images[pos];
                                     if (!img?.webpDataUrl) return null;
                                     return (
-                                        <div key={pos} className="bg-white border border-gray-250 p-3 rounded-2xl space-y-1">
-                                            <span className="text-[8px] font-black text-black uppercase tracking-widest">{pos} View</span>
+                                        <div key={pos} className="bg-white border border-gray-200 p-3 rounded-2xl space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[8px] font-black text-black uppercase tracking-widest">{pos} View</span>
+                                                {img.isBgRemoved && (
+                                                    <span className="text-[7px] font-black text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full uppercase">BG Removed</span>
+                                                )}
+                                            </div>
                                             <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center relative">
                                                 <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
-                                                <span className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
-                                                    {img.webpBlob ? `${(img.webpBlob.size / 1024).toFixed(1)} KB` : "—"}
-                                                </span>
+                                                <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5">
+                                                    <span className="bg-black/70 text-[7px] font-black text-white px-2 py-0.5 rounded">
+                                                        {formatBytes(img.processedSize)}
+                                                    </span>
+                                                    {img.originalSize && img.processedSize && (
+                                                        <span className="bg-green-700/80 text-[7px] font-black text-white px-2 py-0.5 rounded">
+                                                            -{Math.round((1 - img.processedSize / img.originalSize) * 100)}%
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     );
@@ -927,7 +1130,7 @@ export default function Visualise({ userProfile }) {
 
                     <div className="flex gap-4">
                         <button
-                            onClick={() => setVisualiseStage('images')}
+                            onClick={() => setStage("images")}
                             className="flex-1 py-4 border-2 border-black text-black text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5"
                         >
                             <ChevronLeft size={14} /> Back
@@ -942,10 +1145,13 @@ export default function Visualise({ userProfile }) {
                 </div>
             )}
 
-            {/* CONFIRMATION POPUP MODAL */}
+            {/* ── CONFIRM POPUP ────────────────────────────────────────────── */}
             {showConfirmPopup && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowConfirmPopup(false)} />
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setShowConfirmPopup(false)}
+                    />
                     <div className="relative bg-white border-2 border-black rounded-[24px] p-6 shadow-2xl max-w-sm w-full space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
                         <div>
                             <h3 className="text-base font-black text-black uppercase tracking-tight">Confirm Pending Product</h3>
@@ -964,10 +1170,10 @@ export default function Visualise({ userProfile }) {
                             <button
                                 type="button"
                                 disabled={submitting}
-                                onClick={handleFinalConfirmSubmission}
+                                onClick={handleFinalConfirm}
                                 className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase rounded-xl hover:bg-neutral-800 disabled:opacity-60 flex items-center justify-center gap-1.5"
                             >
-                                {submitting ? "Confirming..." : "Confirm"}
+                                {submitting ? "Confirming…" : "Confirm"}
                             </button>
                         </div>
                     </div>
