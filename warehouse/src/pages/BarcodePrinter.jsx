@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
-  Printer, Terminal, Settings, HelpCircle, FolderPlus,
-  Usb, Unplug, Zap, AlertTriangle, ExternalLink, SlidersHorizontal, ChevronDown, ChevronUp, Layers
+  Printer, Terminal, Settings, FolderPlus,
+  Usb, Unplug, Zap, AlertTriangle, Layers
 } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import { usePrintQueue } from "../hooks/usePrintQueue";
@@ -48,10 +48,10 @@ export default function BarcodePrinter({ userProfile }) {
   const [templeLength, setTempleLength] = useState("140");
   const [printQuantity, setPrintQuantity] = useState(1);
   const [printingStatus, setPrintingStatus] = useState("IDLE");
+  const [activePrinterTab, setActivePrinterTab] = useState("single");
 
   // -- Label / TSPL settings --------------------------------------------------
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [showSettings, setShowSettings] = useState(false);
   const setSetting = (key, val) => setSettings((s) => ({ ...s, [key]: val }));
 
   // -- Batch Loader Drawer ---------------------------------------------------- 
@@ -471,7 +471,7 @@ export default function BarcodePrinter({ userProfile }) {
         body{margin:0;width:${settings.widthMm}mm;height:${settings.heightMm}mm;display:flex;align-items:center;justify-content:center;}
         svg{width:${settings.widthMm}mm;height:${settings.heightMm}mm;}
       </style></head><body>${svgEl ? svgEl.outerHTML : ""}
-      <script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.frameElement.remove();},100);},300);};<\/script>
+      <script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.frameElement.remove();},100);},300);};</script>
       </body></html>`);
       doc.close();
       setPrintingStatus("Dialog"); addLog("SUCCESS", "Browser print dialog opened.");
@@ -515,423 +515,376 @@ export default function BarcodePrinter({ userProfile }) {
   );
 
   return (
-    <div className="w-full space-y-4 p-2 sm:p-4">
+    <div className="w-full space-y-6 p-2 sm:p-4">
 
-      {/* -- Status Bar -- */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* USB */}
-        <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
-          <span className={`w-1.5 h-1.5 rounded-full ${isUsbConnected ? "bg-green-500 animate-pulse" : usbStatus === "CONNECTING" ? "bg-yellow-400 animate-pulse" : isDriverBlocked ? "bg-orange-500" : "bg-gray-300"}`} />
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">USB: {isUsbConnected ? "CONNECTED" : usbStatus}</span>
+      {/* -- Top Header & Status Bar -- */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white border border-gray-150 p-6 rounded-3xl shadow-sm">
+        <div className="flex items-center gap-2.5">
+          {/* USB */}
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${isUsbConnected ? "bg-green-500 animate-pulse" : usbStatus === "CONNECTING" ? "bg-yellow-400 animate-pulse" : isDriverBlocked ? "bg-orange-500" : "bg-gray-300"}`} />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">USB: {isUsbConnected ? "CONNECTED" : usbStatus}</span>
+          </div>
+          {/* Agent */}
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${agentStatus === "ONLINE" ? "bg-green-500 animate-pulse" : "bg-gray-300"}`} />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Agent: {agentStatus}</span>
+          </div>
         </div>
-        {/* Agent */}
-        <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
-          <span className={`w-1.5 h-1.5 rounded-full ${agentStatus === "ONLINE" ? "bg-green-500 animate-pulse" : "bg-gray-300"}`} />
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Agent: {agentStatus}</span>
-        </div>
-        {/* Checkpoint Loader Button */}
-        <button
-          onClick={() => setShowBatchDrawer(true)}
-          className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 active:scale-95 transition-all"
-        >
-          <Layers className="w-3.5 h-3.5 text-black" />
-          Ingestion Checkpoints
-        </button>
         {/* Label size badge */}
-        <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-full px-3 py-1.5 ml-auto">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
-            {settings.widthMm}mm x {settings.heightMm}mm
+        <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-full px-3.5 py-1.5">
+          <span className="text-[10px] font-black uppercase tracking-wider text-blue-600">
+            {settings.widthMm}mm x {settings.heightMm}mm Roll
           </span>
         </div>
       </div>
 
+      {/* -- Tab Navigation -- */}
+      <div className="flex border-2 border-black rounded-2xl p-1 bg-white overflow-hidden max-w-lg shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+        {[
+          { id: "single", label: "Single Print" },
+          { id: "queue", label: "Batch Print Queue" },
+          { id: "settings", label: "Calibrator & Settings" }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActivePrinterTab(tab.id)}
+            className={`flex-1 text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all ${
+              activePrinterTab === tab.id
+                ? "bg-black text-white shadow-md scale-100"
+                : "text-gray-500 hover:text-black hover:bg-gray-50"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* -- Zadig Warning -- */}
       {isDriverBlocked && (
-        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 text-xs">
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 text-xs animate-pulse">
           <div className="flex items-center gap-2 font-bold text-orange-800">
             <AlertTriangle className="w-4 h-4" /> Driver is blocked, swap to WinUSB
           </div>
         </div>
       )}
 
-      {/* -- Main Grid -- */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      {/* -- Conditional Tabs Rendering -- */}
+      {activePrinterTab === "single" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fast-zoom">
+          {/* Left Column: Properties Form */}
+          <div className="lg:col-span-6 space-y-4">
+            <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <h2 className="text-sm font-black text-black uppercase tracking-widest mb-4 flex items-center gap-2">
+                <Settings className="w-4 h-4" /> Tag Properties
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Barcode Value</label>
+                  <input type="text" value={barcodeValue}
+                    onChange={(e) => setBarcodeValue(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
+                    placeholder="1414199999"
+                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Brand</label>
+                  <input type="text" value={brandValue}
+                    onChange={(e) => setBrandValue(e.target.value)}
+                    placeholder="e.g. Ray-Ban"
+                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Alphanumeric Code / SKU</label>
+                  <input type="text" value={skuValue}
+                    onChange={(e) => setSkuValue(e.target.value)}
+                    placeholder="e.g. RB3025"
+                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Model No</label>
+                  <input type="text" value={modelValue}
+                    onChange={(e) => setModelValue(e.target.value)}
+                    placeholder="e.g. RB3025"
+                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Category</label>
+                  <input type="text" value={categoryName}
+                    onChange={(e) => setCategoryName(e.target.value)}
+                    placeholder="e.g. Eyeglasses"
+                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Price (Rs.)</label>
+                  <input type="text" value={priceValue}
+                    onChange={(e) => setPriceValue(e.target.value)}
+                    placeholder="e.g. 1200"
+                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                </div>
+                <div className="col-span-1 sm:col-span-2">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Frame Dimensions (A / B / DBL / Temple)</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    <input type="text" value={sizeA} onChange={(e) => setSizeA(e.target.value)} placeholder="A" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                    <input type="text" value={sizeB} onChange={(e) => setSizeB(e.target.value)} placeholder="B" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                    <input type="text" value={dbl} onChange={(e) => setDbl(e.target.value)} placeholder="DBL" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                    <input type="text" value={templeLength} onChange={(e) => setTempleLength(e.target.value)} placeholder="Tem" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                  </div>
+                </div>
+                <div className="col-span-1 sm:col-span-2">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Print Quantity</label>
+                  <input type="number" min="1" max="100" value={printQuantity}
+                    onChange={(e) => setPrintQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                </div>
+              </div>
 
-        {/* ==== Left Panel: Tag Config & Connections ==== */}
-        <div className="lg:col-span-4 space-y-4">
-
-          {/* Card 1: Tag Properties */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Settings className="w-3.5 h-3.5" /> Tag Properties
-            </h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Barcode Value</label>
-                <input type="text" value={barcodeValue}
-                  onChange={(e) => setBarcodeValue(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
-                  placeholder="1414199999"
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Brand</label>
-                <input type="text" value={brandValue}
-                  onChange={(e) => setBrandValue(e.target.value)}
-                  placeholder="e.g. Ray-Ban"
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Alphanumeric Code / SKU</label>
-                <input type="text" value={skuValue}
-                  onChange={(e) => setSkuValue(e.target.value)}
-                  placeholder="e.g. RB3025"
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Model No</label>
-                <input type="text" value={modelValue}
-                  onChange={(e) => setModelValue(e.target.value)}
-                  placeholder="e.g. RB3025"
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Category</label>
-                <input type="text" value={categoryName}
-                  onChange={(e) => setCategoryName(e.target.value)}
-                  placeholder="e.g. Eyeglasses"
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Price (Rs.)</label>
-                <input type="text" value={priceValue}
-                  onChange={(e) => setPriceValue(e.target.value)}
-                  placeholder="e.g. 1200"
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                <div>
-                  <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">A</label>
-                  <input type="text" value={sizeA}
-                    onChange={(e) => setSizeA(e.target.value)}
-                    placeholder="52"
-                    className="w-full border border-gray-200 rounded-xl px-2 py-2 text-center text-xs focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">B</label>
-                  <input type="text" value={sizeB}
-                    onChange={(e) => setSizeB(e.target.value)}
-                    placeholder="45"
-                    className="w-full border border-gray-200 rounded-xl px-2 py-2 text-center text-xs focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">DBL</label>
-                  <input type="text" value={dbl}
-                    onChange={(e) => setDbl(e.target.value)}
-                    placeholder="18"
-                    className="w-full border border-gray-200 rounded-xl px-2 py-2 text-center text-xs focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tem</label>
-                  <input type="text" value={templeLength}
-                    onChange={(e) => setTempleLength(e.target.value)}
-                    placeholder="140"
-                    className="w-full border border-gray-200 rounded-xl px-2 py-2 text-center text-xs focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Quantity</label>
-                <input type="number" min="1" max="100" value={printQuantity}
-                  onChange={(e) => setPrintQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black transition-all" />
+              <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleAddToQueue}
+                  disabled={!barcodeValue?.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border-2 border-black text-black font-black py-3.5 rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FolderPlus size={16} /> Add to Queue
+                </button>
               </div>
             </div>
 
-            <div className="mt-5">
-              <button
-                onClick={handleAddToQueue}
-                disabled={!barcodeValue?.trim()}
-                className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold py-3 rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50"
-              >
-                Add to Print Queue
-              </button>
-            </div>
-          </div>
-
-          {/* Card 2: Hardware Printer Control */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-3">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-              <Printer className="w-3.5 h-3.5" /> Hardware Connection
-            </h2>
-
-            <div className="space-y-2">
-              {/* USB Action button */}
-              {isUsbConnected ? (
+            {/* Quick Connections Panel */}
+            <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-3">
+              <h2 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2">
+                <Printer className="w-4 h-4" /> Quick Print Spoolers
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {isUsbConnected ? (
+                  <button onClick={handleUsbPrint} className="flex items-center justify-center gap-2 bg-black hover:bg-neutral-800 text-white font-black py-3 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md active:scale-95">
+                    <Zap className="w-3.5 h-3.5 text-yellow-400" /> USB Print Single
+                  </button>
+                ) : (
+                  <button onClick={connectUSB} className="flex items-center justify-center gap-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 font-bold py-3 rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95">
+                    <Usb className="w-3.5 h-3.5" /> Connect USB
+                  </button>
+                )}
                 <button
-                  onClick={disconnectUSB}
-                  className="w-full flex items-center justify-center gap-2 bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-bold py-3 rounded-xl text-xs transition-all active:scale-95"
-                >
-                  <Unplug className="w-3.5 h-3.5" />
-                  Disconnect USB Printer
-                </button>
-              ) : (
-                <button
-                  onClick={connectUSB}
-                  disabled={!isUsbSupported || printingStatus.includes("SENDING")}
-                  className="w-full flex items-center justify-center gap-2 bg-black hover:bg-neutral-800 text-white font-bold py-3 rounded-xl text-xs transition-all shadow-md active:scale-95 disabled:bg-neutral-300 disabled:cursor-not-allowed"
-                >
-                  <Usb className="w-3.5 h-3.5" />
-                  Connect USB Printer First
-                </button>
-              )}
-
-              {/* Agent Print Button */}
-              <button
-                onClick={handleAgentPrint}
-                disabled={agentStatus !== "ONLINE" || printingStatus.includes("SENDING")}
-                className={`w-full flex items-center justify-center gap-2 border font-bold py-2.5 rounded-xl text-xs transition-all active:scale-95 ${agentStatus === "ONLINE"
-                  ? "bg-white hover:bg-gray-50 border-gray-200 text-gray-700"
-                  : "bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed"
+                  onClick={handleAgentPrint}
+                  disabled={agentStatus !== "ONLINE" || printingStatus.includes("SENDING")}
+                  className={`flex items-center justify-center gap-2 border-2 font-black py-3 rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95 ${
+                    agentStatus === "ONLINE"
+                      ? "bg-white hover:bg-gray-50 border-black text-black"
+                      : "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
                   }`}
-              >
-                <Settings className="w-3.5 h-3.5" />
-                {agentStatus === "ONLINE"
-                  ? "Print Single via Local Agent"
-                  : "Agent Offline - run local-print-agent.js"}
-              </button>
-
-              {/* Fallback Dialog */}
+                >
+                  <Settings className="w-3.5 h-3.5" /> Agent Print Single
+                </button>
+              </div>
               <button
                 onClick={handleBrowserPrint}
                 className="w-full flex items-center justify-center gap-2 border border-gray-100 text-gray-500 font-bold py-2 rounded-xl text-[10px] hover:bg-gray-50 transition-all active:scale-95"
               >
-                <Printer className="w-3 h-3" />
                 Browser Dialog (Fallback)
               </button>
             </div>
           </div>
 
-          {/* -- Custom Settings Panel -- */}
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-            <button onClick={() => setShowSettings((s) => !s)}
-              className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-all">
-              <span className="text-xs font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" /> Custom TSPL Settings
-              </span>
-              {showSettings ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-            </button>
-
-            {showSettings && (
-              <div className="px-5 pb-5 space-y-4 border-t border-gray-100">
-                {/* Label Size */}
-                <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-4 mb-2">Label Size</p>
-                  <div className="space-y-2">
-                    <SettingRow label="Width (mm)" settingKey="widthMm" min={20} max={200} step={0.1} />
-                    <SettingRow label="Height (mm)" settingKey="heightMm" min={10} max={200} step={0.1} />
-                    <SettingRow label="Gap (mm)" settingKey="gapMm" min={0} max={20} step={0.5} />
-                    <SettingRow label="Direction" settingKey="direction"
-                      options={[{ value: 0, label: "0 - Normal" }, { value: 1, label: "1 - Rotate 180 deg" }]} />
-                  </div>
-                </div>
-
-                {/* Category Text */}
-                <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Category Text</p>
-                  <div className="space-y-2">
-                    <SettingRow label="X offset (dots)" settingKey="categoryX" min={0} max={800} />
-                    <SettingRow label="Y - brand (dots)" settingKey="categoryY1" min={0} max={200} />
-                    <SettingRow label="Y - category (dots)" settingKey="categoryY2" min={0} max={200} />
-                    <SettingRow label="Y - SKU (dots)" settingKey="categoryY3" min={0} max={200} />
-                    <SettingRow label="Font size" settingKey="categoryFont"
-                      options={[
-                        { value: "1", label: "1 - Tiny" },
-                        { value: "2", label: "2 - Small" },
-                        { value: "3", label: "3 - Medium" },
-                        { value: "4", label: "4 - Large" },
-                      ]} />
-                  </div>
-                </div>
-
-                {/* Barcode */}
-                <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Barcode</p>
-                  <div className="space-y-2">
-                    <SettingRow label="X position (dots)" settingKey="barcodeX" min={0} max={800} />
-                    <SettingRow label="Y position (dots)" settingKey="barcodeY" min={0} max={180} />
-                    <SettingRow label="Bar height (dots)" settingKey="barcodeHeight" min={20} max={200} />
-                    <SettingRow label="Narrow bar (dots)" settingKey="barcodeNarrow" min={1} max={4} />
-                    <SettingRow label="Text Y position (dots)" settingKey="barcodeTextY" min={0} max={180} />
-                  </div>
-                </div>
-
-                {/* Reset */}
-                <button onClick={() => setSettings(DEFAULT_SETTINGS)}
-                  className="w-full text-[10px] font-bold uppercase tracking-widest text-red-400 hover:text-red-600 py-2 border border-red-100 rounded-xl hover:bg-red-50 transition-all">
-                  Reset to Defaults
-                </button>
+          {/* Right Column: Live Preview & Spooler Logs */}
+          <div className="lg:col-span-6 space-y-4">
+            <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <h2 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Live Label Preview</h2>
+              <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl p-4 flex items-center justify-center min-h-[140px]">
+                <svg id="preview-label-svg" viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full h-auto shadow-md border border-gray-150 rounded-lg bg-white" style={{ maxHeight: 160 }} xmlns="http://www.w3.org/2000/svg">
+                  <path d="M 10,15 H 310 A 10,10 0 0,1 320,25 V 42 H 390 A 8,8 0 0,1 390,58 H 320 V 75 A 10,10 0 0,1 310,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z" fill="white" stroke="#e5e7eb" strokeWidth="1.5" />
+                  <text x={Math.round((65 / 440) * 320)} y={32} fontFamily="'Inter', sans-serif" fontWeight="800" fontSize={8} fill="#111" textAnchor="middle">{brandValue || "No Brand"}</text>
+                  <text x={Math.round((15 / 440) * 320)} y={54} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#555">{categoryName || "Uncategorized"}</text>
+                  <text x={Math.round((130 / 440) * 320)} y={54} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">SKU:{skuValue || ""}</text>
+                  <text x={Math.round((15 / 440) * 320)} y={74} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#444">price:Rs.{priceValue || ""}</text>
+                  <text x={Math.round((130 / 440) * 320)} y={74} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">M:{modelValue || ""}</text>
+                  <text x={Math.round((240 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">A</text>
+                  <text x={Math.round((240 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeA || ""}</text>
+                  <text x={Math.round((290 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">B</text>
+                  <text x={Math.round((290 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeB || ""}</text>
+                  <text x={Math.round((340 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">DBL</text>
+                  <text x={Math.round((340 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{dbl || ""}</text>
+                  <text x={Math.round((390 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">Tem</text>
+                  <text x={Math.round((390 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{templeLength || ""}</text>
+                  {renderMockBars(Math.round((230 / 440) * 320), Math.round((200 / 440) * 320), 48, 26)}
+                  <text x={Math.round((270 / 440) * 320)} y={82} fontFamily="monospace" fontSize="6" fill="#333" textAnchor="middle">{barcodeValue}</text>
+                </svg>
               </div>
-            )}
+            </div>
+
+            {/* Logs console */}
+            <div className="bg-black text-white border-2 border-black rounded-3xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <div className="bg-neutral-900 border-b-2 border-black px-5 py-3 flex items-center justify-between">
+                <span className="text-xs font-black text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Terminal className="w-4 h-4" /> Live Spooler Log
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-300">{printingStatus}</span>
+              </div>
+              <div className="p-4 font-mono text-xs space-y-1.5 max-h-[220px] overflow-y-auto">
+                {logs.map((log, i) => (
+                  <div key={i} className="flex items-start gap-2 leading-relaxed">
+                    <span className="text-neutral-500">[{log.ts}]</span>
+                    <span className={`font-bold ${log.status === "INFO" ? "text-blue-400" : log.status === "PENDING" ? "text-amber-400" : log.status === "SUCCESS" ? "text-green-400" : log.status === "WARNING" ? "text-yellow-400" : "text-red-400"}`}>{log.status}:</span>
+                    <span className="text-neutral-300">{log.msg}</span>
+                  </div>
+                ))}
+                <div ref={logsEndRef} />
+              </div>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* ==== Right Panel: Preview + Queue + Logs ==== */}
-        <div className="lg:col-span-8 space-y-4">
-
-          {/* -- Label Preview -- */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-              Live Label Preview - {settings.widthMm}mm x {settings.heightMm}mm (Jewelry/Dumbbell Tag)
-            </h2>
-            <div className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-4 flex items-center justify-center min-h-[120px]">
-              <svg
-                id="preview-label-svg"
-                viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-                className="w-full h-auto shadow border border-gray-100"
-                style={{ maxHeight: 140 }}
-                xmlns="http://www.w3.org/2000/svg"
+      {activePrinterTab === "queue" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fast-zoom">
+          {/* Left Column: Connections & Checkpoints */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
+              <h2 className="text-sm font-black text-black uppercase tracking-widest">Ingestion Sources</h2>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Import product specs from a checkpoint batch into the queue</p>
+              <button
+                onClick={() => setShowBatchDrawer(true)}
+                className="w-full flex items-center justify-center gap-2 bg-black hover:bg-neutral-800 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md active:scale-95"
               >
-                {/* Background: actual physical flat-edged jewelry dumbbell tag shape with a tail */}
-                <path
-                  d="M 10,15 H 310 A 10,10 0 0,1 320,25 V 42 H 390 A 8,8 0 0,1 390,58 H 320 V 75 A 10,10 0 0,1 310,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z"
-                  fill="white" stroke="#e5e7eb" strokeWidth="1.5"
-                />
-
-                {/* Left Flap: Brand Name (Centered at X = 65 dots -> SVG X = 47) */}
-                <text
-                  x={Math.round((65 / 440) * 320)}
-                  y={32}
-                  fontFamily="'Inter', sans-serif" fontWeight="800"
-                  fontSize={8}
-                  fill="#111"
-                  textAnchor="middle"
-                >
-                  {brandValue || "No Brand"}
-                </text>
-
-                {/* Left Flap: Category (Left-aligned at X = 15 dots -> SVG X = 11) */}
-                <text
-                  x={Math.round((15 / 440) * 320)}
-                  y={54}
-                  fontFamily="'Inter', sans-serif" fontWeight="700"
-                  fontSize={6}
-                  fill="#555"
-                >
-                  {categoryName || "Uncategorized"}
-                </text>
-
-                {/* Left Flap: SKU (Right-aligned at X = 130 dots -> SVG X = 95) */}
-                <text
-                  x={Math.round((130 / 440) * 320)}
-                  y={54}
-                  fontFamily="monospace" fontWeight="700"
-                  fontSize={6}
-                  fill="#444"
-                >
-                  SKU:{skuValue || ""}
-                </text>
-
-                {/* Left Flap: Price (Left-aligned at X = 15 dots -> SVG X = 11) */}
-                <text
-                  x={Math.round((15 / 440) * 320)}
-                  y={74}
-                  fontFamily="'Inter', sans-serif" fontWeight="700"
-                  fontSize={6}
-                  fill="#444"
-                >
-                  price:Rs.{priceValue || ""}
-                </text>
-
-                {/* Left Flap: Model No (Right-aligned at X = 130 dots -> SVG X = 95) */}
-                <text
-                  x={Math.round((130 / 440) * 320)}
-                  y={74}
-                  fontFamily="monospace" fontWeight="700"
-                  fontSize={6}
-                  fill="#444"
-                >
-                  M:{modelValue || ""}
-                </text>
-
-                {/* Right Flap: Spec Headers & Values (Evenly spaced columns starting at X=240 dots) */}
-                <text x={Math.round((240 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">A</text>
-                <text x={Math.round((240 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeA || ""}</text>
-
-                <text x={Math.round((290 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">B</text>
-                <text x={Math.round((290 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeB || ""}</text>
-
-                <text x={Math.round((340 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">DBL</text>
-                <text x={Math.round((340 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{dbl || ""}</text>
-
-                <text x={Math.round((390 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">Tem</text>
-                <text x={Math.round((390 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{templeLength || ""}</text>
-
-                {/* Right Flap: Barcode (Centered in the right flap zone, Y=48 to 74) */}
-                {renderMockBars(Math.round((230 / 440) * 320), Math.round((200 / 440) * 320), 48, 26)}
-
-                {/* Right Flap: Barcode number (Y = 82) */}
-                <text
-                  x={Math.round((270 / 440) * 320)}
-                  y={82}
-                  fontFamily="monospace" fontSize="6" fill="#333" textAnchor="middle"
-                >
-                  {barcodeValue}
-                </text>
-              </svg>
+                <Layers className="w-4 h-4 text-white" />
+                Load Ingestion Checkpoint
+              </button>
             </div>
-          </div>
 
-          {/* -- Active Review Queue Table -- */}
-          <PrintQueue
-            queue={queue}
-            onUpdateQty={updateItemQty}
-            onRemove={removeItem}
-            onClear={clearQueue}
-            onClearCompleted={clearCompleted}
-            onPrintBatch={handlePrintBatch}
-            isPrinting={isPrintingBatch}
-            currentIndex={currentBatchIdx}
-            activeMode={usbStatus === "CONNECTED" ? "usb" : "agent"}
-          />
-
-          {/* -- TSPL Payload Preview -- */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-              Generated Single Label TSPL
-            </h3>
-            <pre className="bg-gray-50 rounded-xl p-4 text-[11px] font-mono text-gray-700 whitespace-pre-wrap leading-relaxed overflow-x-auto">
-              {tsplOutput}
-            </pre>
-          </div>
-
-          {/* -- Console Spooler Logs -- */}
-          <div className="bg-black text-white border border-neutral-800 rounded-2xl overflow-hidden">
-            <div className="bg-neutral-900 border-b border-neutral-800 px-4 py-2.5 flex items-center justify-between">
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5" /> Spooler Log
-              </span>
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${printingStatus === "IDLE" ? "bg-neutral-500" : printingStatus.includes("SENDING") ? "bg-amber-500 animate-pulse" : printingStatus.includes("SUCCESS") ? "bg-green-500" : "bg-red-500"}`} />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-300">{printingStatus}</span>
+            <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
+              <h2 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2">
+                <Printer className="w-4 h-4" /> Hardware Settings
+              </h2>
+              <div className="space-y-2">
+                {isUsbConnected ? (
+                  <button onClick={disconnectUSB} className="w-full flex items-center justify-center gap-2 bg-red-50 border-2 border-red-200 hover:bg-red-100 text-red-700 font-black py-3.5 rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95">
+                    <Unplug className="w-4 h-4" /> Disconnect USB
+                  </button>
+                ) : (
+                  <button onClick={connectUSB} className="w-full flex items-center justify-center gap-2 bg-black hover:bg-neutral-800 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md active:scale-95">
+                    <Usb className="w-4 h-4" /> Connect USB Printer
+                  </button>
+                )}
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1.5 text-xs">
+                  <div className="flex justify-between font-semibold"><span className="text-gray-500">USB Status:</span> <span className="uppercase text-black">{usbStatus}</span></div>
+                  <div className="flex justify-between font-semibold"><span className="text-gray-500">Print Agent:</span> <span className="uppercase text-black">{agentStatus}</span></div>
+                </div>
               </div>
             </div>
-            <div className="p-4 font-mono text-xs space-y-1 max-h-[180px] overflow-y-auto">
-              {logs.map((log, i) => (
-                <div key={i} className="flex items-start gap-2 leading-relaxed">
-                  <span className="text-neutral-500 flex-shrink-0">[{log.ts}]</span>
-                  <span className={`flex-shrink-0 font-bold ${log.status === "INFO" ? "text-blue-400" :
-                    log.status === "PENDING" ? "text-amber-400" :
-                      log.status === "SUCCESS" ? "text-green-400" :
-                        log.status === "WARNING" ? "text-yellow-400" :
-                          log.status === "DIAGNOSTIC" ? "text-orange-400" : "text-red-400"
-                    }`}>{log.status}:</span>
-                  <span className="text-neutral-300">{log.msg}</span>
-                </div>
-              ))}
-              <div ref={logsEndRef} />
+
+            {/* Console Log */}
+            <div className="bg-black text-white border-2 border-black rounded-3xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <div className="bg-neutral-900 border-b-2 border-black px-5 py-3 flex items-center justify-between">
+                <span className="text-xs font-black text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Terminal className="w-4 h-4" /> Spooler Logs
+                </span>
+              </div>
+              <div className="p-4 font-mono text-[10px] space-y-1.5 max-h-[220px] overflow-y-auto">
+                {logs.map((log, i) => (
+                  <div key={i} className="flex items-start gap-2 leading-relaxed">
+                    <span className="text-neutral-500">[{log.ts}]</span>
+                    <span className={`font-bold ${log.status === "INFO" ? "text-blue-400" : log.status === "PENDING" ? "text-amber-400" : log.status === "SUCCESS" ? "text-green-400" : log.status === "WARNING" ? "text-yellow-400" : "text-red-400"}`}>{log.status}:</span>
+                    <span className="text-neutral-300">{log.msg}</span>
+                  </div>
+                ))}
+                <div ref={logsEndRef} />
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Print Queue Table */}
+          <div className="lg:col-span-8">
+            <PrintQueue
+              queue={queue}
+              onUpdateQty={updateItemQty}
+              onRemove={removeItem}
+              onClear={clearQueue}
+              onClearCompleted={clearCompleted}
+              onPrintBatch={handlePrintBatch}
+              isPrinting={isPrintingBatch}
+              currentIndex={currentBatchIdx}
+              activeMode={usbStatus === "CONNECTED" ? "usb" : "agent"}
+            />
+          </div>
+        </div>
+      )}
+
+      {activePrinterTab === "settings" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fast-zoom">
+          {/* Left Column: Sliders/Settings */}
+          <div className="lg:col-span-5 bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-6">
+            <div>
+              <h2 className="text-sm font-black text-black uppercase tracking-widest">TSPL Calibrator</h2>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Fine-tune label metrics and offsets</p>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-1">Label size</p>
+                <SettingRow label="Width (mm)" settingKey="widthMm" min={20} max={200} step={0.1} />
+                <SettingRow label="Height (mm)" settingKey="heightMm" min={10} max={200} step={0.1} />
+                <SettingRow label="Gap (mm)" settingKey="gapMm" min={0} max={20} step={0.5} />
+                <SettingRow label="Direction" settingKey="direction" options={[{ value: 0, label: "0 - Normal" }, { value: 1, label: "1 - Rotate 180 deg" }]} />
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-1">Text Alignment</p>
+                <SettingRow label="X offset (dots)" settingKey="categoryX" min={0} max={800} />
+                <SettingRow label="Y - brand (dots)" settingKey="categoryY1" min={0} max={200} />
+                <SettingRow label="Y - category (dots)" settingKey="categoryY2" min={0} max={200} />
+                <SettingRow label="Y - SKU (dots)" settingKey="categoryY3" min={0} max={200} />
+                <SettingRow label="Font size" settingKey="categoryFont" options={[{ value: "1", label: "1 - Tiny" }, { value: "2", label: "2 - Small" }, { value: "3", label: "3 - Medium" }, { value: "4", label: "4 - Large" }]} />
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-1">Barcode alignment</p>
+                <SettingRow label="X position (dots)" settingKey="barcodeX" min={0} max={800} />
+                <SettingRow label="Y position (dots)" settingKey="barcodeY" min={0} max={180} />
+                <SettingRow label="Bar height (dots)" settingKey="barcodeHeight" min={20} max={200} />
+                <SettingRow label="Narrow bar (dots)" settingKey="barcodeNarrow" min={1} max={4} />
+                <SettingRow label="Text Y position (dots)" settingKey="barcodeTextY" min={0} max={180} />
+              </div>
+
+              <button onClick={() => setSettings(DEFAULT_SETTINGS)} className="w-full text-xs font-black uppercase tracking-widest text-red-500 hover:text-red-700 py-3 border-2 border-red-200 hover:bg-red-50 rounded-xl transition-all">
+                Reset to Defaults
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column: Live Preview & Raw TSPL */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <h2 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Calibration Preview</h2>
+              <div className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-4 flex items-center justify-center min-h-[140px]">
+                <svg id="preview-label-svg" viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full h-auto shadow border border-gray-105 bg-white" style={{ maxHeight: 140 }} xmlns="http://www.w3.org/2000/svg">
+                  <path d="M 10,15 H 310 A 10,10 0 0,1 320,25 V 42 H 390 A 8,8 0 0,1 390,58 H 320 V 75 A 10,10 0 0,1 310,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z" fill="white" stroke="#e5e7eb" strokeWidth="1.5" />
+                  <text x={Math.round((65 / 440) * 320)} y={32} fontFamily="'Inter', sans-serif" fontWeight="800" fontSize={8} fill="#111" textAnchor="middle">{brandValue || "No Brand"}</text>
+                  <text x={Math.round((15 / 440) * 320)} y={54} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#555">{categoryName || "Uncategorized"}</text>
+                  <text x={Math.round((130 / 440) * 320)} y={54} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">SKU:{skuValue || ""}</text>
+                  <text x={Math.round((15 / 440) * 320)} y={74} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#444">price:Rs.{priceValue || ""}</text>
+                  <text x={Math.round((130 / 440) * 320)} y={74} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">M:{modelValue || ""}</text>
+                  <text x={Math.round((240 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">A</text>
+                  <text x={Math.round((240 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeA || ""}</text>
+                  <text x={Math.round((290 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">B</text>
+                  <text x={Math.round((290 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeB || ""}</text>
+                  <text x={Math.round((340 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">DBL</text>
+                  <text x={Math.round((340 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{dbl || ""}</text>
+                  <text x={Math.round((390 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">Tem</text>
+                  <text x={Math.round((390 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{templeLength || ""}</text>
+                  {renderMockBars(Math.round((230 / 440) * 320), Math.round((200 / 440) * 320), 48, 26)}
+                  <text x={Math.round((270 / 440) * 320)} y={82} fontFamily="monospace" fontSize="6" fill="#333" textAnchor="middle">{barcodeValue}</text>
+                </svg>
+              </div>
+            </div>
+
+            <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Generated TSPL Payload</h3>
+              <pre className="bg-gray-50 rounded-2xl p-4 text-[10px] font-mono text-gray-700 whitespace-pre-wrap leading-relaxed overflow-x-auto max-h-[220px]">
+                {tsplOutput}
+              </pre>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* -- Modal: Ingestion Checkpoint Loader -- */}
       <BatchLoader

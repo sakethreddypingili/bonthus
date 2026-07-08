@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { Camera, Upload, Trash2, Check, Sparkles, QrCode, Clock, AlertCircle, ChevronRight, ImageIcon, PackageCheck } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Camera, Upload, Trash2, Check, QrCode, ChevronLeft } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
+import { Html5Qrcode } from "html5-qrcode";
 
 const POSITIONS = ['cover', 'front', 'side'];
 
@@ -56,16 +57,6 @@ const getComputedProductName = (name, brand, frameSpecs) => {
         .join(" ");
 };
 
-// Read a File as a Base64 Data URL
-const readFileAsDataURL = (file) => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error("Failed to read file as Data URL"));
-        reader.readAsDataURL(file);
-    });
-};
-
 // Helper to convert any image file to a WebP data URL (Base64)
 const convertToWebP = (file) => {
     return new Promise((resolve, reject) => {
@@ -107,6 +98,43 @@ const convertToWebP = (file) => {
     });
 };
 
+// Background removal helper using HTML5 Canvas white thresholding
+const removeWhiteBackground = (webpDataUrl, threshold = 230) => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+
+            try {
+                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imgData.data;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+
+                    // If pixel is very close to white/light gray
+                    if (r > threshold && g > threshold && b > threshold) {
+                        data[i + 3] = 0; // Alpha channel to 0 (fully transparent)
+                    }
+                }
+
+                ctx.putImageData(imgData, 0, 0);
+                resolve(canvas.toDataURL("image/webp", 0.82));
+            } catch (err) {
+                reject(err);
+            }
+        };
+        img.onerror = (e) => reject(e);
+        img.src = webpDataUrl;
+    });
+};
+
 // Convert a data URL back to a Blob for upload
 const dataURLToBlob = async (dataUrl) => {
     const res = await fetch(dataUrl);
@@ -119,26 +147,20 @@ export default function Visualise({ userProfile }) {
     const [successMessage, setSuccessMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
 
-    const [poolItems, setPoolItems] = useState([]);
-    const [selectedItem, setSelectedItem] = useState(null);
+    // Step state: 'scan' | 'details' | 'images' | 'summary'
+    const [visualiseStage, setVisualiseStage] = useState('scan');
     
-    // Captured images mapping
-    const [images, setImages] = useState({
-        cover: null, // { file, previewDataUrl, webpDataUrl, webpBlob }
-        front: null,
-        side: null
-    });
+    // Scanner control states
+    const [isScanning, setIsScanning] = useState(false);
+    const html5QrCodeRef = useRef(null);
+    const isProcessingBarcodeRef = useRef(false);
 
-    const [showPreviewModal, setShowPreviewModal] = useState(false);
-    const [recentUploads, setRecentUploads] = useState([]);
-    const [currentTime, setCurrentTime] = useState(new Date());
-
+    // Scanned product details
     const [barcodeQuery, setBarcodeQuery] = useState("");
     const [scannedProduct, setScannedProduct] = useState(null);
     const [scannedProductCategoryPath, setScannedProductCategoryPath] = useState("");
     const [scannedProductCategoryType, setScannedProductCategoryType] = useState(null);
-    const [visualiseStage, setVisualiseStage] = useState('scan');
-    
+
     const [lensForm, setLensForm] = useState({
         lensType: "",
         index: "",
@@ -149,10 +171,25 @@ export default function Visualise({ userProfile }) {
         axis: "",
         add: ""
     });
+
     const [frameForm, setFrameForm] = useState({
         modelNo: "",
-        color: ""
+        color: "",
+        sizeA: "",
+        sizeB: "",
+        dbl: "",
+        templeLength: "",
+        frameShape: "",
+        frameType: ""
     });
+
+    // Ingested images state
+    const [images, setImages] = useState({
+        cover: null, // { file, previewDataUrl, webpDataUrl, webpBlob, isBgRemoved }
+        front: null,
+        side: null
+    });
+
     const [showConfirmPopup, setShowConfirmPopup] = useState(false);
 
     const fetchCategoryPath = async (categoryId) => {
@@ -182,18 +219,30 @@ export default function Visualise({ userProfile }) {
         return null;
     };
 
-    const handleBarcodeScan = async (e) => {
-        if (e) e.preventDefault();
-        if (!barcodeQuery.trim()) return;
+    // Camera scanner start/stop helpers
+    const stopScanner = useCallback(async () => {
+        if (html5QrCodeRef.current) {
+            try {
+                if (html5QrCodeRef.current.isScanning) {
+                    await html5QrCodeRef.current.stop();
+                }
+            } catch (err) {
+                console.warn("Scanner stop cleanup:", err);
+            }
+            html5QrCodeRef.current = null;
+        }
+        setIsScanning(false);
+        isProcessingBarcodeRef.current = false;
+    }, []);
+
+    const searchProductByBarcode = useCallback(async (queryVal) => {
         setLoading(true);
         setErrorMessage("");
         setSuccessMessage("");
         try {
-            const queryVal = barcodeQuery.trim();
-
             let pendingData = null;
 
-            // Path 1a: Check if barcode is registered in pending_product_barcodes
+            // Search pending_products
             const { data: pBarData } = await supabase
                 .from("pending_product_barcodes")
                 .select("pending_product_id")
@@ -210,7 +259,6 @@ export default function Visualise({ userProfile }) {
                 pendingData = pProd;
             }
 
-            // Path 1b: Fallback to searching SKU directly in pending_products (if they entered SKU code)
             if (!pendingData) {
                 const { data: pProd } = await supabase
                     .from("pending_products")
@@ -222,30 +270,28 @@ export default function Visualise({ userProfile }) {
             }
 
             if (pendingData) {
-                // Process pending product (existing flow)
                 const categoryPath = await fetchCategoryPath(pendingData.category_id);
                 const categoryType = getCategoryType(categoryPath);
 
                 setScannedProduct(pendingData);
                 setScannedProductCategoryPath(categoryPath);
                 setScannedProductCategoryType(categoryType);
-                setVisualiseStage('input');
+                setVisualiseStage('details');
 
+                // Populate specs forms
                 if (categoryType === 'lens' && pendingData.description) {
                     try {
                         const parsed = JSON.parse(pendingData.description);
-                        if (parsed.type === 'lens') {
-                            setLensForm({
-                                lensType: parsed.lensType || "",
-                                index: parsed.index || "",
-                                material: parsed.material || "",
-                                coating: parsed.coating || "",
-                                sph: parsed.sph || "",
-                                cyl: parsed.cyl || "",
-                                axis: parsed.axis || "",
-                                add: parsed.add || ""
-                            });
-                        }
+                        setLensForm({
+                            lensType: parsed.lensType || "",
+                            index: parsed.index || "",
+                            material: parsed.material || "",
+                            coating: parsed.coating || "",
+                            sph: parsed.sph || "",
+                            cyl: parsed.cyl || "",
+                            axis: parsed.axis || "",
+                            add: parsed.add || ""
+                        });
                     } catch (e) {}
                 } else if (categoryType === 'frame') {
                     try {
@@ -256,76 +302,153 @@ export default function Visualise({ userProfile }) {
                             sizeA: parsed.sizeA || "",
                             sizeB: parsed.sizeB || "",
                             dbl: parsed.dbl || "",
-                            templeLength: parsed.templeLength || ""
+                            templeLength: parsed.templeLength || "",
+                            frameShape: parsed.frameShape || pendingData.frame_shape || "",
+                            frameType: parsed.frameType || pendingData.frame_type || ""
                         });
                     } catch (e) {
                         setFrameForm({
                             modelNo: pendingData.frame_model_no || "",
                             color: pendingData.frame_color || "",
-                            sizeA: "",
-                            sizeB: "",
-                            dbl: "",
-                            templeLength: ""
+                            sizeA: "", sizeB: "", dbl: "", templeLength: "", frameShape: "", frameType: ""
                         });
                     }
                 }
                 setImages({ cover: null, front: null, side: null });
-                return;
+            } else {
+                setErrorMessage(`Product with barcode "${queryVal}" was not found in pending inventory.`);
+                isProcessingBarcodeRef.current = false;
             }
-
-            // Path 2: Look up in product_barcodes and find matching imagine_pool items
-            const { data: barcodeData } = await supabase
-                .from("product_barcodes")
-                .select("product_id")
-                .eq("barcode", queryVal)
-                .maybeSingle();
-
-            if (barcodeData) {
-                // Find matching pending imagine_pool item for this product
-                const { data: poolData } = await supabase
-                    .from("imagine_pool")
-                    .select(`
-                        id,
-                        status,
-                        expires_at,
-                        created_at,
-                        products (
-                            id,
-                            name,
-                            sku,
-                            frame_shape,
-                            frame_type,
-                            product_barcodes (
-                                barcode
-                            ),
-                            product_images (
-                                image_url,
-                                position
-                            )
-                        )
-                    `)
-                    .eq("product_id", barcodeData.product_id)
-                    .eq("status", "pending")
-                    .gt("expires_at", new Date().toISOString())
-                    .maybeSingle();
-
-                if (poolData) {
-                    // Select item from the pool list
-                    handleSelectItem(poolData);
-                    setSuccessMessage(`Found linked product order request: "${poolData.products.name}"! Ready for visualisation uploads.`);
-                    return;
-                }
-            }
-            // Path 3: Fallback - Product not found anywhere
-            setErrorMessage(`No pending product or order request found with barcode: ${queryVal}`);
         } catch (err) {
-            setErrorMessage("Search failed: " + err.message);
+            setErrorMessage("Search error: " + err.message);
+            isProcessingBarcodeRef.current = false;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const handleBarcodeFound = useCallback(async (barcodeVal) => {
+        if (isProcessingBarcodeRef.current) return;
+        isProcessingBarcodeRef.current = true;
+        await stopScanner();
+        await searchProductByBarcode(barcodeVal);
+    }, [stopScanner, searchProductByBarcode]);
+
+    const startScanner = useCallback(async () => {
+        setErrorMessage("");
+        setSuccessMessage("");
+        try {
+            await stopScanner();
+            const qrCode = new Html5Qrcode("visualise-camera-reader");
+            html5QrCodeRef.current = qrCode;
+            setIsScanning(true);
+            await qrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 180 } },
+                (decodedText) => {
+                    handleBarcodeFound(decodedText);
+                },
+                () => {}
+            );
+        } catch (err) {
+            setErrorMessage("Failed to access device camera: " + err.message);
+            setIsScanning(false);
+        }
+    }, [stopScanner, handleBarcodeFound]);
+
+    const handleManualSearch = useCallback((e) => {
+        if (e) e.preventDefault();
+        if (!barcodeQuery.trim()) return;
+        stopScanner();
+        searchProductByBarcode(barcodeQuery.trim());
+    }, [barcodeQuery, stopScanner, searchProductByBarcode]);
+
+    // Auto-start camera when stage is 'scan'
+    useEffect(() => {
+        if (visualiseStage === 'scan') {
+            startScanner();
+        }
+        return () => {
+            stopScanner();
+        };
+    }, [visualiseStage, startScanner, stopScanner]);
+
+    const handleFileChange = async (e, position) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            // Read for immediate preview
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const previewDataUrl = event.target.result;
+
+                setImages(prev => ({
+                    ...prev,
+                    [position]: {
+                        file,
+                        previewDataUrl,
+                        webpDataUrl: previewDataUrl,
+                        webpBlob: file,
+                        isBgRemoved: false
+                    }
+                }));
+
+                // Convert to WebP format
+                const webpDataUrl = await convertToWebP(file);
+                const webpBlob = await dataURLToBlob(webpDataUrl);
+
+                setImages(prev => {
+                    if (!prev[position]) return prev;
+                    return {
+                        ...prev,
+                        [position]: {
+                            ...prev[position],
+                            webpDataUrl,
+                            webpBlob
+                        }
+                    };
+                });
+            };
+            reader.readAsDataURL(file);
+        } catch (err) {
+            setErrorMessage("Image processing failed: " + err.message);
+        }
+    };
+
+    // Run Background Removal for the Cover Image
+    const handleRemoveCoverBg = async () => {
+        const cover = images.cover;
+        if (!cover?.webpDataUrl) return;
+
+        setLoading(true);
+        try {
+            const cleanDataUrl = await removeWhiteBackground(cover.webpDataUrl, 238);
+            const cleanBlob = await dataURLToBlob(cleanDataUrl);
+
+            setImages(prev => ({
+                ...prev,
+                cover: {
+                    ...prev.cover,
+                    webpDataUrl: cleanDataUrl,
+                    webpBlob: cleanBlob,
+                    isBgRemoved: true
+                }
+            }));
+            setSuccessMessage("Background removed from Cover image.");
+        } catch (err) {
+            setErrorMessage("Background removal failed: " + err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleConfirmScanSubmission = async () => {
+    const handleRemoveImage = (position) => {
+        setImages(prev => ({ ...prev, [position]: null }));
+    };
+
+    // Final confirmation submission
+    const handleFinalConfirmSubmission = async () => {
         setShowConfirmPopup(false);
         setSubmitting(true);
         setErrorMessage("");
@@ -342,6 +465,7 @@ export default function Visualise({ userProfile }) {
                 let coverUrl = null;
                 const uploadedUrls = {};
 
+                // Upload WebP images to storage
                 for (const position of POSITIONS) {
                     const imgData = images[position];
                     if (!imgData?.webpBlob) continue;
@@ -381,6 +505,8 @@ export default function Visualise({ userProfile }) {
                     sizeB: frameForm.sizeB,
                     dbl: frameForm.dbl,
                     templeLength: frameForm.templeLength,
+                    frameShape: frameForm.frameShape,
+                    frameType: frameForm.frameType,
                     imageUrls: uploadedUrls,
                     coverUrl: coverUrl || scannedProduct.image_url
                 });
@@ -431,245 +557,23 @@ export default function Visualise({ userProfile }) {
 
             if (updateError) throw updateError;
 
-            setSuccessMessage(`Successfully confirmed and moved ${scannedProduct.name} to Confirmed Queue!`);
+            setSuccessMessage(`Successfully confirmed and ingested product: "${scannedProduct.name}"!`);
             
+            // Reset state
             setImages({ cover: null, front: null, side: null });
             setScannedProduct(null);
             setVisualiseStage('scan');
             setBarcodeQuery("");
-            await fetchPool();
         } catch (err) {
-            setErrorMessage(err.message || "Submission failed.");
+            setErrorMessage(err.message || "Failed to finalize submission.");
         } finally {
             setSubmitting(false);
         }
-    };
-
-    useEffect(() => {
-        fetchPool();
-        const timer = setInterval(() => {
-            setCurrentTime(new Date());
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    const fetchPool = async () => {
-        setLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('imagine_pool')
-                .select(`
-                    id,
-                    status,
-                    expires_at,
-                    created_at,
-                    products (
-                        id,
-                        name,
-                        sku,
-                        frame_shape,
-                        frame_type,
-                        product_barcodes (
-                            barcode
-                        ),
-                        product_images (
-                            image_url,
-                            position
-                        )
-                    )
-                `)
-                .eq('status', 'pending')
-                .gt('expires_at', new Date().toISOString())
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setPoolItems(data || []);
-
-            const { data: recent, error: recentErr } = await supabase
-                .from('imagine_pool')
-                .select(`
-                    id,
-                    status,
-                    created_at,
-                    products (
-                        name,
-                        product_barcodes (
-                            barcode
-                        ),
-                        product_images (
-                            image_url,
-                            position
-                        )
-                    )
-                `)
-                .eq('status', 'completed')
-                .order('created_at', { ascending: false })
-                .limit(10);
-
-            if (!recentErr) {
-                setRecentUploads(recent || []);
-            }
-        } catch (err) {
-            console.error("Error fetching visualise pool:", err);
-            setErrorMessage("Failed to fetch visualise items: " + err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSelectItem = (item) => {
-        setSelectedItem(item);
-        setImages({ cover: null, front: null, side: null });
-        setErrorMessage("");
-        setSuccessMessage("");
-    };
-
-    const handleFileChange = async (e, position) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        try {
-            // Read the file as a base64 data URL for immediate preview
-            const previewDataUrl = await readFileAsDataURL(file);
-
-            // Set temporary local preview with the original file data URL
-            // webpBlob defaults to the raw file until WebP conversion completes
-            setImages(prev => ({
-                ...prev,
-                [position]: {
-                    file,
-                    previewDataUrl,
-                    webpDataUrl: previewDataUrl,
-                    webpBlob: file
-                }
-            }));
-
-            // Convert to WebP data URL asynchronously
-            const webpDataUrl = await convertToWebP(file);
-            // Create a blob from the WebP data URL for storage upload
-            const webpBlob = await dataURLToBlob(webpDataUrl);
-
-            setImages(prev => {
-                if (!prev[position]) return prev;
-                return {
-                    ...prev,
-                    [position]: {
-                        ...prev[position],
-                        webpDataUrl,
-                        webpBlob
-                    }
-                };
-            });
-        } catch (err) {
-            console.error("Error converting file:", err);
-        }
-    };
-
-    const handleRemoveImage = (position) => {
-        setImages(prev => ({ ...prev, [position]: null }));
-    };
-
-    const handleSaveTrigger = () => {
-        const hasAny = POSITIONS.some(p => images[p]?.webpBlob);
-        if (!hasAny) {
-            setErrorMessage("Please upload at least one image.");
-            return;
-        }
-        setShowPreviewModal(true);
-    };
-
-    const handleConfirmUpload = async () => {
-        setShowPreviewModal(false);
-        setSubmitting(true);
-        setErrorMessage("");
-        setSuccessMessage("");
-
-        try {
-            const product = selectedItem.products;
-            if (!product) throw new Error("Linked product not found.");
-
-            // Upload images and save URLs
-            for (const position of POSITIONS) {
-                const imgData = images[position];
-                if (!imgData?.webpBlob) continue;
-
-                // Save file as WebP
-                const fileName = `${product.id}/${position}.webp`;
-
-                // Upload to bucket
-                const { error: uploadError } = await supabase.storage
-                    .from('imagine-uploads')
-                    .upload(fileName, imgData.webpBlob, { 
-                        cacheControl: '3600', 
-                        contentType: 'image/webp',
-                        upsert: true 
-                    });
-
-                if (uploadError) throw uploadError;
-
-                const { data: urlData } = supabase.storage
-                    .from('imagine-uploads')
-                    .getPublicUrl(fileName);
-
-                // Insert into product_images table
-                const { error: imgInsertError } = await supabase
-                    .from('product_images')
-                    .insert([{
-                        product_id: product.id,
-                        image_url: urlData.publicUrl,
-                        position
-                    }]);
-
-                if (imgInsertError) throw imgInsertError;
-
-                // If this is the cover image, update the primary products image_url field
-                if (position === 'cover') {
-                    await supabase
-                        .from('products')
-                        .update({ image_url: urlData.publicUrl })
-                        .eq('id', product.id);
-                }
-            }
-
-            // Mark this visualise request completed
-            const { error: updateError } = await supabase
-                .from('imagine_pool')
-                .update({ status: 'completed' })
-                .eq('id', selectedItem.id);
-
-            if (updateError) throw updateError;
-
-            setSuccessMessage("WebP images uploaded and linked to product successfully!");
-
-            setImages({ cover: null, front: null, side: null });
-            setSelectedItem(null);
-            fetchPool();
-        } catch (err) {
-            setErrorMessage(err.message || "Failed to submit images.");
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const getCountdownLabel = (expiresAt) => {
-        const diff = new Date(expiresAt) - currentTime;
-        if (diff <= 0) return "Expired";
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const secs = Math.floor((diff % (1000 * 60)) / 1000);
-        return `${hours}h ${mins}m ${secs}s`;
-    };
-
-    // Helper: get cover image URL from product_images array
-    const getCoverImage = (product) => {
-        if (!product?.product_images) return null;
-        const coverImg = product.product_images.find(img => img.position === 'cover');
-        return coverImg?.image_url || null;
     };
 
     return (
         <div className="space-y-6 pb-28 pt-2 animate-fast-slide">
-
+            
             {successMessage && (
                 <div className="bg-green-50 border border-green-200 text-green-700 text-[11px] font-bold rounded-xl px-3.5 py-2.5 flex items-center gap-2 animate-in fade-in duration-150">
                     <Check size={14} /> {successMessage}
@@ -681,331 +585,218 @@ export default function Visualise({ userProfile }) {
                 </div>
             )}
 
-            {/* SCANNING & LOOKUP AREA (Only shown when no active product is selected for input/review) */}
-            {!scannedProduct && !selectedItem ? (
-                <div className="space-y-6">
-                    {/* Barcode Search / Scan Card */}
+            {/* STAGE 1: SCAN BARCODE (No other distractions on the page) */}
+            {visualiseStage === 'scan' && (
+                <div className="space-y-6 max-w-lg mx-auto">
                     <div className="bg-white rounded-3xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
-                        <div>
-                            <h3 className="text-base font-black text-black uppercase tracking-wider flex items-center gap-2">
-                                <QrCode size={18} /> Warehouse Ingest Scanner
+                        <div className="text-center space-y-1.5">
+                            <h3 className="text-sm font-black text-black uppercase tracking-wider flex items-center justify-center gap-2">
+                                <QrCode size={18} /> Point at Barcode
                             </h3>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">
-                                Scan or enter a product barcode to initiate verification
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                Hold barcode within scanner area
                             </p>
                         </div>
-                        <form onSubmit={handleBarcodeScan} className="flex gap-2">
+
+                        {/* Scanner Reader Viewport */}
+                        <div className="relative aspect-video w-full rounded-2xl border-2 border-dashed border-gray-300 overflow-hidden bg-black flex items-center justify-center">
+                            <div id="visualise-camera-reader" className="w-full h-full object-cover" />
+                            {!isScanning && (
+                                <button
+                                    onClick={startScanner}
+                                    className="absolute inset-0 bg-black/60 text-white text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-black/50 transition-all"
+                                >
+                                    <Camera size={16} /> Start Camera
+                                </button>
+                            )}
+                        </div>
+
+                        <form onSubmit={handleManualSearch} className="flex gap-2">
                             <input 
                                 type="text"
                                 value={barcodeQuery}
                                 onChange={e => setBarcodeQuery(e.target.value)}
-                                placeholder="Scan or enter barcode number..."
+                                placeholder="Or type barcode/SKU manually..."
                                 className="flex-1 px-4 py-3 bg-gray-50 border-2 border-gray-150 rounded-2xl text-[12px] font-bold text-black outline-none focus:border-black placeholder:text-gray-300"
-                                autoFocus
                             />
                             <button
                                 type="submit"
                                 disabled={loading}
                                 className="px-5 bg-black hover:bg-neutral-800 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
                             >
-                                {loading ? "Searching..." : "Scan"}
+                                {loading ? "Searching..." : "Search"}
                             </button>
                         </form>
                     </div>
-
-                    {/* Pending Requests pool */}
-                    <div className="space-y-4">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Pending Requests Pool</p>
-                        {loading ? (
-                            <div className="text-[11px] text-gray-400 font-bold text-center py-6">Loading requests...</div>
-                        ) : poolItems.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 bg-white border-2 border-dashed border-neutral-205 rounded-[32px] px-6 text-center gap-3 shadow-sm">
-                                <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center">
-                                    <PackageCheck size={26} className="text-neutral-400" />
-                                </div>
-                                <div>
-                                    <p className="text-base font-black text-neutral-400 uppercase tracking-tight">All Clear</p>
-                                    <p className="text-[10px] text-neutral-300 font-bold uppercase tracking-widest mt-0.5">No pending requests in the pool</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {poolItems.map((item) => {
-                                    const prod = item.products;
-                                    const barcode = prod?.product_barcodes?.[0]?.barcode || 'No Barcode';
-                                    const isExpired = new Date(item.expires_at) - currentTime <= 0;
-                                    const coverUrl = getCoverImage(prod);
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            onClick={() => handleSelectItem(item)}
-                                            className="w-full bg-white border-2 border-neutral-100 rounded-2xl p-3.5 flex items-center gap-3 hover:border-black hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all text-left group"
-                                        >
-                                            <div className="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center shrink-0 group-hover:ring-2 group-hover:ring-black transition-all">
-                                                {coverUrl ? (
-                                                    <img
-                                                        src={coverUrl}
-                                                        alt={prod?.name || 'Product'}
-                                                        className="w-full h-full object-cover"
-                                                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                                                    />
-                                                ) : null}
-                                                <div className={`w-full h-full items-center justify-center ${coverUrl ? 'hidden' : 'flex'} group-hover:bg-black/10 transition-all`}>
-                                                    <ImageIcon size={18} className="text-neutral-500 group-hover:text-neutral-700 transition-colors" />
-                                                </div>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5 mb-0.5">
-                                                    <span className="text-xs font-black text-black uppercase tracking-tight truncate">
-                                                        {prod?.name || 'Unnamed Product'}
-                                                    </span>
-                                                    {isExpired ? (
-                                                        <span className="text-[7px] font-black text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5">
-                                                            <AlertCircle size={8} /> Expired
-                                                        </span>
-                                                    ) : (
-                                                        <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5 ${
-                                                            new Date(item.expires_at) - currentTime < 30 * 60 * 1000
-                                                                ? 'text-red-500 bg-red-50'
-                                                                : 'text-amber-600 bg-amber-50'
-                                                        }`}>
-                                                            <Clock size={8} />
-                                                            {getCountdownLabel(item.expires_at)}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-2 text-[9px] text-gray-400 font-bold">
-                                                    <span className="flex items-center gap-1">
-                                                        <QrCode size={10} />
-                                                        {barcode}
-                                                    </span>
-                                                    {prod?.sku && (
-                                                        <span className="bg-neutral-100 px-1.5 py-0.5 rounded-full">
-                                                            {prod.sku}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="w-7 h-7 rounded-lg bg-neutral-100 flex items-center justify-center group-hover:bg-black group-hover:text-white transition-all shrink-0">
-                                                <ChevronRight size={14} />
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
                 </div>
-            ) : null}
+            )}
 
-            {/* SCAN INPUT MODE STAGE */}
-            {scannedProduct && visualiseStage === 'input' && (
-                <div className="space-y-6">
-                    {/* Header */}
-                    <div className="bg-white border-2 border-black rounded-3xl p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-3">
-                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest block">Scanned Product Details</span>
-                        <h3 className="text-base font-black text-black uppercase tracking-tight">{scannedProduct.name}</h3>
-                        <div className="flex flex-col sm:flex-row gap-3 sm:items-center text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                            <span>Barcode: {scannedProduct.sku}</span>
-                            <span className="hidden sm:inline text-gray-200">|</span>
-                            <span>Category: {scannedProductCategoryPath}</span>
+            {/* STAGE 2: PRODUCT DETAILS */}
+            {visualiseStage === 'details' && scannedProduct && (
+                <div className="max-w-2xl mx-auto space-y-6">
+                    <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
+                        <div className="border-b border-gray-100 pb-3 flex flex-wrap justify-between items-center gap-2">
+                            <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                {scannedProduct.checkpoint_name || "Quick Intake"}
+                            </span>
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">SKU: {scannedProduct.sku}</span>
                         </div>
-                    </div>
 
-                    {/* Frame Form */}
-                    {scannedProductCategoryType === 'frame' && (
-                        <div className="space-y-4">
-                            <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] space-y-4">
-                                <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Verify Frame Specifications</h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 text-xs">
-                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Model No</span>
+                        <div className="space-y-1">
+                            <h3 className="text-base font-black text-black uppercase tracking-tight">{scannedProduct.name || scannedProduct.product_name}</h3>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{scannedProductCategoryPath}</p>
+                        </div>
+
+                        {/* Specs Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-3 border-t border-gray-100 text-xs">
+                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Brand</span>
+                                <span className="text-[11px] font-black text-black uppercase">{scannedProduct.brand || "—"}</span>
+                            </div>
+                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Base Price</span>
+                                <span className="text-[11px] font-black text-black uppercase">{scannedProduct.base_price ? `Rs. ${scannedProduct.base_price}` : "—"}</span>
+                            </div>
+                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Created At</span>
+                                <span className="text-[10px] font-bold text-black uppercase">{scannedProduct.created_at ? new Date(scannedProduct.created_at).toLocaleString() : "—"}</span>
+                            </div>
+                        </div>
+
+                        {scannedProductCategoryType === 'frame' && (
+                            <div className="space-y-4">
+                                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-150 space-y-3">
+                                    <h4 className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-1">Frame Dimensions</h4>
+                                    <div className="grid grid-cols-4 gap-2 text-center">
+                                        <div>
+                                            <span className="text-[7px] font-black text-gray-400 block uppercase">A Size</span>
+                                            <span className="text-xs font-black text-black">{frameForm.sizeA || "—"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[7px] font-black text-gray-400 block uppercase">B Size</span>
+                                            <span className="text-xs font-black text-black">{frameForm.sizeB || "—"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[7px] font-black text-gray-400 block uppercase">DBL</span>
+                                            <span className="text-xs font-black text-black">{frameForm.dbl || "—"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[7px] font-black text-gray-400 block uppercase">Temple</span>
+                                            <span className="text-xs font-black text-black">{frameForm.templeLength || "—"}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Frame Shape</span>
+                                        <span className="text-[11px] font-black text-black uppercase">{frameForm.frameShape || "—"}</span>
+                                    </div>
+                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Frame Type</span>
+                                        <span className="text-[11px] font-black text-black uppercase">{frameForm.frameType || "—"}</span>
+                                    </div>
+                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
+                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Frame Model No</span>
                                         <span className="text-[11px] font-black text-black uppercase">{frameForm.modelNo || "—"}</span>
                                     </div>
-                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-150">
                                         <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Color</span>
                                         <span className="text-[11px] font-black text-black uppercase">{frameForm.color || "—"}</span>
                                     </div>
-                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">A Size</span>
-                                        <span className="text-[11px] font-black text-black uppercase">{frameForm.sizeA || "—"}</span>
-                                    </div>
-                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">B Size</span>
-                                        <span className="text-[11px] font-black text-black uppercase">{frameForm.sizeB || "—"}</span>
-                                    </div>
-                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">DBL</span>
-                                        <span className="text-[11px] font-black text-black uppercase">{frameForm.dbl || "—"}</span>
-                                    </div>
-                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Temple Length</span>
-                                        <span className="text-[11px] font-black text-black uppercase">{frameForm.templeLength || "—"}</span>
-                                    </div>
                                 </div>
                             </div>
-
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Capture Frame Images</p>
-                            <div className="space-y-4">
-                                {/* Grid container for Cover and Front views (Row 1) */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {POSITIONS.map((pos) => {
-                                    const img = images[pos];
-                                    return (
-                                        <div key={pos} className="bg-white border border-neutral-200 rounded-2xl p-4 shadow-sm space-y-2.5 flex flex-col justify-between">
-                                            <div>
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <span className="text-[9px] font-black text-black uppercase tracking-widest">{pos} View</span>
-                                                    {img && (
-                                                        <button type="button" onClick={() => handleRemoveImage(pos)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
-                                                            <Trash2 size={13} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                {(img?.webpDataUrl || img?.previewDataUrl) ? (
-                                                    <div className="aspect-video w-full rounded-xl border border-neutral-150 overflow-hidden bg-neutral-50 flex items-center justify-center relative">
-                                                        <img src={img.webpDataUrl || img.previewDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
-                                                        <div className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">WebP Ready</div>
-                                                    </div>
-                                                ) : (
-                                                    <label className="flex flex-col items-center justify-center gap-1.5 aspect-video border-2 border-dashed border-neutral-200 hover:border-black rounded-xl cursor-pointer p-4 transition-all">
-                                                        <Upload size={20} className="text-neutral-400" />
-                                                        <span className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Upload Image</span>
-                                                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
-                                                    </label>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Lens Form */}
-                    {scannedProductCategoryType === 'lens' && (
-                        <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] space-y-4">
-                            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Verify & Confirm Lens Power</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Lens Type *</label>
-                                    <select 
-                                        value={lensForm.lensType} 
-                                        onChange={e => setLensForm({...lensForm, lensType: e.target.value})} 
-                                        className="w-full px-3 py-2 border-2 border-gray-150 rounded-xl text-[11px] font-bold text-black outline-none bg-white focus:border-black"
-                                    >
-                                        <option value="">— Select —</option>
-                                        <option value="Single Vision">Single Vision</option>
-                                        <option value="Bifocal">Bifocal</option>
-                                        <option value="Progressive">Progressive</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Index *</label>
-                                    <input 
-                                        type="text" 
-                                        value={lensForm.index} 
-                                        onChange={e => setLensForm({...lensForm, index: e.target.value})} 
-                                        placeholder="e.g. 1.56" 
-                                        className="w-full px-3 py-2 border-2 border-gray-150 rounded-xl text-[11px] font-bold text-black outline-none focus:border-black"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Material *</label>
-                                    <input 
-                                        type="text" 
-                                        value={lensForm.material} 
-                                        onChange={e => setLensForm({...lensForm, material: e.target.value})} 
-                                        placeholder="e.g. CR-39" 
-                                        className="w-full px-3 py-2 border-2 border-gray-150 rounded-xl text-[11px] font-bold text-black outline-none focus:border-black"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Coating *</label>
-                                    <input 
-                                        type="text" 
-                                        value={lensForm.coating} 
-                                        onChange={e => setLensForm({...lensForm, coating: e.target.value})} 
-                                        placeholder="e.g. ARC" 
-                                        className="w-full px-3 py-2 border-2 border-gray-150 rounded-xl text-[11px] font-bold text-black outline-none focus:border-black"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
-                                <div className="space-y-1.5">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH</label>
-                                    <input 
-                                        type="text" 
-                                        value={lensForm.sph} 
-                                        onChange={e => setLensForm({...lensForm, sph: e.target.value})} 
-                                        placeholder="e.g. -2.00" 
-                                        className="w-full px-3 py-2 border-2 border-gray-150 rounded-xl text-[11px] font-bold text-black outline-none focus:border-black"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
-                                    <input 
-                                        type="text" 
-                                        value={lensForm.cyl} 
-                                        onChange={e => setLensForm({...lensForm, cyl: e.target.value})} 
-                                        placeholder="e.g. -0.50" 
-                                        className="w-full px-3 py-2 border-2 border-gray-150 rounded-xl text-[11px] font-bold text-black outline-none focus:border-black"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
-                                    <input 
-                                        type="text" 
-                                        value={lensForm.axis} 
-                                        onChange={e => setLensForm({...lensForm, axis: e.target.value})} 
-                                        placeholder="e.g. 180" 
-                                        className="w-full px-3 py-2 border-2 border-gray-150 rounded-xl text-[11px] font-bold text-black outline-none focus:border-black"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">ADD</label>
-                                    <input 
-                                        type="text" 
-                                        value={lensForm.add} 
-                                        onChange={e => setLensForm({...lensForm, add: e.target.value})} 
-                                        placeholder="e.g. +2.00" 
-                                        className="w-full px-3 py-2 border-2 border-gray-150 rounded-xl text-[11px] font-bold text-black outline-none focus:border-black"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
 
                     <div className="flex gap-4">
                         <button
-                            type="button"
-                            onClick={() => { setScannedProduct(null); setImages({ cover: null, front: null, side: null }); }}
-                            className="flex-1 py-4 border border-neutral-200 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-neutral-50 transition-colors"
+                            onClick={() => { setScannedProduct(null); setVisualiseStage('scan'); }}
+                            className="flex-1 py-4 border-2 border-black text-black text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5"
                         >
-                            Cancel
+                            <ChevronLeft size={14} /> Back
                         </button>
                         <button
-                            type="button"
+                            onClick={() => setVisualiseStage('images')}
+                            className="flex-1 py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg hover:bg-neutral-800 transition-all"
+                        >
+                            Proceed
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* STAGE 3: ACQUIRE IMAGES */}
+            {visualiseStage === 'images' && scannedProduct && (
+                <div className="max-w-3xl mx-auto space-y-6">
+                    <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
+                        <div className="space-y-1">
+                            <h3 className="text-sm font-black text-black uppercase tracking-widest">Image Acquisition</h3>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Provide Cover, Front, and Side product perspectives</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3">
+                            {POSITIONS.map((pos) => {
+                                const img = images[pos];
+                                return (
+                                    <div key={pos} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-black text-black uppercase tracking-widest">{pos} view</span>
+                                            {img && (
+                                                <button onClick={() => handleRemoveImage(pos)} className="text-red-500 hover:text-red-700 p-1">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {img?.webpDataUrl ? (
+                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center relative">
+                                                <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
+                                                <span className="absolute bottom-2 right-2 bg-black/60 text-[6px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">WebP</span>
+                                            </div>
+                                        ) : (
+                                            <label className="aspect-video w-full border-2 border-dashed border-gray-300 hover:border-black rounded-xl cursor-pointer flex flex-col items-center justify-center p-4 transition-all gap-1 text-center">
+                                                <Upload size={18} className="text-gray-400" />
+                                                <span className="text-[8px] font-black uppercase tracking-widest text-gray-500">Capture / Upload</span>
+                                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
+                                            </label>
+                                        )}
+
+                                        {/* Background removal tool exclusively for Cover View */}
+                                        {pos === 'cover' && img?.webpDataUrl && (
+                                            <button
+                                                onClick={handleRemoveCoverBg}
+                                                disabled={loading || img.isBgRemoved}
+                                                className={`w-full py-2 text-[8px] font-black uppercase tracking-widest rounded-xl border transition-all ${
+                                                    img.isBgRemoved 
+                                                        ? "bg-green-50 border-green-200 text-green-700 cursor-not-allowed" 
+                                                        : "bg-white border-black text-black hover:bg-gray-50"
+                                                }`}
+                                            >
+                                                {img.isBgRemoved ? "✓ Background Removed" : "✨ Remove Background"}
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                        <button
+                            onClick={() => setVisualiseStage('details')}
+                            className="flex-1 py-4 border-2 border-black text-black text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5"
+                        >
+                            <ChevronLeft size={14} /> Back
+                        </button>
+                        <button
                             onClick={() => {
-                                if (scannedProductCategoryType === 'frame') {
-                                    if (!frameForm.modelNo || !frameForm.color) {
-                                        setErrorMessage("Please fill in Model No and Color.");
-                                        return;
-                                    }
-                                    const hasAny = POSITIONS.some(p => images[p]?.webpBlob);
-                                    if (!hasAny) {
-                                        setErrorMessage("Please capture/upload at least one image.");
-                                        return;
-                                    }
-                                } else if (scannedProductCategoryType === 'lens') {
-                                    if (!lensForm.lensType || !lensForm.index || !lensForm.material || !lensForm.coating) {
-                                        setErrorMessage("Please fill all required lens properties.");
-                                        return;
-                                    }
+                                const hasAny = POSITIONS.some(pos => images[pos]?.webpBlob);
+                                if (!hasAny) {
+                                    setErrorMessage("Please capture or upload at least one image to proceed.");
+                                    return;
                                 }
-                                setVisualiseStage('review');
+                                setVisualiseStage('summary');
                             }}
                             className="flex-1 py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg hover:bg-neutral-800 transition-all"
                         >
@@ -1015,118 +806,96 @@ export default function Visualise({ userProfile }) {
                 </div>
             )}
 
-            {/* SCAN REVIEW STAGE */}
-            {scannedProduct && visualiseStage === 'review' && (
-                <div className="space-y-6">
-                    {/* Header */}
-                    <div className="bg-white border-2 border-black rounded-3xl p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-2">
-                        <span className="text-[8px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-wider self-start inline-block font-black">Review Queue Verification</span>
-                        <h3 className="text-base font-black text-black uppercase tracking-tight">{scannedProduct.name}</h3>
-                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Barcode: {scannedProduct.sku}</p>
-                    </div>
+            {/* STAGE 4: SUMMARY & CONFIRMATION */}
+            {visualiseStage === 'summary' && scannedProduct && (
+                <div className="max-w-3xl mx-auto space-y-6">
+                    <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-6">
+                        <div className="space-y-1">
+                            <h3 className="text-sm font-black text-black uppercase tracking-widest">Ingest Summary Review</h3>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Review all catalog specifications and image renders before finalizing</p>
+                        </div>
 
-                    {/* Frame Review Content */}
-                    {scannedProductCategoryType === 'frame' && (
-                        <div className="space-y-4">
-                            <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] space-y-4">
-                                <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Verify Frame Specifications</h4>
-                                <div className="grid grid-cols-2 gap-4 text-xs font-bold uppercase">
-                                    <div>
-                                        <span className="text-[8px] font-black text-gray-400 block">Model No</span>
-                                        <span className="text-black">{frameForm.modelNo}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[8px] font-black text-gray-400 block">Color</span>
-                                        <span className="text-black">{frameForm.color}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[8px] font-black text-gray-400 block">A Size</span>
-                                        <span className="text-black">{frameForm.sizeA || "—"}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[8px] font-black text-gray-400 block">B Size</span>
-                                        <span className="text-black">{frameForm.sizeB || "—"}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[8px] font-black text-gray-400 block">DBL</span>
-                                        <span className="text-black">{frameForm.dbl || "—"}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[8px] font-black text-gray-400 block">Temple Length</span>
-                                        <span className="text-black">{frameForm.templeLength || "—"}</span>
-                                    </div>
-                                </div>
+                        {/* specs summary */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-gray-50 p-5 rounded-2xl border border-gray-150 text-xs">
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Checkpoint</span>
+                                <span className="font-black text-black uppercase">{scannedProduct.checkpoint_name || "Quick Intake"}</span>
+                            </div>
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Product Display Name</span>
+                                <span className="font-black text-black uppercase">{scannedProduct.name || scannedProduct.product_name}</span>
+                            </div>
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Barcode / SKU</span>
+                                <span className="font-black text-black uppercase">{scannedProduct.sku}</span>
+                            </div>
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Brand</span>
+                                <span className="font-black text-black uppercase">{scannedProduct.brand || "—"}</span>
+                            </div>
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Base Price</span>
+                                <span className="font-black text-black uppercase">{scannedProduct.base_price ? `Rs. ${scannedProduct.base_price}` : "—"}</span>
+                            </div>
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Category</span>
+                                <span className="font-black text-black uppercase">{scannedProductCategoryPath}</span>
+                            </div>
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Created At</span>
+                                <span className="font-bold text-black uppercase">{scannedProduct.created_at ? new Date(scannedProduct.created_at).toLocaleString() : "—"}</span>
                             </div>
 
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Verification Image Previews</p>
+                            {scannedProductCategoryType === 'frame' && (
+                                <>
+                                    <div className="space-y-1">
+                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Frame Model No</span>
+                                        <span className="font-black text-black uppercase">{frameForm.modelNo || "—"}</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Color</span>
+                                        <span className="font-black text-black uppercase">{frameForm.color || "—"}</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Frame Shape</span>
+                                        <span className="font-black text-black uppercase">{frameForm.frameShape || "—"}</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">Dimensions (A / B / DBL / Temple)</span>
+                                        <span className="font-black text-black uppercase">{`${frameForm.sizeA || "—"} / ${frameForm.sizeB || "—"} / ${frameForm.dbl || "—"} / ${frameForm.templeLength || "—"}`}</span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* images summary */}
+                        <div className="space-y-2">
+                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Processed Images</span>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 {POSITIONS.map(pos => {
                                     const img = images[pos];
-                                    if (!img?.webpDataUrl && !img?.previewDataUrl) return null;
+                                    if (!img?.webpDataUrl) return null;
                                     return (
-                                        <div key={pos} className="bg-white border border-neutral-200 p-3 rounded-2xl space-y-1">
+                                        <div key={pos} className="bg-white border border-gray-250 p-3 rounded-2xl space-y-1">
                                             <span className="text-[8px] font-black text-black uppercase tracking-widest">{pos} View</span>
-                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-neutral-50 flex items-center justify-center border border-neutral-100">
-                                                <img src={img.previewDataUrl || img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
+                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                                <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
                         </div>
-                    )}
-
-                    {/* Lens Review Content */}
-                    {scannedProductCategoryType === 'lens' && (
-                        <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] space-y-4">
-                            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Verify Power Specifications</h4>
-                            <div className="grid grid-cols-2 gap-4 text-xs font-bold uppercase">
-                                <div>
-                                    <span className="text-[8px] font-black text-gray-400 block">Lens Type</span>
-                                    <span className="text-black">{lensForm.lensType}</span>
-                                </div>
-                                <div>
-                                    <span className="text-[8px] font-black text-gray-400 block">Index</span>
-                                    <span className="text-black">{lensForm.index}</span>
-                                </div>
-                                <div>
-                                    <span className="text-[8px] font-black text-gray-400 block">Material</span>
-                                    <span className="text-black">{lensForm.material}</span>
-                                </div>
-                                <div>
-                                    <span className="text-[8px] font-black text-gray-400 block">Coating</span>
-                                    <span className="text-black">{lensForm.coating}</span>
-                                </div>
-                                <div>
-                                    <span className="text-[8px] font-black text-gray-400 block">SPH</span>
-                                    <span className="text-black">{lensForm.sph || "0.00"}</span>
-                                </div>
-                                <div>
-                                    <span className="text-[8px] font-black text-gray-400 block">CYL</span>
-                                    <span className="text-black">{lensForm.cyl || "0.00"}</span>
-                                </div>
-                                <div>
-                                    <span className="text-[8px] font-black text-gray-400 block">Axis</span>
-                                    <span className="text-black">{lensForm.axis || "0"}</span>
-                                </div>
-                                <div>
-                                    <span className="text-[8px] font-black text-gray-400 block">ADD</span>
-                                    <span className="text-black">{lensForm.add || "0.00"}</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    </div>
 
                     <div className="flex gap-4">
                         <button
-                            type="button"
-                            onClick={() => setVisualiseStage('input')}
-                            className="flex-1 py-4 border border-neutral-200 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-neutral-50 transition-colors"
+                            onClick={() => setVisualiseStage('images')}
+                            className="flex-1 py-4 border-2 border-black text-black text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5"
                         >
-                            Back
+                            <ChevronLeft size={14} /> Back
                         </button>
                         <button
-                            type="button"
                             onClick={() => setShowConfirmPopup(true)}
                             className="flex-1 py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg hover:bg-neutral-800 transition-all"
                         >
@@ -1140,165 +909,28 @@ export default function Visualise({ userProfile }) {
             {showConfirmPopup && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowConfirmPopup(false)} />
-                    <div className="relative bg-white border border-neutral-200 rounded-[24px] p-6 shadow-2xl max-w-sm w-full space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+                    <div className="relative bg-white border-2 border-black rounded-[24px] p-6 shadow-2xl max-w-sm w-full space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
                         <div>
-                            <h3 className="text-base font-black text-black uppercase tracking-tight">Confirm Verification</h3>
+                            <h3 className="text-base font-black text-black uppercase tracking-tight">Confirm Pending Product</h3>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">
-                                {scannedProductCategoryType === 'frame' 
-                                    ? "Confirm frame details and images to catalog queue?" 
-                                    : "Confirm lens power specifications to catalog queue?"}
+                                Are you sure you want to confirm and ingest this product to active inventory?
                             </p>
                         </div>
                         <div className="flex gap-3">
                             <button
                                 type="button"
                                 onClick={() => setShowConfirmPopup(false)}
-                                className="flex-1 py-3 text-[10px] font-black uppercase border border-neutral-200 rounded-xl hover:bg-neutral-50"
+                                className="flex-1 py-3 text-[10px] font-black uppercase border-2 border-black rounded-xl hover:bg-gray-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 disabled={submitting}
-                                onClick={handleConfirmScanSubmission}
+                                onClick={handleFinalConfirmSubmission}
                                 className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase rounded-xl hover:bg-neutral-800 disabled:opacity-60 flex items-center justify-center gap-1.5"
                             >
                                 {submitting ? "Confirming..." : "Confirm"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ORIGINAL POOL ITEM SELECTION (IF ANY ACTIVE) */}
-            {selectedItem && (
-                <div className="space-y-4">
-                    <div className="bg-white border border-neutral-200 rounded-2xl p-4 space-y-2.5">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Target Product</p>
-                        <div className="flex items-center gap-3">
-                            {getCoverImage(selectedItem.products) ? (
-                                <div className="w-14 h-14 rounded-xl overflow-hidden border border-neutral-200 shrink-0">
-                                    <img
-                                        src={getCoverImage(selectedItem.products)}
-                                        alt={selectedItem.products?.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                            ) : (
-                                <div className="w-14 h-14 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0">
-                                    <ImageIcon size={22} className="text-neutral-400" />
-                                </div>
-                            )}
-                            <div className="space-y-0.5">
-                                <h3 className="text-sm font-black text-black uppercase tracking-tight">
-                                    {selectedItem.products?.name || 'Unnamed Product'}
-                                </h3>
-                                <div className="flex items-center gap-2 text-[9px] text-gray-400 font-bold uppercase">
-                                    <span>Barcode: {selectedItem.products?.product_barcodes?.[0]?.barcode || 'None'}</span>
-                                    <span>SKU: {selectedItem.products?.sku || 'None'}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="border-t border-neutral-100 pt-2.5 flex justify-between items-center">
-                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Expiry</span>
-                            <span className="text-[9px] font-black text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">
-                                {getCountdownLabel(selectedItem.expires_at)}
-                            </span>
-                        </div>
-                    </div>
-
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Capture Images (WebP)</p>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {POSITIONS.map((pos) => {
-                            const img = images[pos];
-                            return (
-                                <div key={pos} className="bg-white border border-neutral-200 rounded-2xl p-4 shadow-sm space-y-2.5 flex flex-col justify-between">
-                                    <div>
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-[9px] font-black text-black uppercase tracking-widest">{pos} View</span>
-                                            {img && (
-                                                <button type="button" onClick={() => handleRemoveImage(pos)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
-                                                    <Trash2 size={13} />
-                                                </button>
-                                            )}
-                                        </div>
-                                        {(img?.webpDataUrl || img?.previewDataUrl) ? (
-                                            <div className="aspect-video w-full rounded-xl border border-neutral-150 overflow-hidden bg-neutral-50 flex items-center justify-center relative">
-                                                <img src={img.webpDataUrl || img.previewDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
-                                                <div className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">WebP Ready</div>
-                                            </div>
-                                        ) : (
-                                            <label className="flex flex-col items-center justify-center gap-1.5 aspect-video border-2 border-dashed border-neutral-200 hover:border-black rounded-xl cursor-pointer p-4 transition-all">
-                                                <Upload size={20} className="text-neutral-400" />
-                                                <span className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Upload Image</span>
-                                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
-                                            </label>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    <div className="flex gap-2.5">
-                        <button
-                            type="button"
-                            onClick={() => { setSelectedItem(null); setImages({ cover: null, front: null, side: null }); }}
-                            className="flex-1 py-3.5 border border-neutral-200 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-neutral-50 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleSaveTrigger}
-                            className="flex-1 py-3.5 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-2xl shadow-lg hover:bg-neutral-800 transition-all"
-                        >
-                            Save Images
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* WEBP PREVIEW MODAL */}
-            {showPreviewModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowPreviewModal(false)} />
-                    <div className="relative bg-white border border-neutral-200 rounded-[24px] p-5 shadow-2xl max-w-sm w-full space-y-5 text-center animate-in fade-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
-                        <div className="space-y-0.5">
-                            <h3 className="text-sm font-black text-black uppercase tracking-tight">WebP Quality Preview</h3>
-                            <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">Verify final compressed renders before upload</p>
-                        </div>
-
-                        <div className="space-y-3">
-                            {POSITIONS.map(pos => {
-                                const img = images[pos];
-                                if (!img?.webpDataUrl && !img?.previewDataUrl) return null;
-                                return (
-                                    <div key={pos} className="space-y-0.5 text-left border border-neutral-100 p-2.5 rounded-xl">
-                                        <span className="text-[8px] font-black text-black uppercase tracking-widest">{pos} View</span>
-                                        <div className="aspect-video w-full rounded-lg overflow-hidden bg-neutral-50 flex items-center justify-center border border-neutral-200">
-                                            <img src={img.previewDataUrl || img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="flex gap-2.5">
-                            <button
-                                type="button"
-                                onClick={() => setShowPreviewModal(false)}
-                                className="flex-1 py-2.5 text-[9px] font-black uppercase border border-neutral-200 rounded-xl hover:bg-neutral-50"
-                            >
-                                Edit
-                            </button>
-                            <button
-                                type="button"
-                                disabled={submitting}
-                                onClick={handleConfirmUpload}
-                                className="flex-1 py-2.5 bg-black text-white text-[9px] font-black uppercase rounded-xl hover:bg-neutral-800 disabled:opacity-60 flex items-center justify-center gap-1.5"
-                            >
-                                {submitting ? "Uploading..." : "Confirm & Upload"}
                             </button>
                         </div>
                     </div>

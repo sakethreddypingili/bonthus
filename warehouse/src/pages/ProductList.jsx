@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Search, Plus, LayoutGrid, List, X, MoreVertical, ChevronDown, Check, Tags, Database, FolderSync, Trash2, CheckCircle2, ChevronRight, AlertCircle, FilePlus, Layers, PackagePlus, ClipboardList } from "lucide-react";
+import { Search, Plus, LayoutGrid, List, X, MoreVertical, ChevronDown, Check, Tags, Database, FolderSync, Trash2, CheckCircle2, ChevronRight, AlertCircle, FilePlus, Layers, PackagePlus, ClipboardList, ArrowLeft } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import SlideDrawer from "../components/common/SlideDrawer";
 
@@ -74,9 +74,26 @@ export default function ProductList({ userProfile }) {
   const tabParam = new URLSearchParams(location.search).get("tab") || "stock";
   const activeTab = ["stock", "quick-add", "batch-load", "review-queue"].includes(tabParam) ? tabParam : "stock";
 
+  const selectedBatch = new URLSearchParams(location.search).get("batch") || null;
+  const setSelectedBatch = (batchName) => {
+    const params = new URLSearchParams(location.search);
+    if (batchName) {
+      params.set("batch", batchName);
+    } else {
+      params.delete("batch");
+    }
+    navigate(`/products?${params.toString()}`, { replace: true });
+    setDetailSearch("");
+    setDetailFilter("all");
+  };
+
   const setActiveTab = (tabName) => {
     navigate(`/products?tab=${tabName}`, { replace: true });
   };
+
+  const [batchSearch, setBatchSearch] = useState("");
+  const [detailSearch, setDetailSearch] = useState("");
+  const [detailFilter, setDetailFilter] = useState("all");
   
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -421,6 +438,38 @@ export default function ProductList({ userProfile }) {
       }))
     };
   }, [pendingItems]);
+
+  const selectedBatchItems = useMemo(() => {
+    if (!selectedBatch) return [];
+    return pendingByCheckpoint[selectedBatch] || [];
+  }, [selectedBatch, pendingByCheckpoint]);
+
+  const selectedBatchStats = useMemo(() => {
+    const items = selectedBatchItems;
+    const total = items.length;
+    const confirmed = items.filter(i => i.status === 'confirmed').length;
+    const pending = items.filter(i => i.status === 'pending').length;
+    const percent = total > 0 ? Math.round((confirmed / total) * 100) : 0;
+    return { total, confirmed, pending, percent };
+  }, [selectedBatchItems]);
+
+  const filteredSelectedBatchItems = useMemo(() => {
+    return selectedBatchItems.filter(item => {
+      // Status Filter
+      if (detailFilter === "pending" && item.status !== "pending") return false;
+      if (detailFilter === "confirmed" && item.status !== "confirmed") return false;
+
+      // Search Filter
+      if (detailSearch.trim() !== "") {
+        const query = detailSearch.toLowerCase();
+        const nameMatch = item.name?.toLowerCase().includes(query);
+        const skuMatch = item.sku?.toLowerCase().includes(query);
+        const brandMatch = item.brand?.toLowerCase().includes(query);
+        return nameMatch || skuMatch || brandMatch;
+      }
+      return true;
+    });
+  }, [selectedBatchItems, detailFilter, detailSearch]);
 
   const handleSaveProduct = async (e) => {
     e.preventDefault();
@@ -1917,196 +1966,354 @@ export default function ProductList({ userProfile }) {
       {/* -------------------- 4. REVIEW QUEUE TAB -------------------- */}
       {activeTab === "review-queue" && (
         <div className="space-y-6">
-          {/* Analysis View cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-3xl border border-gray-150 p-6 flex items-center justify-between shadow-sm">
-              <div>
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Total Batches</span>
-                <span className="text-2xl font-black text-black block mt-1">{reviewStats.totalBatches}</span>
-              </div>
-              <div className="p-3 bg-neutral-50 rounded-2xl border border-neutral-100">
-                <ClipboardList className="text-black" size={24} />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl border border-gray-150 p-6 flex items-center justify-between shadow-sm">
-              <div>
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Pending Products</span>
-                <span className="text-2xl font-black text-amber-500 block mt-1">{reviewStats.pendingCount}</span>
-              </div>
-              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-100">
-                <FolderSync className="text-amber-500" size={24} />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl border border-gray-150 p-6 flex items-center justify-between shadow-sm">
-              <div>
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Confirmed Products</span>
-                <span className="text-2xl font-black text-green-500 block mt-1">{reviewStats.confirmedCount}</span>
-              </div>
-              <div className="p-3 bg-green-50 rounded-2xl border border-green-100">
-                <CheckCircle2 className="text-green-500" size={24} />
-              </div>
-            </div>
-          </div>
-
-          {/* Batch Breakdown Boxes */}
-          {reviewStats.batchBreakdown.length > 0 && (
-            <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4">
-              <h4 className="text-[10px] font-black text-black uppercase tracking-widest font-black">Batch / Box Breakdown</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                {reviewStats.batchBreakdown.map((b, idx) => (
-                  <div key={idx} className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center space-y-1">
-                    <p className="text-[9px] font-black text-black uppercase truncate">{b.name}</p>
-                    <div className="flex justify-center gap-1.5 text-[9px] font-bold">
-                      <span className="text-amber-500">{b.pending} P</span>
-                      <span className="text-gray-300">|</span>
-                      <span className="text-green-500">{b.confirmed} C</span>
+          {selectedBatch ? (
+            /* ==========================================
+               BATCH DETAIL VIEW SCREEN
+               ========================================== */
+            <div className="space-y-6">
+              {/* Back & Batch Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-3xl border border-gray-150 p-6 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setSelectedBatch(null)}
+                    className="p-3 bg-neutral-50 rounded-2xl border border-neutral-150 hover:bg-neutral-100 hover:scale-105 transition-all text-black flex-shrink-0"
+                    title="Back to Batches"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                  <div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Review Batch</span>
+                    <h3 className="text-xl font-black text-black uppercase tracking-tight mt-0.5">{selectedBatch}</h3>
+                  </div>
+                </div>
+                {/* Selected Batch Stats */}
+                <div className="flex flex-wrap items-center gap-6">
+                  <div className="text-center sm:text-left">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block">Confirmation Rate</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-lg font-black text-green-500">{selectedBatchStats.confirmed}</span>
+                      <span className="text-sm font-bold text-gray-300">/</span>
+                      <span className="text-sm font-bold text-gray-500">{selectedBatchStats.total}</span>
+                      <span className="text-xs font-black bg-green-50 text-green-700 border border-green-150 px-2 py-0.5 rounded-full uppercase ml-1">
+                        {selectedBatchStats.percent}%
+                      </span>
                     </div>
                   </div>
-                ))}
+                  <div className="text-center sm:text-left border-l border-gray-200 pl-6">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block">Pending Scans</span>
+                    <span className="text-lg font-black text-amber-500 block mt-1">{selectedBatchStats.pending}</span>
+                  </div>
+                </div>
               </div>
+
+              {/* Progress Bar for the batch */}
+              <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm space-y-2">
+                <div className="flex justify-between text-[10px] font-black text-black uppercase tracking-widest">
+                  <span>Batch Completion</span>
+                  <span>{selectedBatchStats.confirmed} of {selectedBatchStats.total} Products Confirmed</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-3.5 overflow-hidden">
+                  <div
+                    className="bg-black h-3.5 rounded-full transition-all duration-500"
+                    style={{ width: `${selectedBatchStats.percent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Filters & Actions Controls */}
+              <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {/* Filters Row */}
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-1">
+                  {/* Status tabs */}
+                  <div className="flex border-2 border-black rounded-xl p-0.5 bg-neutral-50 overflow-hidden self-start">
+                    {[
+                      { value: "all", label: `All (${selectedBatchStats.total})` },
+                      { value: "pending", label: `Pending (${selectedBatchStats.pending})` },
+                      { value: "confirmed", label: `Confirmed (${selectedBatchStats.confirmed})` }
+                    ].map(tab => (
+                      <button
+                        key={tab.value}
+                        onClick={() => setDetailFilter(tab.value)}
+                        className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all ${
+                          detailFilter === tab.value
+                            ? "bg-black text-white shadow-sm"
+                            : "text-gray-500 hover:text-black"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search items inside batch */}
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                    <input
+                      type="text"
+                      placeholder="Search within batch (name, sku, brand)..."
+                      value={detailSearch}
+                      onChange={e => setDetailSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl text-xs font-semibold focus:border-black focus:ring-0 outline-none"
+                    />
+                    {detailSearch && (
+                      <button
+                        onClick={() => setDetailSearch("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bulk Actions */}
+                <div className="flex items-center gap-2">
+                  {selectedPendingIds.size > 0 ? (
+                    <div className="flex items-center gap-2 animate-fast-zoom">
+                      <button
+                        onClick={handleIngestSelectedConfirmed}
+                        disabled={saving}
+                        className="text-[10px] font-black bg-black text-white uppercase tracking-widest px-4 py-2.5 rounded-xl hover:scale-105 transition-all flex items-center gap-1.5 shadow-md animate-pulse"
+                      >
+                        <CheckCircle2 size={12} /> Ingest Selected ({selectedPendingIds.size})
+                      </button>
+                      <button
+                        onClick={handleDeleteSelectedPending}
+                        disabled={saving}
+                        className="text-[10px] font-black border-2 border-black text-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-red-50 flex items-center gap-1.5 transition-all"
+                      >
+                        <Trash2 size={12} /> Discard
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                      Select confirmed products below to bulk ingest
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Items Table container */}
+              <div className="bg-white rounded-3xl border-2 border-black overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <div className="bg-gray-50 border-b-2 border-black px-6 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={
+                        filteredSelectedBatchItems.filter(i => i.status === 'confirmed').length > 0 &&
+                        filteredSelectedBatchItems.filter(i => i.status === 'confirmed').every(i => selectedPendingIds.has(i.id))
+                      }
+                      disabled={filteredSelectedBatchItems.filter(i => i.status === 'confirmed').length === 0}
+                      onChange={e => toggleSelectCheckpoint(filteredSelectedBatchItems, e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    />
+                    <div>
+                      <h3 className="text-sm font-black text-black uppercase tracking-wider">Batch Contents</h3>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                        Showing {filteredSelectedBatchItems.length} of {selectedBatchStats.total} entities
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-white border-b border-gray-100">
+                        <th className="w-12 px-6 py-3"></th>
+                        <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Name</th>
+                        <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Unique Code (SKU)</th>
+                        <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Barcode</th>
+                        <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Brand</th>
+                        <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Category</th>
+                        <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Price</th>
+                        <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Qty</th>
+                        <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                        <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {filteredSelectedBatchItems.map(item => (
+                        <tr key={item.id} className="hover:bg-gray-50/30 transition-colors">
+                          <td className="px-6 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedPendingIds.has(item.id)}
+                              disabled={item.status !== 'confirmed'}
+                              onChange={() => toggleSelectPending(item.id)}
+                              className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            />
+                          </td>
+                          <td className="px-6 py-3 text-xs font-black text-black uppercase tracking-tight">{item.name}</td>
+                          <td className="px-6 py-3 text-xs font-mono font-bold text-black uppercase tracking-wider">{item.sku}</td>
+                          <td className="px-6 py-3 text-xs font-mono font-bold text-gray-400 uppercase tracking-wider">
+                            {item.pending_product_barcodes?.[0]?.barcode || "-"}
+                          </td>
+                          <td className="px-6 py-3 text-xs font-bold text-black uppercase tracking-widest">{item.brand || "Generic"}</td>
+                          <td className="px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                            {item.category?.name || "Unassigned"}
+                          </td>
+                          <td className="px-6 py-3 text-xs font-bold text-black">₹{item.base_price}</td>
+                          <td className="px-6 py-3 text-xs font-black text-black">{item.stock_quantity} units</td>
+                          <td className="px-6 py-3">
+                            {item.status === 'confirmed' ? (
+                              <span className="text-[8px] font-black bg-green-50 text-green-700 border border-green-150 px-2 py-0.5 rounded-full uppercase tracking-wider font-black">Confirmed</span>
+                            ) : (
+                              <span className="text-[8px] font-black bg-amber-50 text-amber-700 border border-amber-150 px-2 py-0.5 rounded-full uppercase tracking-wider font-black">Pending</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3">
+                            {item.status === 'confirmed' ? (
+                              <button
+                                onClick={() => handleIngestConfirmedProduct(item)}
+                                disabled={saving}
+                                className="text-[9px] font-black bg-black text-white px-3 py-1.5 rounded-lg uppercase tracking-widest hover:scale-105 transition-all shadow-sm"
+                              >
+                                Add to Products
+                              </button>
+                            ) : (
+                              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Requires Scan</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredSelectedBatchItems.length === 0 && (
+                        <tr>
+                          <td colSpan="10" className="px-6 py-12 text-center text-xs font-black text-gray-400 uppercase tracking-widest">
+                            No items match the search or filter criteria
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* ==========================================
+               BATCH LIST VIEW SCREEN (OVERVIEW)
+               ========================================== */
+            <div className="space-y-6">
+              {/* Analysis View cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-3xl border border-gray-150 p-6 flex items-center justify-between shadow-sm">
+                  <div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Total Batches</span>
+                    <span className="text-2xl font-black text-black block mt-1">{reviewStats.totalBatches}</span>
+                  </div>
+                  <div className="p-3 bg-neutral-50 rounded-2xl border border-neutral-100">
+                    <ClipboardList className="text-black" size={24} />
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl border border-gray-150 p-6 flex items-center justify-between shadow-sm">
+                  <div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Pending Products</span>
+                    <span className="text-2xl font-black text-amber-500 block mt-1">{reviewStats.pendingCount}</span>
+                  </div>
+                  <div className="p-3 bg-amber-50 rounded-2xl border border-amber-100">
+                    <FolderSync className="text-amber-500" size={24} />
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl border border-gray-150 p-6 flex items-center justify-between shadow-sm">
+                  <div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Confirmed Products</span>
+                    <span className="text-2xl font-black text-green-500 block mt-1">{reviewStats.confirmedCount}</span>
+                  </div>
+                  <div className="p-3 bg-green-50 rounded-2xl border border-green-100">
+                    <CheckCircle2 className="text-green-500" size={24} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Batch List Header & Search */}
+              <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-[10px] font-black text-black uppercase tracking-widest font-black">Ingestion Batches / Boxes</h4>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Select a batch to verify items and import to stock</p>
+                </div>
+                <div className="relative w-full sm:w-80">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                  <input
+                    type="text"
+                    placeholder="Search batches by name..."
+                    value={batchSearch}
+                    onChange={e => setBatchSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl text-xs font-semibold focus:border-black focus:ring-0 outline-none"
+                  />
+                  {batchSearch && (
+                    <button
+                      onClick={() => setBatchSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Batches Grid */}
+              {reviewStats.batchBreakdown.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                  {reviewStats.batchBreakdown
+                    .filter(b => b.name?.toLowerCase().includes(batchSearch.toLowerCase()))
+                    .map((b, idx) => {
+                      const total = b.confirmed + b.pending;
+                      const percent = total > 0 ? Math.round((b.confirmed / total) * 100) : 0;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setSelectedBatch(b.name)}
+                          className="bg-white border-2 border-neutral-100 hover:border-black rounded-3xl p-6 transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5 space-y-4 flex flex-col justify-between"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <h5 className="text-xs font-black text-black uppercase tracking-tight line-clamp-2">{b.name}</h5>
+                              {b.pending === 0 ? (
+                                <span className="text-[8px] font-black bg-green-50 text-green-700 border border-green-150 px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
+                                  Ready
+                                </span>
+                              ) : (
+                                <span className="text-[8px] font-black bg-amber-50 text-amber-700 border border-amber-150 px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
+                                  Pending
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                              <span>Total: <strong className="text-black font-black">{total}</strong></span>
+                              <span>Confirmed: <strong className="text-green-500 font-black">{b.confirmed}</strong></span>
+                              <span>Pending: <strong className="text-amber-500 font-black">{b.pending}</strong></span>
+                            </div>
+                          </div>
+
+                          {/* Mini Progress Bar */}
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                              <span>Verification</span>
+                              <span className="text-black">{percent}%</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="bg-black h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${percent}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="p-20 text-center border-2 border-dashed border-gray-200 rounded-3xl bg-neutral-50 flex flex-col items-center justify-center gap-4">
+                  <FolderSync size={32} className="text-gray-300 animate-pulse" />
+                  <div>
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest">No ingestion batches found</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-
-          {/* Bulk Ingestion Controls */}
-          <div className="bg-white rounded-3xl border border-gray-105 shadow-sm p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-              Select and Confirm Ingested checkpoint batches
-            </span>
-            {selectedPendingIds.size > 0 && (
-              <div className="flex items-center gap-2 animate-fast-zoom">
-                <button 
-                  onClick={handleIngestSelectedConfirmed}
-                  disabled={saving}
-                  className="text-[10px] font-black bg-black text-white uppercase tracking-widest px-4 py-2.5 rounded-xl hover:scale-105 transition-all flex items-center gap-1.5 shadow-md animate-pulse"
-                >
-                  <CheckCircle2 size={12} /> Ingest Selected Confirmed ({selectedPendingIds.size})
-                </button>
-                <button 
-                  onClick={handleDeleteSelectedPending}
-                  disabled={saving}
-                  className="text-[10px] font-black border-2 border-black text-black uppercase tracking-widest px-4 py-2 rounded-xl hover:bg-red-50 flex items-center gap-1.5 transition-all"
-                >
-                  <Trash2 size={12} /> Discard
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Accordion / Groups */}
-          <div className="space-y-6">
-            {Object.entries(pendingByCheckpoint).map(([checkpoint, items]) => {
-              const confirmedItems = items.filter(i => i.status === 'confirmed');
-              const hasCheckedAll = confirmedItems.length > 0 && confirmedItems.every(i => selectedPendingIds.has(i.id));
-              const hasCheckedSome = confirmedItems.some(i => selectedPendingIds.has(i.id)) && !hasCheckedAll;
-
-              return (
-                <div key={checkpoint} className="bg-white rounded-3xl border-2 border-black overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                  {/* Accordion Header */}
-                  <div className="bg-gray-50 border-b-2 border-black px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <input 
-                        type="checkbox"
-                        checked={hasCheckedAll}
-                        disabled={confirmedItems.length === 0}
-                        ref={el => {
-                          if (el) el.indeterminate = hasCheckedSome;
-                        }}
-                        onChange={e => toggleSelectCheckpoint(items, e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                      />
-                      <div>
-                        <h3 className="text-sm font-black text-black uppercase tracking-wider">{checkpoint}</h3>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
-                          {items.length} entities ({items.filter(i => i.status === 'pending').length} Pending, {items.filter(i => i.status === 'confirmed').length} Confirmed)
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-[9px] font-black bg-white border border-gray-200 text-gray-500 px-3 py-1 rounded-full uppercase tracking-wider">
-                      Batch Ingest
-                    </span>
-                  </div>
-
-                  {/* Batch Items List */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-white border-b border-gray-100">
-                          <th className="w-12 px-6 py-3"></th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Name</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Unique Code (SKU)</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Barcode</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Brand</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Category</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Price</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Qty</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                          <th className="px-6 py-3 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white">
-                        {items.map(item => (
-                          <tr key={item.id} className="hover:bg-gray-50/30 transition-colors">
-                            <td className="px-6 py-3">
-                              <input 
-                                type="checkbox"
-                                checked={selectedPendingIds.has(item.id)}
-                                disabled={item.status !== 'confirmed'}
-                                onChange={() => toggleSelectPending(item.id)}
-                                className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                              />
-                            </td>
-                            <td className="px-6 py-3 text-xs font-black text-black uppercase tracking-tight">{item.name}</td>
-                            <td className="px-6 py-3 text-xs font-mono font-bold text-black uppercase tracking-wider">{item.sku}</td>
-                            <td className="px-6 py-3 text-xs font-mono font-bold text-gray-400 uppercase tracking-wider">
-                              {item.pending_product_barcodes?.[0]?.barcode || "-"}
-                            </td>
-                            <td className="px-6 py-3 text-xs font-bold text-black uppercase tracking-widest">{item.brand || "Generic"}</td>
-                            <td className="px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                              {item.category?.name || "Unassigned"}
-                            </td>
-                            <td className="px-6 py-3 text-xs font-bold text-black">₹{item.base_price}</td>
-                            <td className="px-6 py-3 text-xs font-black text-black">{item.stock_quantity} units</td>
-                            <td className="px-6 py-3">
-                              {item.status === 'confirmed' ? (
-                                <span className="text-[8px] font-black bg-green-50 text-green-700 border border-green-150 px-2 py-0.5 rounded-full uppercase tracking-wider font-black">Confirmed</span>
-                              ) : (
-                                <span className="text-[8px] font-black bg-amber-50 text-amber-700 border border-amber-150 px-2 py-0.5 rounded-full uppercase tracking-wider font-black">Pending</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-3">
-                              {item.status === 'confirmed' ? (
-                                <button
-                                  onClick={() => handleIngestConfirmedProduct(item)}
-                                  disabled={saving}
-                                  className="text-[9px] font-black bg-black text-white px-3 py-1.5 rounded-lg uppercase tracking-widest hover:scale-105 transition-all shadow-sm"
-                                >
-                                  Add to Products
-                                </button>
-                              ) : (
-                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Requires Scan</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })}
-            
-            {pendingItems.length === 0 && (
-              <div className="p-20 text-center border-2 border-dashed border-gray-200 rounded-3xl bg-neutral-50 flex flex-col items-center justify-center gap-4">
-                <FolderSync size={32} className="text-gray-300 animate-pulse" />
-                <div>
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Ingestion queue empty</p>
-                  <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider mt-1">No pending or confirmed checkpoint batches currently</p>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       )}
 

@@ -31,6 +31,7 @@ const navItems = [
   { to:"/", label:"Overview", role: ["admin","super_admin","store_manager"], icon: LayoutDashboard },
   { to:"/products", label:"Products", role: ["admin","super_admin","store_manager"], icon: Package },
   { to:"/products?tab=quick-add", label:"Intake", role: ["admin","super_admin","store_manager"], icon: FolderSync },
+  { to:"/products?tab=review-queue", label:"Review Queue", role: ["admin","super_admin","store_manager"], icon: ClipboardList },
   { to:"/barcode-creator", label:"Labels", role: ["admin","super_admin","store_manager"], icon: QrCode },
   { to:"/visualise", label:"Visualise", role: ["admin","super_admin","store_manager","employee"], icon: Sparkles },
   { to:"/barcode-printer", label:"Barcode Printer", role: ["admin","super_admin","store_manager","employee"], icon: Printer },
@@ -80,16 +81,19 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
             : (to ==="/reminders" 
                 ? (location.pathname ==="/reminders" || location.pathname ==="/notifications")
                 : (label ==="Intake"
-                    ? (location.pathname ==="/products" && (location.search.includes("quick-add") || location.search.includes("batch-load") || location.search.includes("review-queue")))
-                    : (label ==="Labels"
-                        ? (location.pathname ==="/visual-ingest" || location.pathname ==="/barcode-creator" || location.pathname ==="/barcodes")
-                        : (to ==="/products"
-                            ? ((location.pathname ==="/products" && (!location.search || location.search.includes("stock") || !location.search.includes("tab="))) || location.pathname ==="/categories")
-                            : (to ==="/shipments"
-                                ? (location.pathname ==="/shipments" || location.pathname ==="/shipment-overview" || location.pathname ==="/vendors" || location.pathname ==="/provisioning")
-                                : (to ==="/labs"
-                                    ? location.pathname ==="/labs"
-                                    : location.pathname.startsWith(to)
+                    ? (location.pathname ==="/products" && (location.search.includes("quick-add") || location.search.includes("batch-load")))
+                    : (label ==="Review Queue"
+                        ? (location.pathname ==="/products" && location.search.includes("review-queue"))
+                        : (label ==="Labels"
+                            ? (location.pathname ==="/visual-ingest" || location.pathname ==="/barcode-creator" || location.pathname ==="/barcodes")
+                            : (to ==="/products"
+                                ? ((location.pathname ==="/products" && (!location.search || location.search.includes("stock") || !location.search.includes("tab="))) || location.pathname ==="/categories")
+                                : (to ==="/shipments"
+                                    ? (location.pathname ==="/shipments" || location.pathname ==="/shipment-overview" || location.pathname ==="/vendors" || location.pathname ==="/provisioning")
+                                    : (to ==="/labs"
+                                        ? location.pathname ==="/labs"
+                                        : location.pathname.startsWith(to)
+                                      )
                                   )
                               )
                           )
@@ -120,8 +124,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
                   {[
                     { to:"/products?tab=quick-add", label:"Quick Add", icon: FilePlus },
-                    { to:"/products?tab=batch-load", label:"Batch Load", icon: PackagePlus },
-                    { to:"/products?tab=review-queue", label:"Review Queue", icon: ClipboardList }
+                    { to:"/products?tab=batch-load", label:"Batch Load", icon: PackagePlus }
                   ].map((sub) => {
                     const isSubActive = location.pathname === "/products" && location.search.includes(sub.to.split("=")[1]);
                     const SubIcon = sub.icon;
