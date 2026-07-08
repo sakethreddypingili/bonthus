@@ -10,21 +10,16 @@ import {
 // ─── Constants ───────────────────────────────────────────────────────────────
 const POSITIONS = ["cover", "front", "side"];
 
-// Only scan 1D linear barcodes + common 2D — skips heavy QR-only formats for speed
+// Only scan common 1D linear barcodes (EAN, Code 128, UPC) — skips heavy 2D/QR checks for instant lock speed
 const BARCODE_FORMATS = typeof Html5QrcodeSupportedFormats !== "undefined" && Html5QrcodeSupportedFormats
     ? [
         Html5QrcodeSupportedFormats.EAN_13,
         Html5QrcodeSupportedFormats.EAN_8,
         Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.CODE_93,
         Html5QrcodeSupportedFormats.UPC_A,
         Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.ITF,
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.DATA_MATRIX,
       ]
-    : [9, 10, 5, 3, 4, 14, 15, 8, 0, 6];
+    : [9, 10, 5, 14, 15];
 
 const SCANNER_CONTAINER_ID = "visualise-camera-reader";
 
@@ -425,11 +420,7 @@ export default function Visualise({ userProfile }) {
                 await qr.start(
                     cameraConfig,
                     {
-                        fps: 12,
-                        qrbox: (vw, vh) => ({
-                            width: Math.min(280, Math.round(vw * 0.8)),
-                            height: Math.min(140, Math.round(vh * 0.5)),
-                        }),
+                        fps: 30, // Max frame rate for instant detection
                         aspectRatio: 1.777,
                         disableFlip: false,
                     },
