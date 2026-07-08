@@ -1344,181 +1344,208 @@ export default function Visualise({ userProfile }) {
 
             {/* ── STAGE 3: IMAGES ─────────────────────────────────────────── */}
             {stage === "images" && scannedProduct && (
-                <div className="max-w-3xl mx-auto space-y-6">
+                <div className="max-w-4xl mx-auto space-y-6">
                     <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
-                        <div className="space-y-1">
-                            <h3 className="text-sm font-black text-black uppercase tracking-widest">Image Acquisition</h3>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                                Cover image background will be automatically removed. Front &amp; Side get WebP compression.
-                            </p>
-                        </div>
+                        {activeCaptureSlot ? (
+                            /* Large full width inline camera capture panel */
+                            <div className="space-y-4 animate-in fade-in duration-200">
+                                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                                    <div>
+                                        <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2">
+                                            <Camera size={16} /> Capturing {activeCaptureSlot.toUpperCase()} VIEW
+                                        </h3>
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                                            Lining up the product frame or lens for high-resolution ingestion
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveCaptureSlot(null)}
+                                        className="py-2 px-4 border border-gray-300 hover:border-black text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                        ✕ Cancel
+                                    </button>
+                                </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3">
-                            {POSITIONS.map((pos) => {
-                                const img = images[pos];
-                                const showProgress = pos === "cover" && bgProgress && loading;
+                                <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black relative flex flex-col justify-end border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-h-[55vh]">
+                                    <video
+                                        id="in-app-video-preview"
+                                        autoPlay
+                                        playsInline
+                                        muted
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                    />
+                                    {/* Centered square guides for lining up frames */}
+                                    <div className="absolute inset-0 border-[3px] border-dashed border-white/20 pointer-events-none m-8 rounded-2xl flex items-center justify-center">
+                                        <div className="w-48 h-48 border-2 border-dashed border-amber-500/30 rounded-full" />
+                                    </div>
+                                    <div className="absolute bottom-4 inset-x-4 flex gap-3 justify-center z-10">
+                                        <button
+                                            type="button"
+                                            onClick={handleCaptureSnapshot}
+                                            className="py-3 px-8 bg-amber-500 hover:bg-amber-600 text-black font-black uppercase text-xs rounded-xl tracking-widest shadow-md transition-all active:scale-95"
+                                        >
+                                            Snap Photo
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveCaptureSlot(null)}
+                                            className="py-3 px-8 bg-neutral-900 hover:bg-neutral-800 text-white font-black uppercase text-xs rounded-xl tracking-widest shadow-md transition-all active:scale-95"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Original 3-column view grid */
+                            <>
+                                <div className="space-y-1">
+                                    <h3 className="text-sm font-black text-black uppercase tracking-widest">Image Acquisition</h3>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                        Cover image background will be automatically removed. Front &amp; Side get WebP compression.
+                                    </p>
+                                </div>
 
-                                return (
-                                    <div key={pos} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-3">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-[10px] font-black text-black uppercase tracking-widest">
-                                                {pos} view
-                                            </span>
-                                            {pos === "cover" && (
-                                                <span className="text-[8px] font-black text-purple-500 bg-purple-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                                    AI BG Remove
-                                                </span>
-                                            )}
-                                        </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3">
+                                    {POSITIONS.map((pos) => {
+                                        const img = images[pos];
+                                        const showProgress = pos === "cover" && bgProgress && loading;
 
-                                        {showProgress ? (
-                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border-2 border-black flex flex-col items-center justify-center p-4 space-y-2">
-                                                <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
-                                                <span className="text-[9px] font-black uppercase text-black tracking-widest text-center">
-                                                    {bgProgress.message}
-                                                </span>
-                                                {bgProgress.percent > 0 && (
-                                                    <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="bg-black h-full transition-all duration-300"
-                                                            style={{ width: `${bgProgress.percent}%` }}
-                                                        />
-                                                    </div>
-                                                )}
-                                                <span className="text-[8px] font-black text-gray-400">
-                                                    {bgProgress.percent}%
-                                                </span>
-                                            </div>
-                                        ) : img?.webpDataUrl ? (
-                                            <div className="space-y-3">
-                                                <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center relative">
-                                                    <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
-                                                    <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5">
-                                                        <span className="bg-black/70 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
-                                                            WebP · {formatBytes(img.processedSize)}
+                                        return (
+                                            <div key={pos} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[10px] font-black text-black uppercase tracking-widest">
+                                                        {pos} view
+                                                    </span>
+                                                    {pos === "cover" && (
+                                                        <span className="text-[8px] font-black text-purple-500 bg-purple-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                            AI BG Remove
                                                         </span>
-                                                        {img.originalSize && img.processedSize && (
-                                                            <span className="bg-green-700/80 text-[7px] font-black text-white px-2 py-0.5 rounded">
-                                                                {Math.round((1 - img.processedSize / img.originalSize) * 100)}% smaller
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Alignment Controls */}
-                                                <div className="bg-gray-50 border border-gray-150 rounded-xl p-3 space-y-3 text-left">
-                                                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest block">Alignment</span>
-                                                    <div className="space-y-2">
-                                                        <div>
-                                                            <div className="flex justify-between text-[9px] font-bold text-gray-500 mb-0.5">
-                                                                <span>Rotation</span>
-                                                                <span className="font-mono text-black">{img.rotation || 0}°</span>
-                                                            </div>
-                                                            <input
-                                                                type="range"
-                                                                min="-180"
-                                                                max="180"
-                                                                value={img.rotation || 0}
-                                                                onChange={(e) => {
-                                                                    const rot = Number(e.target.value);
-                                                                    composeImage(pos, img.foregroundUrl, rot, img.scale || 1);
-                                                                }}
-                                                                className="w-full h-1 bg-gray-250 rounded-lg appearance-none cursor-pointer accent-black"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex justify-between text-[9px] font-bold text-gray-500 mb-0.5">
-                                                                <span>Scale</span>
-                                                                <span className="font-mono text-black">{Math.round((img.scale || 1) * 100)}%</span>
-                                                            </div>
-                                                            <input
-                                                                type="range"
-                                                                min="0.5"
-                                                                max="1.5"
-                                                                step="0.05"
-                                                                value={img.scale || 1}
-                                                                onChange={(e) => {
-                                                                    const scl = Number(e.target.value);
-                                                                    composeImage(pos, img.foregroundUrl, img.rotation || 0, scl);
-                                                                }}
-                                                                className="w-full h-1 bg-gray-250 rounded-lg appearance-none cursor-pointer accent-black"
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {pos === "cover" && !img.isBgRemoved && (
-                                                        <button
-                                                            type="button"
-                                                            disabled={loading}
-                                                            onClick={() => triggerBgRemoval("cover")}
-                                                            className="w-full mt-2 py-2.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                                                        >
-                                                            <Sparkles size={12} /> Remove BG (1:1 Square)
-                                                        </button>
                                                     )}
                                                 </div>
+
+                                                {showProgress ? (
+                                                    <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border-2 border-black flex flex-col items-center justify-center p-4 space-y-2">
+                                                        <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
+                                                        <span className="text-[9px] font-black uppercase text-black tracking-widest text-center">
+                                                            {bgProgress.message}
+                                                        </span>
+                                                        {bgProgress.percent > 0 && (
+                                                            <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className="bg-black h-full transition-all duration-300"
+                                                                    style={{ width: `${bgProgress.percent}%` }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        <span className="text-[8px] font-black text-gray-400">
+                                                            {bgProgress.percent}%
+                                                        </span>
+                                                    </div>
+                                                ) : img?.webpDataUrl ? (
+                                                    <div className="space-y-3">
+                                                        <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center relative">
+                                                            <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
+                                                            <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5">
+                                                                <span className="bg-black/70 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
+                                                                    WebP · {formatBytes(img.processedSize)}
+                                                                </span>
+                                                                {img.originalSize && img.processedSize && (
+                                                                    <span className="bg-green-700/80 text-[7px] font-black text-white px-2 py-0.5 rounded">
+                                                                        {Math.round((1 - img.processedSize / img.originalSize) * 100)}% smaller
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Alignment Controls */}
+                                                        <div className="bg-gray-50 border border-gray-150 rounded-xl p-3 space-y-3 text-left">
+                                                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest block">Alignment</span>
+                                                            <div className="space-y-2">
+                                                                <div>
+                                                                    <div className="flex justify-between text-[9px] font-bold text-gray-500 mb-0.5">
+                                                                        <span>Rotation</span>
+                                                                        <span className="font-mono text-black">{img.rotation || 0}°</span>
+                                                                    </div>
+                                                                    <input
+                                                                        type="range"
+                                                                        min="-180"
+                                                                        max="180"
+                                                                        value={img.rotation || 0}
+                                                                        onChange={(e) => {
+                                                                            const rot = Number(e.target.value);
+                                                                            composeImage(pos, img.foregroundUrl, rot, img.scale || 1);
+                                                                        }}
+                                                                        className="w-full h-1 bg-gray-250 rounded-lg appearance-none cursor-pointer accent-black"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex justify-between text-[9px] font-bold text-gray-500 mb-0.5">
+                                                                        <span>Scale</span>
+                                                                        <span className="font-mono text-black">{Math.round((img.scale || 1) * 100)}%</span>
+                                                                    </div>
+                                                                    <input
+                                                                        type="range"
+                                                                        min="0.5"
+                                                                        max="1.5"
+                                                                        step="0.05"
+                                                                        value={img.scale || 1}
+                                                                        onChange={(e) => {
+                                                                            const scl = Number(e.target.value);
+                                                                            composeImage(pos, img.foregroundUrl, img.rotation || 0, scl);
+                                                                        }}
+                                                                        className="w-full h-1 bg-gray-250 rounded-lg appearance-none cursor-pointer accent-black"
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            {pos === "cover" && !img.isBgRemoved && (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={loading}
+                                                                    onClick={() => triggerBgRemoval("cover")}
+                                                                    className="w-full mt-2 py-2.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                                                >
+                                                                    <Sparkles size={12} /> Remove BG (1:1 Square)
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="aspect-video w-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-4 transition-all gap-2 text-center border-gray-300">
+                                                        <span className="text-[8px] font-black uppercase tracking-widest text-gray-400 block mb-1">
+                                                            Acquire {pos} View
+                                                        </span>
+                                                        <div className="flex flex-col gap-2 w-full max-w-[160px]">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setCaptureFacingMode("environment");
+                                                                    setActiveCaptureSlot(pos);
+                                                                }}
+                                                                className="py-2 px-3 bg-black hover:bg-neutral-800 text-white rounded-xl text-[9px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                                            >
+                                                                <Camera size={11} /> Take Photo (In-App)
+                                                            </button>
+                                                            <label className="py-2 px-3 border border-gray-300 hover:border-black text-gray-700 rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer bg-white hover:bg-gray-50">
+                                                                <Upload size={11} /> Choose File
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    onChange={(e) => handleFileChange(e, pos)}
+                                                                    className="hidden"
+                                                                />
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
-                                        ) : activeCaptureSlot === pos ? (
-                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-black relative flex flex-col justify-end border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                                                <video
-                                                    id="in-app-video-preview"
-                                                    autoPlay
-                                                    playsInline
-                                                    muted
-                                                    className="absolute inset-0 w-full h-full object-cover"
-                                                />
-                                                <div className="absolute inset-0 border-2 border-dashed border-white/20 pointer-events-none flex items-center justify-center m-4 rounded-lg">
-                                                    <div className="w-16 h-16 border border-dashed border-amber-500/40 rounded-full" />
-                                                </div>
-                                                <div className="absolute bottom-2 inset-x-2 flex gap-1.5 justify-center z-10">
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleCaptureSnapshot}
-                                                        className="py-1 px-2.5 bg-amber-500 hover:bg-amber-600 text-black font-black uppercase text-[7px] rounded-lg tracking-widest shadow-md transition-all active:scale-95"
-                                                    >
-                                                        Snap
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setActiveCaptureSlot(null)}
-                                                        className="py-1 px-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-black uppercase text-[7px] rounded-lg tracking-widest shadow-md transition-all active:scale-95"
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className={`aspect-video w-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-4 transition-all gap-2 text-center border-gray-300 ${loading ? "opacity-40 pointer-events-none" : ""}`}>
-                                                <span className="text-[8px] font-black uppercase tracking-widest text-gray-400 block mb-1">
-                                                    Acquire {pos} View
-                                                </span>
-                                                <div className="flex flex-col gap-2 w-full max-w-[160px]">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setCaptureFacingMode("environment");
-                                                            setActiveCaptureSlot(pos);
-                                                        }}
-                                                        className="py-2 px-3 bg-black hover:bg-neutral-800 text-white rounded-xl text-[9px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                                                    >
-                                                        <Camera size={11} /> Take Photo (In-App)
-                                                    </button>
-                                                    <label className="py-2 px-3 border border-gray-300 hover:border-black text-gray-700 rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer bg-white hover:bg-gray-50">
-                                                        <Upload size={11} /> Choose File
-                                                        <input
-                                                            type="file"
-                                                            accept="image/*"
-                                                            onChange={(e) => handleFileChange(e, pos)}
-                                                            className="hidden"
-                                                        />
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <div className="flex gap-4">
