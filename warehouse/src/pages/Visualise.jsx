@@ -400,13 +400,17 @@ export default function Visualise({ userProfile }) {
         // Ensure previous instance is fully cleaned up
         await destroyScanner();
 
-        // Small delay so React can commit the DOM node before Html5Qrcode looks for it
-        startTimerRef.current = setTimeout(async () => {
+        let retries = 0;
+        const tryStart = async () => {
             if (!mountedRef.current) return;
-
             const el = document.getElementById(SCANNER_CONTAINER_ID);
             if (!el) {
-                setScannerError("Camera viewport not ready. Please try again.");
+                if (retries < 15) {
+                    retries++;
+                    startTimerRef.current = setTimeout(tryStart, 100);
+                } else {
+                    setScannerError("Camera viewport not ready. Please try again.");
+                }
                 return;
             }
 
@@ -414,7 +418,7 @@ export default function Visualise({ userProfile }) {
                 const cameraConfig = await resolveCamera();
                 const qr = new Html5Qrcode(SCANNER_CONTAINER_ID, {
                     formatsToSupport: BARCODE_FORMATS,
-                    verbose: false, // silence console spam
+                    verbose: false,
                 });
                 html5QrRef.current = qr;
 
@@ -426,7 +430,7 @@ export default function Visualise({ userProfile }) {
                             width: Math.min(280, Math.round(vw * 0.8)),
                             height: Math.min(140, Math.round(vh * 0.5)),
                         }),
-                        aspectRatio: 1.777, // 16:9
+                        aspectRatio: 1.777,
                         disableFlip: false,
                     },
                     (decodedText) => {
@@ -436,7 +440,6 @@ export default function Visualise({ userProfile }) {
                             if (mountedRef.current) searchProduct(decodedText.trim());
                         });
                     },
-                    // Suppress per-frame "not found" errors — they are normal noise
                     (_errorMsg) => {}
                 );
 
@@ -445,13 +448,11 @@ export default function Visualise({ userProfile }) {
                 console.error("[Scanner] start failed:", err);
                 if (mountedRef.current) {
                     const msg = err?.message || String(err);
-                    // Parse friendly message from common Html5Qrcode errors
                     if (/permission/i.test(msg)) {
                         setScannerError("Camera permission denied. Please allow access and try again.");
                     } else if (/not found|no camera/i.test(msg)) {
                         setScannerError("No camera found on this device.");
                     } else if (/already/i.test(msg)) {
-                        // Scanner was already running — cleanup and retry once
                         setScannerError("");
                         html5QrRef.current = null;
                         setTimeout(() => { if (mountedRef.current) startScanner(); }, 400);
@@ -461,7 +462,9 @@ export default function Visualise({ userProfile }) {
                     setIsScanning(false);
                 }
             }
-        }, 150); // 150 ms is enough for React to flush DOM
+        };
+
+        startTimerRef.current = setTimeout(tryStart, 150);
     }, [destroyScanner, resolveCamera, searchProduct]);
 
     const handleManualSearch = useCallback(
@@ -720,7 +723,7 @@ export default function Visualise({ userProfile }) {
         }
     }, []);
 
-    // ─── Sub-menu Navigation Effect ────────────────────────────────────────
+    // ─── Sub-menu Navigation Effect & Scanner Re-ignition ───────────────────
 
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
@@ -730,10 +733,12 @@ export default function Visualise({ userProfile }) {
             fetchUploadedProducts();
         } else {
             setStage("scan");
-            startScanner();
+            if (!scannedProduct) {
+                startScanner();
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [location.search]);
+    }, [location.search, scannedProduct]);
 
     // ─── Final submission ─────────────────────────────────────────────────────
 
