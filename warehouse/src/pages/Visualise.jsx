@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Camera, Upload, Trash2, Check, QrCode, ChevronLeft } from "lucide-react";
+import { Camera, Upload, Check, QrCode, ChevronLeft } from "lucide-react";
 import { supabase } from "../server/supabase/supabase";
 import { Html5Qrcode } from "html5-qrcode";
+import { removeBackground } from "@imgly/background-removal";
 
 const POSITIONS = ['cover', 'front', 'side'];
 
@@ -99,7 +100,7 @@ const convertToWebP = (file) => {
 };
 
 // Background removal helper using HTML5 Canvas white thresholding
-const removeWhiteBackground = (webpDataUrl, threshold = 230) => {
+const removeWhiteBackground = (webpDataUrl, threshold = 210) => {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
@@ -118,9 +119,12 @@ const removeWhiteBackground = (webpDataUrl, threshold = 230) => {
                     const g = data[i + 1];
                     const b = data[i + 2];
 
-                    // If pixel is very close to white/light gray
+                    // If pixel is very close to white/light gray, force to pure solid white
                     if (r > threshold && g > threshold && b > threshold) {
-                        data[i + 3] = 0; // Alpha channel to 0 (fully transparent)
+                        data[i] = 255;     // R
+                        data[i + 1] = 255; // G
+                        data[i + 2] = 255; // B
+                        data[i + 3] = 255; // A (Fully opaque white background)
                     }
                 }
 
@@ -135,10 +139,45 @@ const removeWhiteBackground = (webpDataUrl, threshold = 230) => {
     });
 };
 
-// Convert a data URL back to a Blob for upload
-const dataURLToBlob = async (dataUrl) => {
-    const res = await fetch(dataUrl);
-    return res.blob();
+// Helper to draw transparent background blob output from @imgly on top of solid white canvas background
+const drawTransparentBlobOnWhiteBackground = (blob) => {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext("2d");
+            
+            // Fill background with solid white
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw transparent image
+            ctx.drawImage(img, 0, 0);
+            
+            resolve(canvas.toDataURL("image/webp", 0.82));
+            URL.revokeObjectURL(url);
+        };
+        img.onerror = (e) => {
+            URL.revokeObjectURL(url);
+            reject(e);
+        };
+        img.src = url;
+    });
+};
+
+// Convert a data URL back to a Blob synchronously (eliminating fetch dependencies)
+const dataURLToBlob = (dataUrl) => {
+    const arr = dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
 };
 
 export default function Visualise({ userProfile }) {
@@ -189,6 +228,9 @@ export default function Visualise({ userProfile }) {
         front: null,
         side: null
     });
+
+    // Browser-based AI background removal progress tracking state
+    const [bgRemovalProgress, setBgRemovalProgress] = useState(null);
 
     const [showConfirmPopup, setShowConfirmPopup] = useState(false);
 
@@ -373,78 +415,70 @@ export default function Visualise({ userProfile }) {
         };
     }, [visualiseStage, startScanner, stopScanner]);
 
+    // Automatically convert to WebP & remove background of cover image synchronously on file load
     const handleFileChange = async (e, position) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        try {
-            // Read for immediate preview
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                const previewDataUrl = event.target.result;
-
-                setImages(prev => ({
-                    ...prev,
-                    [position]: {
-                        file,
-                        previewDataUrl,
-                        webpDataUrl: previewDataUrl,
-                        webpBlob: file,
-                        isBgRemoved: false
-                    }
-                }));
-
-                // Convert to WebP format
-                const webpDataUrl = await convertToWebP(file);
-                const webpBlob = await dataURLToBlob(webpDataUrl);
-
-                setImages(prev => {
-                    if (!prev[position]) return prev;
-                    return {
-                        ...prev,
-                        [position]: {
-                            ...prev[position],
-                            webpDataUrl,
-                            webpBlob
-                        }
-                    };
-                });
-            };
-            reader.readAsDataURL(file);
-        } catch (err) {
-            setErrorMessage("Image processing failed: " + err.message);
-        }
-    };
-
-    // Run Background Removal for the Cover Image
-    const handleRemoveCoverBg = async () => {
-        const cover = images.cover;
-        if (!cover?.webpDataUrl) return;
-
         setLoading(true);
+        setErrorMessage("");
+        setSuccessMessage("");
         try {
-            const cleanDataUrl = await removeWhiteBackground(cover.webpDataUrl, 238);
-            const cleanBlob = await dataURLToBlob(cleanDataUrl);
+            let webpDataUrl = null;
+
+            if (position === 'cover') {
+                setBgRemovalProgress({ message: "Loading AI model...", percent: 0 });
+                try {
+                    // Execute browser-based AI segmentation
+                    const cleanBlob = await removeBackground(file, {
+                        progress: (key, current, total) => {
+                            const percent = Math.round((current / total) * 100);
+                            const phase = key.includes("fetch") ? "Downloading AI assets" : "Processing segmentation";
+                            setBgRemovalProgress({
+                                message: `${phase}...`,
+                                percent
+                            });
+                        }
+                    });
+
+                    setBgRemovalProgress({ message: "Adding white background...", percent: 100 });
+                    // Draw output from AI on canvas with solid white background
+                    webpDataUrl = await drawTransparentBlobOnWhiteBackground(cleanBlob);
+                } catch (aiError) {
+                    console.error("AI background removal failed, falling back to color filter:", aiError);
+                    webpDataUrl = await convertToWebP(file);
+                    webpDataUrl = await removeWhiteBackground(webpDataUrl, 210);
+                }
+                setBgRemovalProgress(null);
+            } else {
+                // Front/side views just get WebP conversion
+                webpDataUrl = await convertToWebP(file);
+            }
+
+            const webpBlob = dataURLToBlob(webpDataUrl);
 
             setImages(prev => ({
                 ...prev,
-                cover: {
-                    ...prev.cover,
-                    webpDataUrl: cleanDataUrl,
-                    webpBlob: cleanBlob,
-                    isBgRemoved: true
+                [position]: {
+                    file,
+                    previewDataUrl: webpDataUrl,
+                    webpDataUrl,
+                    webpBlob,
+                    isBgRemoved: position === 'cover'
                 }
             }));
-            setSuccessMessage("Background removed from Cover image.");
+            
+            if (position === 'cover') {
+                setSuccessMessage("Cover image background removed and saved successfully.");
+            } else {
+                setSuccessMessage(`${position.charAt(0).toUpperCase() + position.slice(1)} image uploaded and compressed to WebP.`);
+            }
         } catch (err) {
-            setErrorMessage("Background removal failed: " + err.message);
+            setErrorMessage("Image processing failed: " + err.message);
         } finally {
             setLoading(false);
+            setBgRemovalProgress(null);
         }
-    };
-
-    const handleRemoveImage = (position) => {
-        setImages(prev => ({ ...prev, [position]: null }));
     };
 
     // Final confirmation submission
@@ -742,17 +776,32 @@ export default function Visualise({ userProfile }) {
                                     <div key={pos} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-3">
                                         <div className="flex justify-between items-center">
                                             <span className="text-[10px] font-black text-black uppercase tracking-widest">{pos} view</span>
-                                            {img && (
-                                                <button onClick={() => handleRemoveImage(pos)} className="text-red-500 hover:text-red-700 p-1">
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            )}
                                         </div>
 
-                                        {img?.webpDataUrl ? (
+                                        {pos === 'cover' && bgRemovalProgress ? (
+                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border-2 border-black flex flex-col items-center justify-center p-4 relative space-y-2">
+                                                <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
+                                                <span className="text-[9px] font-black uppercase text-black tracking-widest text-center">
+                                                    {bgRemovalProgress.message}
+                                                </span>
+                                                {bgRemovalProgress.percent > 0 && (
+                                                    <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className="bg-black h-full transition-all duration-300"
+                                                            style={{ width: `${bgRemovalProgress.percent}%` }}
+                                                        />
+                                                    </div>
+                                                )}
+                                                <span className="text-[8px] font-black text-gray-400">
+                                                    {bgRemovalProgress.percent}% Completed
+                                                </span>
+                                            </div>
+                                        ) : img?.webpDataUrl ? (
                                             <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center relative">
                                                 <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
-                                                <span className="absolute bottom-2 right-2 bg-black/60 text-[6px] font-black text-white px-1.5 py-0.5 rounded uppercase tracking-wider">WebP</span>
+                                                <span className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
+                                                    WEBP | {img.webpBlob ? `${(img.webpBlob.size / 1024).toFixed(1)} KB` : "—"}
+                                                </span>
                                             </div>
                                         ) : (
                                             <label className="aspect-video w-full border-2 border-dashed border-gray-300 hover:border-black rounded-xl cursor-pointer flex flex-col items-center justify-center p-4 transition-all gap-1 text-center">
@@ -760,21 +809,6 @@ export default function Visualise({ userProfile }) {
                                                 <span className="text-[8px] font-black uppercase tracking-widest text-gray-500">Capture / Upload</span>
                                                 <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, pos)} className="hidden" />
                                             </label>
-                                        )}
-
-                                        {/* Background removal tool exclusively for Cover View */}
-                                        {pos === 'cover' && img?.webpDataUrl && (
-                                            <button
-                                                onClick={handleRemoveCoverBg}
-                                                disabled={loading || img.isBgRemoved}
-                                                className={`w-full py-2 text-[8px] font-black uppercase tracking-widest rounded-xl border transition-all ${
-                                                    img.isBgRemoved 
-                                                        ? "bg-green-50 border-green-200 text-green-700 cursor-not-allowed" 
-                                                        : "bg-white border-black text-black hover:bg-gray-50"
-                                                }`}
-                                            >
-                                                {img.isBgRemoved ? "✓ Background Removed" : "✨ Remove Background"}
-                                            </button>
                                         )}
                                     </div>
                                 );
@@ -878,8 +912,11 @@ export default function Visualise({ userProfile }) {
                                     return (
                                         <div key={pos} className="bg-white border border-gray-250 p-3 rounded-2xl space-y-1">
                                             <span className="text-[8px] font-black text-black uppercase tracking-widest">{pos} View</span>
-                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center relative">
                                                 <img src={img.webpDataUrl} alt={pos} className="max-h-full max-w-full object-contain" />
+                                                <span className="absolute bottom-2 right-2 bg-black/60 text-[7px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">
+                                                    {img.webpBlob ? `${(img.webpBlob.size / 1024).toFixed(1)} KB` : "—"}
+                                                </span>
                                             </div>
                                         </div>
                                     );
