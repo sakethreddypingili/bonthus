@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Camera, Upload, Check, QrCode, ChevronLeft, Sparkles } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { supabase } from "../server/supabase/supabase";
 import {
     Html5Qrcode,
@@ -1672,7 +1673,7 @@ export default function Visualise({ userProfile }) {
                 </div>
             )}
             {/* ── IN-APP CAMERA CAPTURE OVERLAY ────────────────────────────── */}
-            {activeCaptureSlot && (
+            {activeCaptureSlot && createPortal(
                 <div className="fixed inset-0 z-[9999] flex flex-col bg-black text-white animate-in fade-in duration-200 w-screen h-screen">
                     {/* Top Bar */}
                     <div className="flex justify-between items-center px-6 py-4 bg-black/90 border-b border-neutral-900 z-10">
@@ -1746,7 +1747,8 @@ export default function Visualise({ userProfile }) {
                             <div className="w-12 h-12" />
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
