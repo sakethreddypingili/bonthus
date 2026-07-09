@@ -96,6 +96,20 @@ export function usePrintQueue() {
       if (pendingErr) throw pendingErr;
       if (!pendingProds || pendingProds.length === 0) return 0;
 
+      // 3. Fetch barcodes mapping for these pending products
+      const productIds = pendingProds.map(p => p.id);
+      const { data: barcodeData } = await supabase
+        .from("pending_product_barcodes")
+        .select("pending_product_id, barcode")
+        .in("pending_product_id", productIds);
+
+      const barcodeMap = {};
+      if (barcodeData) {
+        barcodeData.forEach(b => {
+          barcodeMap[b.pending_product_id] = b.barcode;
+        });
+      }
+
       const formatted = pendingProds.map((item) => {
         let desc = {};
         try {
@@ -105,10 +119,11 @@ export function usePrintQueue() {
         }
 
         const categoryName = catsMap[item.category_id] || desc.type || "Eyewear";
+        const barcodeVal = barcodeMap[item.id] || item.sku;
 
         return {
           id: item.id.toString(),
-          barcodeValue: item.temp_barcode || item.sku,
+          barcodeValue: barcodeVal,
           brandValue: item.brand || "",
           modelValue: desc.modelNo || "",
           skuValue: item.sku,
