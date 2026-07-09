@@ -1580,6 +1580,7 @@ export default function ProductList({ userProfile }) {
                           <option value="Wayfarer">Wayfarer</option>
                           <option value="Clubmaster">Clubmaster</option>
                           <option value="Cat Eye">Cat Eye</option>
+                          <option value="Hexagon">Hexagon</option>
                         </select>
                       </div>
                     </div>
@@ -2360,6 +2361,7 @@ export default function ProductList({ userProfile }) {
                                   <option value="Wayfarer">Wayfarer</option>
                                   <option value="Clubmaster">Clubmaster</option>
                                   <option value="Cat Eye">Cat Eye</option>
+                                  <option value="Hexagon">Hexagon</option>
                                 </select>
                               </div>
                               <div className="space-y-1">
@@ -3133,6 +3135,7 @@ export default function ProductList({ userProfile }) {
                           <option value="Wayfarer">Wayfarer</option>
                           <option value="Clubmaster">Clubmaster</option>
                           <option value="Cat Eye">Cat Eye</option>
+                          <option value="Hexagon">Hexagon</option>
                         </select>
                       </div>
                     </div>
