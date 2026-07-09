@@ -22,14 +22,14 @@ const statusBadge = (status) => {
 };
 
 const StatCard = ({ label, value, trend, up = true, loading, isComparison = true }) => (
-  <div className="stat-card bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:border-black/5 transition-all duration-300 group">
+  <div className="stat-card bg-white rounded-2xl p-3 md:p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:border-black/5 transition-all duration-300 group">
     <div className="flex flex-col h-full">
-      <p className="text-[10px] font-black text-gray-400 mb-2 uppercase tracking-[0.15em]">{label}</p>
-      <div className="flex items-baseline gap-2 mb-4">
-        <p className="text-3xl font-black text-black tracking-tighter">{loading ? "..." : value}</p>
+      <p className="text-[9px] md:text-[10px] font-black text-gray-400 mb-1 md:mb-2 uppercase tracking-[0.15em]">{label}</p>
+      <div className="flex items-baseline gap-1 md:gap-2 mb-2 md:mb-4">
+        <p className="text-xl md:text-3xl font-black text-black tracking-tighter">{loading ? "..." : value}</p>
       </div>
-      <div className="mt-auto flex items-center gap-2">
-        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${up ? "bg-black text-white" : "bg-gray-100 text-black"}`}>
+      <div className="mt-auto flex items-center gap-1.5 md:gap-2">
+        <div className={`inline-flex items-center gap-1 px-1.5 md:px-2 py-0.5 rounded-md ${up ? "bg-black text-white" : "bg-gray-100 text-black"}`}>
           {isComparison && (up ? <ArrowUpRight size={12} strokeWidth={3} /> : <ArrowDownRight size={12} strokeWidth={3} />)}
           <span className="text-[10px] font-black uppercase">{trend}</span>
         </div>
@@ -655,17 +655,9 @@ export default function Dashboard({ userProfile }) {
   const isWeeklyDataEmpty = useMemo(() => weeklyOrdersData.every(d => d.orders === 0), [weeklyOrdersData]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-4 md:space-y-8 animate-in fade-in duration-500">
       {/* Role-based Header / Store Selector */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">
-            Dashboard
-          </h1>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">
-            {isSuperAdmin ? "System-wide Overview" : (selectedStoreId ? `Managing: ${stores.find(s => s.id === selectedStoreId)?.name}` : "Workspace Center")}
-          </p>
-        </div>
+      <div className="flex flex-row md:flex-row items-end justify-end gap-4 md:gap-6">
         
         {isSuperAdmin && (
           <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-2xl border border-gray-100">
@@ -698,7 +690,7 @@ export default function Dashboard({ userProfile }) {
       </div>
 
       {/* Stats - Primary Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         <StatCard label="Total Revenue Today" value={formatCurrency(stats.revenueToday)} trend={`${stats.trendRevenueToday}%`} up={parseFloat(stats.trendRevenueToday) >= 0} loading={loading} />
         <StatCard label="30D Revenue" value={formatCurrency(stats.revenueLast30Days)} trend="Historical" isComparison={false} loading={loading} />
         <StatCard label="Orders Today" value={stats.ordersToday.toLocaleString()} trend={`${stats.trendOrdersToday}%`} up={parseFloat(stats.trendOrdersToday) >= 0} loading={loading} />
@@ -706,10 +698,10 @@ export default function Dashboard({ userProfile }) {
       </div>
 
       {/* Revenue & Category Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-6">
         {/* Revenue Bar Chart - 50% width on large screens */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-col h-[450px]">
-          <div className="flex items-center justify-between mb-8">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 md:p-6 flex flex-col h-[250px] lg:h-[450px]">
+          <div className="flex items-center justify-between mb-4 md:mb-8">
             <div>
               <h3 className="font-black text-black text-lg uppercase tracking-tight">Revenue Overview</h3>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">12 Month Performance</p>
@@ -737,8 +729,8 @@ export default function Dashboard({ userProfile }) {
         </div>
 
         {/* Distribution Chart - 1/3 width */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-col h-[450px]">
-          <div className="mb-8">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 md:p-6 flex flex-col h-[250px] lg:h-[450px]">
+          <div className="mb-4 md:mb-8">
             <h3 className="font-black text-black text-lg uppercase tracking-tight">
               {isSuperAdmin && selectedStoreId === "All" ? "Store Share" : "Category Share"}
             </h3>
@@ -765,10 +757,10 @@ export default function Dashboard({ userProfile }) {
       </div>
 
       {/* Grid for small charts and tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
         {/* Today Hourly Performance */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 h-[400px] flex flex-col">
-          <div className="flex items-center justify-between mb-8">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 md:p-6 h-[220px] lg:h-[400px] flex flex-col">
+          <div className="flex items-center justify-between mb-3 md:mb-8">
             <div>
               <h3 className="font-black text-black text-lg uppercase tracking-tight">Hourly Pulse</h3>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Today Order Velocity</p>
@@ -793,17 +785,17 @@ export default function Dashboard({ userProfile }) {
         </div>
 
         {/* Status Breakdown */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 h-[400px] flex flex-col">
-          <div className="mb-6">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 md:p-6 h-[220px] lg:h-[400px] flex flex-col">
+          <div className="mb-3 md:mb-6">
             <h3 className="font-black text-black text-lg uppercase tracking-tight">Order Pipeline</h3>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Today's Lifecycle</p>
           </div>
           <div className="flex-1 grid grid-cols-2 gap-4 overflow-y-auto pr-2">
             {statusData.map((s) => (
-              <div key={s.name} className="flex flex-col p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-black transition-colors group">
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover:text-black">{s.name}</span>
+              <div key={s.name} className="flex flex-col p-3 md:p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-black transition-colors group">
+                <span className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 md:mb-2 group-hover:text-black">{s.name}</span>
                 <div className="flex items-end justify-between">
-                  <span className="text-2xl font-black text-black">{s.value}</span>
+                  <span className="text-lg md:text-2xl font-black text-black">{s.value}</span>
                   <div className="h-1.5 w-8 bg-gray-200 rounded-full overflow-hidden">
                     <div className="h-full bg-black" style={{ width: `${(s.value / (statusData.reduce((a,b)=>a+b.value,0)||1))*100}%` }} />
                   </div>
@@ -815,10 +807,10 @@ export default function Dashboard({ userProfile }) {
       </div>
 
       {/* Final Tables Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-12">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 pb-12">
         {/* Today's Transactions */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[500px]">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[350px] lg:h-[500px]">
+          <div className="p-4 md:p-6 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-black text-black text-lg uppercase tracking-tight text-outline-black">Today's Flow</h3>
             <button className="text-[10px] font-black text-black uppercase tracking-widest border-b-2 border-black">Full Ledger</button>
           </div>
@@ -826,33 +818,33 @@ export default function Dashboard({ userProfile }) {
             <table className="w-full">
               <thead className="sticky top-0 bg-white border-b border-gray-100">
                 <tr>
-                  <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Time</th>
-                  <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Entity</th>
-                  <th className="px-6 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Value</th>
-                  <th className="px-6 py-4 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest">Time</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest">Entity</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-right text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest">Value</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-center text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {todayOrderHistory.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="px-6 py-20 text-center">
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="p-4 bg-black rounded-2xl mb-3 shadow-lg transform rotate-3 inline-block">
-                          <LayoutDashboard size={24} className="text-white" />
+                  {todayOrderHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="px-3 md:px-6 py-8 md:py-20 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="p-4 bg-black rounded-2xl mb-3 shadow-lg transform rotate-3 inline-block">
+                            <LayoutDashboard size={24} className="text-white" />
+                          </div>
+                          <p className="text-[10px] font-black text-black uppercase tracking-[0.2em]">
+                            No transactions recorded today
+                          </p>
                         </div>
-                        <p className="text-[10px] font-black text-black uppercase tracking-[0.2em]">
-                          No transactions recorded today
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  todayOrderHistory.map((o) => (
+                      </td>
+                    </tr>
+                  ) : (
+                    todayOrderHistory.map((o) => (
                     <tr key={o.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">{o.time}</td>
-                      <td className="px-6 py-4 text-[11px] font-bold text-black">{o.customer}</td>
-                      <td className="px-6 py-4 text-right text-[11px] font-black text-black tracking-tight">₹{o.amount.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-center">{statusBadge(o.status)}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-[9px] md:text-[10px] font-black text-gray-400 uppercase">{o.time}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-[10px] md:text-[11px] font-bold text-black">{o.customer}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-right text-[10px] md:text-[11px] font-black text-black tracking-tight">₹{o.amount.toLocaleString()}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-center">{statusBadge(o.status)}</td>
                     </tr>
                   ))
                 )}
@@ -862,8 +854,8 @@ export default function Dashboard({ userProfile }) {
         </div>
 
         {/* Yesterday's Ledger */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[500px]">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[350px] lg:h-[500px]">
+          <div className="p-4 md:p-6 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-black text-black text-lg uppercase tracking-tight">Past 24H</h3>
             <button className="text-[10px] font-black text-black uppercase tracking-widest border-b-2 border-black">Archive</button>
           </div>
@@ -871,33 +863,33 @@ export default function Dashboard({ userProfile }) {
             <table className="w-full">
               <thead className="sticky top-0 bg-white border-b border-gray-100">
                 <tr>
-                  <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Reference</th>
-                  <th className="px-6 py-4 text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">Entity</th>
-                  <th className="px-6 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Value</th>
-                  <th className="px-6 py-4 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest">Reference</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest">Entity</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-right text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest">Value</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-center text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {recentOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="px-6 py-20 text-center">
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="p-4 bg-black rounded-2xl mb-3 shadow-lg transform rotate-3 inline-block">
-                          <LayoutDashboard size={24} className="text-white" />
+                  {recentOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="px-3 md:px-6 py-8 md:py-20 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="p-4 bg-black rounded-2xl mb-3 shadow-lg transform rotate-3 inline-block">
+                            <LayoutDashboard size={24} className="text-white" />
+                          </div>
+                          <p className="text-[10px] font-black text-black uppercase tracking-[0.2em]">
+                            No orders in the past 24 hours
+                          </p>
                         </div>
-                        <p className="text-[10px] font-black text-black uppercase tracking-[0.2em]">
-                          No orders in the past 24 hours
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  recentOrders.map((o) => (
+                      </td>
+                    </tr>
+                  ) : (
+                    recentOrders.map((o) => (
                     <tr key={o.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-mono text-[10px] font-black text-gray-400">#{o.id.substring(0, 6)}</td>
-                      <td className="px-6 py-4 text-[11px] font-bold text-black">{o.customer}</td>
-                      <td className="px-6 py-4 text-right text-[11px] font-black text-black tracking-tight">₹{o.amount.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-center">{statusBadge(o.status)}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 font-mono text-[9px] md:text-[10px] font-black text-gray-400">#{o.id.substring(0, 6)}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-[10px] md:text-[11px] font-bold text-black">{o.customer}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-right text-[10px] md:text-[11px] font-black text-black tracking-tight">₹{o.amount.toLocaleString()}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-center">{statusBadge(o.status)}</td>
                     </tr>
                   ))
                 )}

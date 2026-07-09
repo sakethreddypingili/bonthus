@@ -209,6 +209,16 @@ export default function Visualise({ userProfile }) {
     const [uploadedProducts, setUploadedProducts] = useState([]);
     const [loadingUploaded, setLoadingUploaded] = useState(false);
     const [selectedUploaded, setSelectedUploaded] = useState(null);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    const filteredProducts = searchQuery.trim()
+        ? uploadedProducts.filter((p) => {
+            const q = searchQuery.toLowerCase();
+            const name = (p.product_name || p.name || "").toLowerCase();
+            const sku = (p.sku || "").toLowerCase();
+            return name.includes(q) || sku.includes(q);
+        })
+        : uploadedProducts;
 
     // ── Cleanup on unmount ─────────────────────────────────────────────────
     useEffect(() => {
@@ -1057,193 +1067,131 @@ export default function Visualise({ userProfile }) {
 
             {/* ── STAGE: GALLERY / HISTORY ─────────────────────────────────── */}
             {stage === "gallery" && (
-                <div className="max-w-4xl mx-auto space-y-6">
-                    <div className="bg-white border-2 border-black rounded-3xl p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-6">
-                        <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                            <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2">
-                                🖼️ Upload History
-                            </h3>
-                            <button
-                                onClick={() => navigate("/visualise?tab=scan")}
-                                className="text-[10px] font-black uppercase text-gray-500 hover:text-black flex items-center gap-1"
-                            >
-                                <ChevronLeft size={14} /> Back to Scanner
-                            </button>
+                <>
+                    {loadingUploaded ? (
+                        <div className="flex flex-col items-center justify-center py-12 space-y-2">
+                            <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
+                            <span className="text-[10px] font-black uppercase text-gray-400">Loading history…</span>
                         </div>
-
-                        {loadingUploaded ? (
-                            <div className="flex flex-col items-center justify-center py-12 space-y-2">
-                                <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
-                                <span className="text-[10px] font-black uppercase text-gray-400">Loading history…</span>
+                    ) : uploadedProducts.length === 0 ? (
+                        <div className="text-center py-12 text-gray-400 text-xs font-bold uppercase tracking-wider">
+                            No products found with uploaded images.
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex flex-col items-end px-4 pb-2">
+                                <div className="relative max-w-xs w-full">
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Search by name or SKU…"
+                                        className="w-full pl-8 pr-3 py-1.5 bg-white border-2 border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black placeholder:text-gray-300"
+                                    />
+                                    <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                                    </svg>
+                                </div>
+                                <span className="text-[10px] font-black text-gray-400 uppercase mt-1">
+                                    Total confirmed: {uploadedProducts.filter((p) => p.status === "confirmed").length}
+                                </span>
                             </div>
-                        ) : uploadedProducts.length === 0 ? (
-                            <div className="text-center py-12 text-gray-400 text-xs font-bold uppercase tracking-wider">
-                                No products found with uploaded images.
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                {uploadedProducts.map((prod) => {
-                                    let coverUrl = null;
-                                    let imgCount = 0;
-                                    try {
-                                        const parsed = safeJsonParse(prod.description);
-                                        coverUrl = parsed.coverUrl || parsed.imageUrls?.cover || prod.image_url;
-                                        if (parsed.imageUrls) imgCount = Object.keys(parsed.imageUrls).length;
-                                    } catch (_) {}
-
-                                    return (
-                                        <div
-                                            key={prod.id}
-                                            onClick={() => setSelectedUploaded(prod)}
-                                            className="bg-white border-2 border-gray-150 hover:border-black rounded-2xl p-4 cursor-pointer transition-all duration-150 hover:shadow-md space-y-3"
-                                        >
-                                            <div className="aspect-square w-full bg-gray-50 border border-gray-100 rounded-xl overflow-hidden flex items-center justify-center relative">
-                                                {coverUrl ? (
-                                                    <img src={coverUrl} alt={prod.product_name} className="max-h-full max-w-full object-contain" />
-                                                ) : (
-                                                    <span className="text-[10px] text-gray-300 font-bold uppercase">No Image</span>
-                                                )}
-                                                {imgCount > 0 && (
-                                                    <span className="absolute top-2 right-2 bg-black text-[7px] font-black text-white px-1.5 py-0.5 rounded-full">
-                                                        {imgCount} views
-                                                    </span>
-                                                )}
+                            <div className="grid grid-cols-1 gap-3">
+                                {filteredProducts.map((prod) => {
+                                let parsed = {};
+                                try { parsed = safeJsonParse(prod.description); } catch (_) {}
+                                const urls = parsed.imageUrls || {};
+                                return (
+                                    <div key={prod.id} className="bg-white border-2 border-black rounded-2xl p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                                        <div className="flex items-start gap-4">
+                                            {/* Front & side image thumbnails */}
+                                            <div className="flex gap-1.5 shrink-0">
+                                                {["front", "side"].map((pos) => {
+                                                    const url = urls[pos];
+                                                    return (
+                                                        <div key={pos} className="flex flex-col items-center gap-0.5">
+                                                            <div className="w-[184px] h-[152px] rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center">
+                                                                {url ? (
+                                                                    <img src={url} alt={pos} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <span className="text-[8px] text-gray-300 font-black uppercase">No Img</span>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-[9px] font-black text-black uppercase">{pos}</span>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                            <div className="space-y-1">
-                                                <h4 className="text-xs font-black text-black uppercase truncate">
+
+                                            {/* Content right column */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[17px] font-black text-black uppercase leading-tight">
                                                     {prod.product_name || prod.name}
-                                                </h4>
-                                                <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase">
-                                                    <span>SKU: {prod.sku}</span>
-                                                    <span>{prod.brand}</span>
                                                 </div>
+
+                                                {/* Overview chips */}
+                                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[17px] font-bold uppercase mt-1.5 leading-tight">
+                                                    <span className="text-gray-400">CP: {prod.checkpoint_name || "Quick Intake"}</span>
+                                                    {prod.base_price && <span className="text-gray-400">Rs.{prod.base_price}</span>}
+                                                    <span className="text-gray-400">Status: {prod.status}</span>
+                                                </div>
+
+                                                {/* Frame / Lens specs as 2-column grid */}
+                                                {(() => {
+                                                    try {
+                                                        const p = safeJsonParse(prod.description);
+                                                        if (p.type === "frame") {
+                                                            const items = [
+                                                                ["Model", p.modelNo || prod.frame_model_no],
+                                                                ["Colour", p.color || prod.frame_color],
+                                                                ["Shape", p.frameShape || prod.frame_shape],
+                                                                ["Type", p.frameType || prod.frame_type],
+                                                                ["A", p.sizeA], ["B", p.sizeB],
+                                                                ["DBL", p.dbl], ["Temple", p.templeLength],
+                                                            ].filter(([, v]) => v);
+                                                            if (items.length === 0) return null;
+                                                            return (
+                                                                <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-1.5">
+                                                                    {items.map(([label, val]) => (
+                                                                        <div key={label} className="text-[15px] font-bold uppercase leading-tight">
+                                                                            <span className="text-gray-400">{label}: </span>
+                                                                            <span className="text-gray-700">{val}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            );
+                                                        }
+                                                        if (p.type === "lens") {
+                                                            const items = [
+                                                                ["Type", p.lensType], ["Index", p.index],
+                                                                ["Material", p.material], ["Coating", p.coating],
+                                                                ["SPH", p.sph], ["CYL", p.cyl],
+                                                                ["Axis", p.axis], ["Add", p.add],
+                                                            ].filter(([, v]) => v);
+                                                            if (items.length === 0) return null;
+                                                            return (
+                                                                <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-1.5">
+                                                                    {items.map(([label, val]) => (
+                                                                        <div key={label} className="text-[15px] font-bold uppercase leading-tight">
+                                                                            <span className="text-gray-400">{label}: </span>
+                                                                            <span className="text-gray-700">{val}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            );
+                                                        }
+                                                    } catch (_) {}
+                                                    return null;
+                                                })()}
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Detailed Product viewer popup from Gallery */}
-                    {selectedUploaded && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                            <div
-                                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                                onClick={() => setSelectedUploaded(null)}
-                            />
-                            <div className="relative bg-white border-2 border-black rounded-[24px] p-6 shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-6 animate-in fade-in zoom-in-95 duration-200">
-                                <div className="flex justify-between items-start border-b border-gray-100 pb-3">
-                                    <div>
-                                        <h3 className="text-base font-black text-black uppercase tracking-tight">
-                                            {selectedUploaded.product_name || selectedUploaded.name}
-                                        </h3>
-                                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
-                                            SKU: {selectedUploaded.sku} | Brand: {selectedUploaded.brand}
-                                        </p>
                                     </div>
-                                    <button
-                                        onClick={() => setSelectedUploaded(null)}
-                                        className="text-gray-400 hover:text-black font-black text-xs uppercase"
-                                    >
-                                        ✕ Close
-                                    </button>
-                                </div>
-
-                                {/* Images */}
-                                <div className="space-y-2">
-                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Uploaded Views</span>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        {(() => {
-                                            let parsed = {};
-                                            try { parsed = safeJsonParse(selectedUploaded.description); } catch (_) {}
-                                            const urls = parsed.imageUrls || {};
-
-                                            return POSITIONS.map((pos) => {
-                                                const url = urls[pos] || (pos === "cover" ? selectedUploaded.image_url : null);
-                                                return (
-                                                    <div key={pos} className="bg-gray-50 border border-gray-200 rounded-2xl p-3 flex flex-col justify-between">
-                                                        <span className="text-[8px] font-black text-black uppercase tracking-widest mb-1.5 block text-center">
-                                                            {pos} View
-                                                        </span>
-                                                        <div className="aspect-square w-full rounded-xl overflow-hidden bg-white border border-gray-100 flex items-center justify-center">
-                                                            {url ? (
-                                                                <img src={url} alt={pos} className="max-h-full max-w-full object-contain" />
-                                                            ) : (
-                                                                <span className="text-[9px] text-gray-300 font-bold uppercase">Not Uploaded</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            });
-                                        })()}
-                                    </div>
-                                </div>
-
-                                {/* Full Specs */}
-                                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100 text-xs">
-                                    {[
-                                        ["Checkpoint", selectedUploaded.checkpoint_name || "Quick Intake"],
-                                        ["Base Price", selectedUploaded.base_price ? `Rs. ${selectedUploaded.base_price}` : null],
-                                        ["Confirmed At", selectedUploaded.confirmed_at ? new Date(selectedUploaded.confirmed_at).toLocaleString() : null],
-                                        ["Status", selectedUploaded.status],
-                                    ].map(([label, val]) => (
-                                        <div key={label} className="bg-gray-50 p-3 rounded-xl border border-gray-150">
-                                            <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
-                                            <span className="text-[11px] font-black text-black uppercase">{val || "—"}</span>
-                                        </div>
-                                    ))}
-
-                                    {(() => {
-                                        let parsed = {};
-                                        try { parsed = safeJsonParse(selectedUploaded.description); } catch (_) {}
-
-                                        if (parsed.type === "frame") {
-                                            return (
-                                                <>
-                                                    {[
-                                                        ["Frame Model No", parsed.modelNo || selectedUploaded.frame_model_no],
-                                                        ["Colour", parsed.color || selectedUploaded.frame_color],
-                                                        ["Frame Shape", parsed.frameShape || selectedUploaded.frame_shape],
-                                                        ["Frame Type", parsed.frameType || selectedUploaded.frame_type],
-                                                        ["Dimensions (A / B / DBL / Temple)",
-                                                            `${parsed.sizeA || "—"} / ${parsed.sizeB || "—"} / ${parsed.dbl || "—"} / ${parsed.templeLength || "—"}`],
-                                                    ].map(([label, val]) => (
-                                                        <div key={label} className="bg-gray-50 p-3 rounded-xl border border-gray-150">
-                                                            <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
-                                                            <span className="text-[11px] font-black text-black uppercase">{val || "—"}</span>
-                                                        </div>
-                                                    ))}
-                                                </>
-                                            );
-                                        } else if (parsed.type === "lens") {
-                                            return (
-                                                <>
-                                                    {[
-                                                        ["Lens Type", parsed.lensType],
-                                                        ["Index", parsed.index],
-                                                        ["Material", parsed.material],
-                                                        ["Coating", parsed.coating],
-                                                        ["SPH", parsed.sph],
-                                                        ["CYL", parsed.cyl],
-                                                        ["Axis", parsed.axis],
-                                                        ["Add", parsed.add],
-                                                    ].map(([label, val]) => (
-                                                        <div key={label} className="bg-gray-50 p-3 rounded-xl border border-gray-150">
-                                                            <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest">{label}</span>
-                                                            <span className="text-[11px] font-black text-black uppercase">{val || "—"}</span>
-                                                        </div>
-                                                    ))}
-                                                </>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
-                                </div>
+                                );
+                            })}
                             </div>
-                        </div>
+                        </>
                     )}
-                </div>
+                </>
             )}
 
             {/* ── STAGE 2: DETAILS ────────────────────────────────────────── */}

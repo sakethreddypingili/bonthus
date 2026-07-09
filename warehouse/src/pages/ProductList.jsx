@@ -67,6 +67,66 @@ const getComputedProductName = (name, brand, frameSpecs) => {
     .join(" ");
 };
 
+const LENS_PRESETS = [
+  { name: "Bonthus Anti-Glare 1.50", type: "Single Vision", index: "1.50", material: "CR-39", coating: "Green ARC", price: 0, brand: "Bonthus" },
+  { name: "Bonthus BLU Screen 1.56", type: "Single Vision", index: "1.56", material: "CR-39", coating: "Green ARC", price: 800, brand: "Bonthus" },
+  { name: "Bonthus BLU+ 1.56", type: "Single Vision", index: "1.56", material: "CR-39", coating: "Blue Cut", price: 1999, brand: "Bonthus" },
+  { name: "Bonthus Night Driving Lens 1.56", type: "Single Vision", index: "1.56", material: "CR-39", coating: "Purple Night Driving", price: 2499, brand: "Bonthus" },
+  { name: "Bonthus Blue Screen Lens 1.67", type: "Single Vision", index: "1.67", material: "MR-8", coating: "Green ARC", price: 2999, brand: "Bonthus" },
+  { name: "Bonthus BLU+ 1.67", type: "Single Vision", index: "1.67", material: "MR-8", coating: "Blue Cut", price: 3999, brand: "Bonthus" },
+  { name: "Bonthus Night Driving Lens 1.67", type: "Single Vision", index: "1.67", material: "MR-8", coating: "Purple Night Driving", price: 4499, brand: "Bonthus" },
+  { name: "Bonthus High Ultra Thin 1.74 (Green)", type: "Single Vision", index: "1.74", material: "Hi-Index", coating: "Green ARC", price: 6999, brand: "Bonthus" },
+  { name: "Bonthus High Ultra Thin 1.74 (Blue)", type: "Single Vision", index: "1.74", material: "Hi-Index", coating: "Blue Cut", price: 8999, brand: "Bonthus" },
+  { name: "Blu Normal Corridor 1.59", type: "Progressive", index: "1.59", material: "Polycarbonate", coating: "Blue Cut", price: 3499, brand: "Bonthus" },
+  { name: "Wide Corridor 1.59", type: "Progressive", index: "1.59", material: "Polycarbonate", coating: "Blue Cut", price: 7999, brand: "Bonthus" },
+  { name: "Wider Corridor 1.59", type: "Progressive", index: "1.59", material: "Polycarbonate", coating: "Blue Cut", price: 11999, brand: "Bonthus" },
+  { name: "Bifocal No Coating 1.56", type: "Bifocal", index: "1.56", material: "CR-39", coating: "No Coating", price: 999, brand: "Bonthus" },
+  { name: "Bifocal Blue Screen 1.56", type: "Bifocal", index: "1.56", material: "CR-39", coating: "Blue Screen", price: 2499, brand: "Bonthus" },
+  { name: "Bifocal Poly Carbonate 1.59", type: "Bifocal", index: "1.59", material: "Polycarbonate", coating: "Poly Carbonate", price: 3999, brand: "Bonthus" },
+  { name: "Poly Carbonate Single Vision BLU Screen 1.59", type: "Single Vision", index: "1.59", material: "Polycarbonate", coating: "Blue Screen", price: 1499, brand: "Bonthus" },
+  { name: "Poly Carbonate Single Vision BLU+ 1.59", type: "Single Vision", index: "1.59", material: "Polycarbonate", coating: "Blue Cut", price: 2499, brand: "Bonthus" },
+  { name: "Poly Carbonate Single Vision Night Driving 1.59", type: "Single Vision", index: "1.59", material: "Polycarbonate", coating: "Purple Night Driving", price: 3499, brand: "Bonthus" },
+  { name: "Progressive Anti-Glare Normal Corridor 1.56", type: "Progressive", index: "1.56", material: "CR-39", coating: "Green ARC", price: 1999, brand: "Bonthus" },
+  { name: "Progressive Blu Normal Corridor 1.56", type: "Progressive", index: "1.56", material: "CR-39", coating: "Blue Cut", price: 2999, brand: "Bonthus" },
+  { name: "Progressive Wide Corridor 1.56", type: "Progressive", index: "1.56", material: "CR-39", coating: "Green ARC", price: 5999, brand: "Bonthus" },
+  { name: "Progressive Wide Corridor 1.67", type: "Progressive", index: "1.67", material: "MR-8", coating: "Green ARC", price: 8499, brand: "Bonthus" },
+  { name: "Progressive Wider Corridor 1.56", type: "Progressive", index: "1.56", material: "CR-39", coating: "Green ARC", price: 9999, brand: "Bonthus" },
+  { name: "Progressive Wider Corridor 1.67", type: "Progressive", index: "1.67", material: "MR-8", coating: "Green ARC", price: 11999, brand: "Bonthus" },
+  { name: "Progressive Wide Thin 1.74", type: "Progressive", index: "1.74", material: "Hi-Index", coating: "Green ARC", price: 14999, brand: "Bonthus" },
+  { name: "Progressive Wider Thin 1.74", type: "Progressive", index: "1.74", material: "Hi-Index", coating: "Green ARC", price: 17999, brand: "Bonthus" }
+];
+
+const generatePowerList = (preset, customValString, type) => {
+  if (preset === 'custom') {
+    return customValString
+      .split(',')
+      .map(v => v.trim())
+      .filter(v => v !== "");
+  }
+  if (type === 'sph') {
+    if (preset === 'low-minus') {
+      return ['0.00', '-0.25', '-0.50', '-0.75', '-1.00', '-1.25', '-1.50', '-1.75', '-2.00'];
+    }
+    if (preset === 'high-minus') {
+      return ['-2.25', '-2.50', '-2.75', '-3.00', '-3.25', '-3.50', '-3.75', '-4.00', '-4.25', '-4.50', '-4.75', '-5.00', '-5.25', '-5.50', '-5.75', '-6.00'];
+    }
+    if (preset === 'low-plus') {
+      return ['0.00', '+0.25', '+0.50', '+0.75', '+1.00', '+1.25', '+1.50', '+1.75', '+2.00'];
+    }
+    if (preset === 'high-plus') {
+      return ['+2.25', '+2.50', '+2.75', '+3.00', '+3.25', '+3.50', '+3.75', '+4.00', '+4.25', '+4.50', '+4.75', '+5.00', '+5.25', '+5.50', '+5.75', '+6.00'];
+    }
+  } else {
+    if (preset === 'standard-cyl') {
+      return ['0.00', '-0.25', '-0.50', '-0.75', '-1.00', '-1.25', '-1.50', '-1.75', '-2.00'];
+    }
+    if (preset === 'high-cyl') {
+      return ['-2.25', '-2.50', '-2.75', '-3.00', '-3.25', '-3.50', '-3.75', '-4.00'];
+    }
+  }
+  return [];
+};
+
 export default function ProductList({ userProfile }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -133,6 +193,27 @@ export default function ProductList({ userProfile }) {
   const [batchStage, setBatchStage] = useState('details'); // 'details' | 'products' | 'review'
   const [showEditDetailsPopup, setShowEditDetailsPopup] = useState(false);
   const [showConfirmEditDetailsPopup, setShowConfirmEditDetailsPopup] = useState(false);
+
+  // Lens Ingest specialized state
+  const [lensPreset, setLensPreset] = useState("");
+  const [lensNamePrefix, setLensNamePrefix] = useState("");
+  const [lensBrand, setLensBrand] = useState("Bonthus");
+  const [lensType, setLensType] = useState("Single Vision");
+  const [lensIndex, setLensIndex] = useState("1.56");
+  const [lensMaterial, setLensMaterial] = useState("CR-39");
+  const [lensCoating, setLensCoating] = useState("Green ARC");
+  const [lensPrice, setLensPrice] = useState("800");
+  const [lensSphRange, setLensSphRange] = useState("low-minus");
+  const [lensCylRange, setLensCylRange] = useState("standard-cyl");
+  const [customSph, setCustomSph] = useState("");
+  const [customCyl, setCustomCyl] = useState("");
+  const [matrixQuantities, setMatrixQuantities] = useState({}); // { 'sph_cyl': qty }
+  const [quickAddList, setQuickAddList] = useState([]); // array of { sph, cyl, axis, add, qty }
+  const [quickSph, setQuickSph] = useState("");
+  const [quickCyl, setQuickCyl] = useState("");
+  const [quickAxis, setQuickAxis] = useState("");
+  const [quickAddVal, setQuickAddVal] = useState("");
+  const [quickQty, setQuickQty] = useState("1");
 
   const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || userProfile?.role === 'warehouse';
 
@@ -645,6 +726,77 @@ export default function ProductList({ userProfile }) {
     setBulkRows(prev => prev.map((row, idx) => idx === index ? { ...row, [field]: value } : row));
   };
 
+  const handleConfirmLensMatrix = () => {
+    if (!lensNamePrefix.trim()) {
+      alert("Please enter a Lens Name Prefix / Series.");
+      return;
+    }
+    const generated = [];
+    
+    // 1. Process Matrix
+    const sphList = generatePowerList(lensSphRange, customSph, 'sph');
+    const cylList = generatePowerList(lensCylRange, customCyl, 'cyl');
+    
+    for (const sph of sphList) {
+      for (const cyl of cylList) {
+        const key = `${sph}_${cyl}`;
+        const qtyVal = matrixQuantities[key];
+        if (qtyVal && Number(qtyVal) > 0) {
+          const qty = Math.max(1, Number(qtyVal));
+          const fullName = `${lensNamePrefix} SPH ${sph} CYL ${cyl}`;
+          generated.push({
+            name: fullName,
+            brand: lensBrand,
+            base_price: lensPrice || '0',
+            stock_quantity: qty.toString(),
+            low_stock_threshold: '5',
+            sku: generateSKU(),
+            lens_type: lensType,
+            lens_index: lensIndex,
+            lens_material: lensMaterial,
+            lens_coating: lensCoating,
+            lens_sph: sph,
+            lens_cyl: cyl,
+            lens_axis: '',
+            lens_add: ''
+          });
+        }
+      }
+    }
+
+    // 2. Process Quick Add List
+    for (const item of quickAddList) {
+      const qty = Math.max(1, Number(item.qty || 1));
+      let fullName = `${lensNamePrefix} SPH ${item.sph} CYL ${item.cyl}`;
+      if (item.axis) fullName += ` AXIS ${item.axis}`;
+      if (item.add) fullName += ` ADD ${item.add}`;
+      generated.push({
+        name: fullName,
+        brand: lensBrand,
+        base_price: lensPrice || '0',
+        stock_quantity: qty.toString(),
+        low_stock_threshold: '5',
+        sku: generateSKU(),
+        lens_type: lensType,
+        lens_index: lensIndex,
+        lens_material: lensMaterial,
+        lens_coating: lensCoating,
+        lens_sph: item.sph,
+        lens_cyl: item.cyl,
+        lens_axis: item.axis || '',
+        lens_add: item.add || ''
+      });
+    }
+
+    if (generated.length === 0) {
+      alert("Please enter a quantity for at least one lens power combination.");
+      return;
+    }
+
+    setBulkRows(generated);
+    setBatchStage('review');
+  };
+
   const handleSaveBulk = async (e) => {
     e.preventDefault();
     if (!bulkCheckpointName.trim()) {
@@ -798,6 +950,20 @@ export default function ProductList({ userProfile }) {
       setBulkCategoryId("");
       setBulkCascadePath([]);
       setBulkRows([{ name: '', brand: '', base_price: '', sku: generateSKU(), stock_quantity: '1', low_stock_threshold: '5' }]);
+      setLensPreset("");
+      setLensNamePrefix("");
+      setLensBrand("Bonthus");
+      setLensType("Single Vision");
+      setLensIndex("1.56");
+      setLensMaterial("CR-39");
+      setLensCoating("Green ARC");
+      setLensPrice("800");
+      setLensSphRange("low-minus");
+      setLensCylRange("standard-cyl");
+      setCustomSph("");
+      setCustomCyl("");
+      setMatrixQuantities({});
+      setQuickAddList([]);
       setBatchStage('details');
       await fetchPendingQueue();
       setActiveTab("review-queue");
@@ -1388,18 +1554,18 @@ export default function ProductList({ userProfile }) {
                 <button 
                   type="button"
                   onClick={() => {
+                    const catType = getCategoryType(bulkCategoryId);
+                    if (catType === 'lens') {
+                      handleConfirmLensMatrix();
+                      return;
+                    }
                     let valid = true;
                     for (const row of bulkRows) {
                       if (!row.name || !row.stock_quantity || !row.base_price) {
                         valid = false;
                       }
-                      const catType = getCategoryType(bulkCategoryId);
                       if (catType === 'frame') {
                         if (!row.frame_model_no || !row.frame_color || !row.frame_type || !row.frame_shape || !row.brand) {
-                          valid = false;
-                        }
-                      } else if (catType === 'lens') {
-                        if (!row.lens_type || !row.lens_index || !row.lens_material || !row.lens_coating) {
                           valid = false;
                         }
                       }
@@ -1521,211 +1687,536 @@ export default function ProductList({ userProfile }) {
                     </button>
                   </div>
 
-                  <div className="space-y-4">
-                    {bulkRows.map((row, idx) => (
-                      <div key={idx} className="p-5 border border-gray-150 rounded-2xl relative bg-white shadow-sm">
-                        {bulkRows.length > 1 && (
-                          <button 
-                            type="button" 
-                            onClick={() => handleRemoveBulkRow(idx)}
-                            className="absolute top-4 right-4 text-red-500 hover:scale-110 transition-transform"
+                  {getCategoryType(bulkCategoryId) === 'lens' ? (
+                    <div className="space-y-6">
+                      {/* Presets and Shared Attributes Panel */}
+                      <div className="p-6 bg-gray-50/50 border border-gray-150 rounded-2xl space-y-4">
+                        <h4 className="text-[10px] font-black text-black uppercase tracking-widest">Shared Lens Attributes</h4>
+                        
+                        <div className="space-y-2">
+                          <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Lens Product Preset</label>
+                          <select
+                            value={lensPreset}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setLensPreset(val);
+                              if (val && val !== 'custom') {
+                                const found = LENS_PRESETS.find(p => p.name === val);
+                                if (found) {
+                                  setLensNamePrefix(found.name);
+                                  setLensBrand(found.brand);
+                                  setLensType(found.type);
+                                  setLensIndex(found.index);
+                                  setLensMaterial(found.material);
+                                  setLensCoating(found.coating);
+                                  setLensPrice(found.price.toString());
+                                }
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black bg-white cursor-pointer"
                           >
-                            <Trash2 size={16} />
-                          </button>
-                        )}
-                        <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest block mb-3">Ingest Row #{idx + 1}</span>
+                            <option value="">— Select Lens Preset (Autofills Shared Attributes) —</option>
+                            {LENS_PRESETS.map(p => (
+                              <option key={p.name} value={p.name}>{p.name} (₹{p.price})</option>
+                            ))}
+                            <option value="custom">Custom Lens / Manual Entry</option>
+                          </select>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="space-y-1 md:col-span-2">
-                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Name *</label>
-                            <input 
-                              required 
-                              value={row.name} 
-                              onChange={e => handleBulkRowChange(idx, 'name', e.target.value)} 
-                              type="text" 
-                              placeholder="Product Name" 
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Lens Name Prefix / Series *</label>
+                            <input
+                              required
+                              type="text"
+                              value={lensNamePrefix}
+                              onChange={e => setLensNamePrefix(e.target.value)}
+                              placeholder="e.g. Bonthus BLU Screen 1.56"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black"
                             />
                           </div>
+
                           <div className="space-y-1">
                             <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Brand *</label>
-                            {getCategoryType(bulkCategoryId) === 'frame' ? (
-                              <div className="space-y-1.5">
-                                <select
-                                  value={['Bonthus', 'Jas Harlon'].includes(row.brand) ? row.brand : (row.brand ? 'Custom' : '')}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    if (val === 'Custom') {
-                                      handleBulkRowChange(idx, '_brand_is_custom', true);
-                                      handleBulkRowChange(idx, 'brand', '');
-                                    } else {
-                                      handleBulkRowChange(idx, '_brand_is_custom', false);
-                                      handleBulkRowChange(idx, 'brand', val);
-                                    }
-                                  }}
-                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black bg-white cursor-pointer"
-                                >
-                                  <option value="">— Select —</option>
-                                  <option value="Bonthus">Bonthus</option>
-                                  <option value="Jas Harlon">Jas Harlon</option>
-                                  <option value="Custom">Custom...</option>
-                                </select>
-                                {(row._brand_is_custom || (!['Bonthus', 'Jas Harlon', ''].includes(row.brand))) && (
-                                  <input 
-                                    required
-                                    value={row.brand === 'Custom' ? '' : row.brand} 
-                                    onChange={e => handleBulkRowChange(idx, 'brand', e.target.value)} 
-                                    type="text" 
-                                    placeholder="Enter Custom Brand" 
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black animate-fast-slide" 
-                                  />
-                                )}
-                              </div>
-                            ) : (
-                              <input 
-                                value={row.brand} 
-                                onChange={e => handleBulkRowChange(idx, 'brand', e.target.value)} 
-                                type="text" 
-                                placeholder="Brand Name" 
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
-                              />
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 mt-3">
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Stock Qty *</label>
-                            <input 
-                              required 
-                              value={row.stock_quantity} 
-                              onChange={e => handleBulkRowChange(idx, 'stock_quantity', e.target.value)} 
-                              type="number" 
-                              min="1"
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                            <input
+                              required
+                              type="text"
+                              value={lensBrand}
+                              onChange={e => setLensBrand(e.target.value)}
+                              placeholder="Brand"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black"
                             />
                           </div>
+
                           <div className="space-y-1">
                             <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Base Price (₹) *</label>
-                            <input 
-                              required 
-                              value={row.base_price} 
-                              onChange={e => handleBulkRowChange(idx, 'base_price', e.target.value)} 
-                              type="number" 
-                              placeholder="₹" 
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                            <input
+                              required
+                              type="number"
+                              value={lensPrice}
+                              onChange={e => setLensPrice(e.target.value)}
+                              placeholder="₹ Price"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black"
                             />
                           </div>
                         </div>
 
-                        {/* Conditional Batch Row Custom Fields for Frame */}
-                        {getCategoryType(bulkCategoryId) === 'frame' && (
-                          <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 animate-fast-zoom">
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Model No *</label>
-                              <input required value={row.frame_model_no || ''} onChange={e => handleBulkRowChange(idx, 'frame_model_no', e.target.value)} type="text" placeholder="e.g. 78005" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Color *</label>
-                              <input required value={row.frame_color || ''} onChange={e => handleBulkRowChange(idx, 'frame_color', e.target.value)} type="text" placeholder="e.g. Black" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Type *</label>
-                              <select required value={row.frame_type || ''} onChange={e => handleBulkRowChange(idx, 'frame_type', e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black">
-                                <option value="">— Select —</option>
-                                <option value="Full Rim">Full Rim</option>
-                                <option value="Half Rim">Half Rim</option>
-                                <option value="Rimless">Rimless</option>
-                              </select>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Shape *</label>
-                              <select required value={row.frame_shape || ''} onChange={e => handleBulkRowChange(idx, 'frame_shape', e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black">
-                                <option value="">— Select —</option>
-                                <option value="Square">Square</option>
-                                <option value="Rectangle">Rectangle</option>
-                                <option value="Round">Round</option>
-                                <option value="Oval">Oval</option>
-                                <option value="Aviator">Aviator</option>
-                                <option value="Wayfarer">Wayfarer</option>
-                                <option value="Clubmaster">Clubmaster</option>
-                                <option value="Cat Eye">Cat Eye</option>
-                              </select>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">A Size</label>
-                              <input value={row.frame_size_a || ''} onChange={e => handleBulkRowChange(idx, 'frame_size_a', e.target.value)} type="text" placeholder="e.g. 52" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">B Size</label>
-                              <input value={row.frame_size_b || ''} onChange={e => handleBulkRowChange(idx, 'frame_size_b', e.target.value)} type="text" placeholder="e.g. 38" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Temple</label>
-                              <input value={row.frame_temple_length || ''} onChange={e => handleBulkRowChange(idx, 'frame_temple_length', e.target.value)} type="text" placeholder="e.g. 140" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">DBL</label>
-                              <input value={row.frame_dbl || ''} onChange={e => handleBulkRowChange(idx, 'frame_dbl', e.target.value)} type="text" placeholder="e.g. 18" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Lens Type *</label>
+                            <select
+                              value={lensType}
+                              onChange={e => setLensType(e.target.value)}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black"
+                            >
+                              <option value="Single Vision">Single Vision</option>
+                              <option value="Bifocal">Bifocal</option>
+                              <option value="Progressive">Progressive</option>
+                            </select>
                           </div>
-                        )}
 
-                        {/* Conditional Batch Row Custom Fields for Lens */}
-                        {getCategoryType(bulkCategoryId) === 'lens' && (
-                          <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 animate-fast-zoom">
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Lens Type *</label>
-                              <select required value={row.lens_type || ''} onChange={e => handleBulkRowChange(idx, 'lens_type', e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black">
-                                <option value="">— Select —</option>
-                                <option value="Single Vision">Single Vision</option>
-                                <option value="Bifocal">Bifocal</option>
-                                <option value="Progressive">Progressive</option>
-                              </select>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Index *</label>
-                              <input required value={row.lens_index || ''} onChange={e => handleBulkRowChange(idx, 'lens_index', e.target.value)} type="text" placeholder="e.g. 1.56" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Material *</label>
-                              <input required value={row.lens_material || ''} onChange={e => handleBulkRowChange(idx, 'lens_material', e.target.value)} type="text" placeholder="e.g. CR-39" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Coating *</label>
-                              <input required value={row.lens_coating || ''} onChange={e => handleBulkRowChange(idx, 'lens_coating', e.target.value)} type="text" placeholder="e.g. ARC" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH</label>
-                              <input value={row.lens_sph || ''} onChange={e => handleBulkRowChange(idx, 'lens_sph', e.target.value)} type="text" placeholder="e.g. -2.00" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
-                              <input value={row.lens_cyl || ''} onChange={e => handleBulkRowChange(idx, 'lens_cyl', e.target.value)} type="text" placeholder="e.g. -0.50" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
-                              <input value={row.lens_axis || ''} onChange={e => handleBulkRowChange(idx, 'lens_axis', e.target.value)} type="text" placeholder="e.g. 180" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">ADD</label>
-                              <input value={row.lens_add || ''} onChange={e => handleBulkRowChange(idx, 'lens_add', e.target.value)} type="text" placeholder="e.g. +2.00" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                            </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Refractive Index *</label>
+                            <input
+                              required
+                              type="text"
+                              value={lensIndex}
+                              onChange={e => setLensIndex(e.target.value)}
+                              placeholder="e.g. 1.56"
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none focus:border-black"
+                            />
                           </div>
-                        )}
+
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Material *</label>
+                            <input
+                              required
+                              type="text"
+                              value={lensMaterial}
+                              onChange={e => setLensMaterial(e.target.value)}
+                              placeholder="e.g. CR-39"
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none focus:border-black"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Coating / Color *</label>
+                            <input
+                              required
+                              type="text"
+                              value={lensCoating}
+                              onChange={e => setLensCoating(e.target.value)}
+                              placeholder="e.g. Green ARC"
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none focus:border-black"
+                            />
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Add Row Button at the bottom of the card list, aligned right */}
-                  <div className="flex justify-end pt-2">
-                    <button 
-                      type="button" 
-                      onClick={handleAddBulkRow}
-                      className="text-[10px] font-black bg-black text-white px-5 py-3 rounded-xl uppercase tracking-widest hover:scale-105 transition-all shadow-md flex items-center gap-2"
-                    >
-                      + Add Row
-                    </button>
-                  </div>
+                      {/* Main Power Matrix Section */}
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Matrix Power Selector & Table Grid */}
+                        <div className="lg:col-span-2 p-6 border border-gray-150 rounded-2xl bg-white space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                            <div>
+                              <h4 className="text-xs font-black text-black uppercase tracking-wider">Lens Power Matrix Grid</h4>
+                              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Quickly select ranges and enter quantities</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setMatrixQuantities({})}
+                              className="text-[9px] font-bold uppercase tracking-wider bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 px-3 py-1.5 rounded-xl transition-all"
+                            >
+                              Clear Grid
+                            </button>
+                          </div>
+
+                          {/* Range Settings */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-150">
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH Power Range</label>
+                              <select
+                                value={lensSphRange}
+                                onChange={e => setLensSphRange(e.target.value)}
+                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black"
+                              >
+                                <option value="low-minus">Low Minus (0.00 to -2.00)</option>
+                                <option value="high-minus">High Minus (-2.25 to -6.00)</option>
+                                <option value="low-plus">Low Plus (0.00 to +2.00)</option>
+                                <option value="high-plus">High Plus (+2.25 to +6.00)</option>
+                                <option value="custom">Custom SPH List...</option>
+                              </select>
+                              {lensSphRange === 'custom' && (
+                                <input
+                                  type="text"
+                                  value={customSph}
+                                  onChange={e => setCustomSph(e.target.value)}
+                                  placeholder="e.g. 0.00, -0.50, -1.00"
+                                  className="w-full mt-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none focus:border-black animate-fast-slide"
+                                />
+                              )}
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL Power Range</label>
+                              <select
+                                value={lensCylRange}
+                                onChange={e => setLensCylRange(e.target.value)}
+                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black"
+                              >
+                                <option value="standard-cyl">Standard CYL (0.00 to -2.00)</option>
+                                <option value="high-cyl">High CYL (-2.25 to -4.00)</option>
+                                <option value="custom">Custom CYL List...</option>
+                              </select>
+                              {lensCylRange === 'custom' && (
+                                <input
+                                  type="text"
+                                  value={customCyl}
+                                  onChange={e => setCustomCyl(e.target.value)}
+                                  placeholder="e.g. 0.00, -0.50, -0.75"
+                                  className="w-full mt-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none focus:border-black animate-fast-slide"
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Matrix Grid Table */}
+                          <div className="overflow-x-auto max-h-[350px] border border-gray-150 rounded-xl">
+                            <table className="w-full border-collapse">
+                              <thead>
+                                <tr className="bg-gray-50 border-b border-gray-150 sticky top-0 z-10">
+                                  <th className="p-2 border-r border-gray-150 text-[9px] font-black text-gray-400 uppercase tracking-wider bg-gray-50">SPH \ CYL</th>
+                                  {generatePowerList(lensCylRange, customCyl, 'cyl').map(cyl => (
+                                    <th key={cyl} className="p-2 border-r border-gray-150 text-[10px] font-extrabold text-black text-center">{cyl}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {generatePowerList(lensSphRange, customSph, 'sph').map(sph => (
+                                  <tr key={sph} className="hover:bg-gray-50/50 border-b border-gray-100">
+                                    <td className="p-2 border-r border-gray-150 text-[10px] font-extrabold text-black bg-gray-50 sticky left-0">{sph}</td>
+                                    {generatePowerList(lensCylRange, customCyl, 'cyl').map(cyl => {
+                                      const key = `${sph}_${cyl}`;
+                                      const hasVal = Number(matrixQuantities[key] || 0) > 0;
+                                      return (
+                                        <td key={cyl} className={`p-1 border-r border-gray-100 text-center transition-all ${hasVal ? "bg-black/5" : ""}`}>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            value={matrixQuantities[key] || ""}
+                                            onChange={e => {
+                                              const val = e.target.value;
+                                              setMatrixQuantities(prev => {
+                                                const next = { ...prev };
+                                                if (val === "" || Number(val) <= 0) {
+                                                  delete next[key];
+                                                } else {
+                                                  next[key] = val;
+                                                }
+                                                return next;
+                                              });
+                                            }}
+                                            className="w-12 text-center py-1 border border-gray-100 rounded focus:border-black outline-none font-bold text-xs bg-white text-black"
+                                            placeholder="—"
+                                          />
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Side Panel: Custom Add Form & List */}
+                        <div className="p-6 border border-gray-150 rounded-2xl bg-white space-y-4">
+                          <div className="border-b border-gray-100 pb-3">
+                            <h4 className="text-xs font-black text-black uppercase tracking-wider">Quick Custom Add</h4>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Add special powers with Axis or ADD</p>
+                          </div>
+
+                          <div className="space-y-3 p-4 bg-gray-50/30 border border-gray-100 rounded-xl">
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">SPH *</label>
+                                <input
+                                  type="text"
+                                  value={quickSph}
+                                  onChange={e => setQuickSph(e.target.value)}
+                                  placeholder="e.g. -2.00"
+                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none focus:border-black bg-white"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">CYL</label>
+                                <input
+                                  type="text"
+                                  value={quickCyl}
+                                  onChange={e => setQuickCyl(e.target.value)}
+                                  placeholder="e.g. -0.50"
+                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none focus:border-black bg-white"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Axis</label>
+                                <input
+                                  type="text"
+                                  value={quickAxis}
+                                  onChange={e => setQuickAxis(e.target.value)}
+                                  placeholder="e.g. 180"
+                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none focus:border-black bg-white"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">ADD</label>
+                                <input
+                                  type="text"
+                                  value={quickAddVal}
+                                  onChange={e => setQuickAddVal(e.target.value)}
+                                  placeholder="e.g. +2.00"
+                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none focus:border-black bg-white"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2.5 items-end">
+                              <div className="col-span-2 space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Qty *</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={quickQty}
+                                  onChange={e => setQuickQty(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none focus:border-black bg-white"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!quickSph.trim()) {
+                                    alert("SPH power is required.");
+                                    return;
+                                  }
+                                  setQuickAddList(prev => [...prev, {
+                                    sph: quickSph.trim(),
+                                    cyl: quickCyl.trim() || '0.00',
+                                    axis: quickAxis.trim(),
+                                    add: quickAddVal.trim(),
+                                    qty: quickQty
+                                  }]);
+                                  setQuickSph("");
+                                  setQuickCyl("");
+                                  setQuickAxis("");
+                                  setQuickAddVal("");
+                                  setQuickQty("1");
+                                }}
+                                className="w-full py-2 bg-black hover:bg-neutral-800 text-white rounded-lg text-[9px] font-black uppercase tracking-widest"
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Quick Add Summary List */}
+                          <div className="space-y-2">
+                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest block">Custom Added Powers ({quickAddList.length})</span>
+                            <div className="max-h-[160px] overflow-y-auto border border-gray-150 rounded-xl divide-y divide-gray-100 bg-gray-50/20">
+                              {quickAddList.map((item, index) => (
+                                <div key={index} className="p-3 flex items-center justify-between gap-3 text-[10px] font-bold text-black uppercase bg-white">
+                                  <div>
+                                    <span className="text-gray-400 mr-1">SPH:</span> {item.sph}
+                                    <span className="text-gray-400 ml-2 mr-1">CYL:</span> {item.cyl}
+                                    {item.axis && <><span className="text-gray-400 ml-2 mr-1">AX:</span> {item.axis}</>}
+                                    {item.add && <><span className="text-gray-400 ml-2 mr-1">ADD:</span> {item.add}</>}
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="bg-gray-100 px-2 py-0.5 rounded-full font-black text-gray-600">x{item.qty}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setQuickAddList(prev => prev.filter((_, idx) => idx !== index))}
+                                      className="text-red-500 hover:scale-110 transition-transform"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                              {quickAddList.length === 0 && (
+                                <div className="p-8 text-center text-gray-300 text-[10px] font-bold uppercase tracking-wider">No custom powers added</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {bulkRows.map((row, idx) => (
+                        <div key={idx} className="p-5 border border-gray-150 rounded-2xl relative bg-white shadow-sm">
+                          {bulkRows.length > 1 && (
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveBulkRow(idx)}
+                              className="absolute top-4 right-4 text-red-500 hover:scale-110 transition-transform"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                          <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest block mb-3">Ingest Row #{idx + 1}</span>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-1 md:col-span-2">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Name *</label>
+                              <input 
+                                required 
+                                value={row.name} 
+                                onChange={e => handleBulkRowChange(idx, 'name', e.target.value)} 
+                                type="text" 
+                                placeholder="Product Name" 
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Brand *</label>
+                              {getCategoryType(bulkCategoryId) === 'frame' ? (
+                                <div className="space-y-1.5">
+                                  <select
+                                    value={['Bonthus', 'Jas Harlon'].includes(row.brand) ? row.brand : (row.brand ? 'Custom' : '')}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      if (val === 'Custom') {
+                                        handleBulkRowChange(idx, '_brand_is_custom', true);
+                                        handleBulkRowChange(idx, 'brand', '');
+                                      } else {
+                                        handleBulkRowChange(idx, '_brand_is_custom', false);
+                                        handleBulkRowChange(idx, 'brand', val);
+                                      }
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black bg-white cursor-pointer"
+                                  >
+                                    <option value="">— Select —</option>
+                                    <option value="Bonthus">Bonthus</option>
+                                    <option value="Jas Harlon">Jas Harlon</option>
+                                    <option value="Custom">Custom...</option>
+                                  </select>
+                                  {(row._brand_is_custom || (!['Bonthus', 'Jas Harlon', ''].includes(row.brand))) && (
+                                    <input 
+                                      required
+                                      value={row.brand === 'Custom' ? '' : row.brand} 
+                                      onChange={e => handleBulkRowChange(idx, 'brand', e.target.value)} 
+                                      type="text" 
+                                      placeholder="Enter Custom Brand" 
+                                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black animate-fast-slide" 
+                                    />
+                                  )}
+                                </div>
+                              ) : (
+                                <input 
+                                  value={row.brand} 
+                                  onChange={e => handleBulkRowChange(idx, 'brand', e.target.value)} 
+                                  type="text" 
+                                  placeholder="Brand Name" 
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 mt-3">
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Stock Qty *</label>
+                              <input 
+                                required 
+                                value={row.stock_quantity} 
+                                onChange={e => handleBulkRowChange(idx, 'stock_quantity', e.target.value)} 
+                                type="number" 
+                                min="1"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Base Price (₹) *</label>
+                              <input 
+                                required 
+                                value={row.base_price} 
+                                onChange={e => handleBulkRowChange(idx, 'base_price', e.target.value)} 
+                                type="number" 
+                                placeholder="₹" 
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                              />
+                            </div>
+                          </div>
+
+                          {/* Conditional Batch Row Custom Fields for Frame */}
+                          {getCategoryType(bulkCategoryId) === 'frame' && (
+                            <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 animate-fast-zoom">
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Model No *</label>
+                                <input required value={row.frame_model_no || ''} onChange={e => handleBulkRowChange(idx, 'frame_model_no', e.target.value)} type="text" placeholder="e.g. 78005" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Color *</label>
+                                <input required value={row.frame_color || ''} onChange={e => handleBulkRowChange(idx, 'frame_color', e.target.value)} type="text" placeholder="e.g. Black" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Type *</label>
+                                <select required value={row.frame_type || ''} onChange={e => handleBulkRowChange(idx, 'frame_type', e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black">
+                                  <option value="">— Select —</option>
+                                  <option value="Full Rim">Full Rim</option>
+                                  <option value="Half Rim">Half Rim</option>
+                                  <option value="Rimless">Rimless</option>
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Shape *</label>
+                                <select required value={row.frame_shape || ''} onChange={e => handleBulkRowChange(idx, 'frame_shape', e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white cursor-pointer focus:border-black">
+                                  <option value="">— Select —</option>
+                                  <option value="Square">Square</option>
+                                  <option value="Rectangle">Rectangle</option>
+                                  <option value="Round">Round</option>
+                                  <option value="Oval">Oval</option>
+                                  <option value="Aviator">Aviator</option>
+                                  <option value="Wayfarer">Wayfarer</option>
+                                  <option value="Clubmaster">Clubmaster</option>
+                                  <option value="Cat Eye">Cat Eye</option>
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">A Size</label>
+                                <input value={row.frame_size_a || ''} onChange={e => handleBulkRowChange(idx, 'frame_size_a', e.target.value)} type="text" placeholder="e.g. 52" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">B Size</label>
+                                <input value={row.frame_size_b || ''} onChange={e => handleBulkRowChange(idx, 'frame_size_b', e.target.value)} type="text" placeholder="e.g. 38" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Temple</label>
+                                <input value={row.frame_temple_length || ''} onChange={e => handleBulkRowChange(idx, 'frame_temple_length', e.target.value)} type="text" placeholder="e.g. 140" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">DBL</label>
+                                <input value={row.frame_dbl || ''} onChange={e => handleBulkRowChange(idx, 'frame_dbl', e.target.value)} type="text" placeholder="e.g. 18" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Add Row Button at the bottom of the card list, aligned right */}
+                      <div className="flex justify-end pt-2">
+                        <button 
+                          type="button" 
+                          onClick={handleAddBulkRow}
+                          className="text-[10px] font-black bg-black text-white px-5 py-3 rounded-xl uppercase tracking-widest hover:scale-105 transition-all shadow-md flex items-center gap-2"
+                        >
+                          + Add Row
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

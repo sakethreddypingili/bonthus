@@ -568,21 +568,17 @@ export default function EditOrder({ userProfile }) {
     return (
         <div className="max-w-6xl mx-auto space-y-10 pb-20 animate-in fade-in duration-500">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-10 border-b border-gray-100">
+            <div className="flex flex-col md:flex-row md:items-end justify-end gap-6 pb-10 border-b border-gray-100">
                 <div className="flex items-center gap-6">
                     <button onClick={() => navigate('/orders')} className="p-3 border border-gray-100 rounded-2xl text-black hover:bg-black hover:text-white transition-all shadow-sm">
                         <ArrowLeft size={20} strokeWidth={3} />
                     </button>
-                    <div>
-                        <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-1">Modify Record</h1>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Reference: <span className="font-mono text-black">#{orderId}</span></p>
-                        {orderDisabled && (
+                    {orderDisabled && (
                             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-black text-white rounded-full">
                                 <Lock size={12} strokeWidth={3} />
                                 <span className="text-[10px] font-black uppercase tracking-widest">Archive State Active</span>
                             </div>
                         )}
-                    </div>
                 </div>
                 <div className="flex items-center gap-3">
                     {isAdmin ? (
@@ -889,9 +885,9 @@ export default function EditOrder({ userProfile }) {
                             </div>
                             <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No technical entities linked</p>
                         </div>
-                    )}
-                </div>
-
+                        )}
+                    </div>
+                    
                 <div className="w-full md:w-96 space-y-6">
                     <div className="bg-black text-white rounded-[32px] p-8 shadow-2xl relative overflow-hidden">
                         <div className="relative z-10 space-y-4">

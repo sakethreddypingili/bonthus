@@ -436,11 +436,7 @@ export default function StoreManagement({ userProfile }) {
     return (
         <div className="space-y-10 relative animate-in fade-in duration-500 pb-20">
             <div className="flex flex-col gap-10">
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-                    <div>
-                        <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Store</h1>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Infrastructure & Administrative Control</p>
-                    </div>
+                <div className="flex flex-col md:flex-row md:items-end justify-end gap-6 pb-8 border-b border-gray-100">
                     <div className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-xl shadow-lg">
                         <Building2 size={16} strokeWidth={3} />
                         <span className="text-[10px] font-black uppercase tracking-widest">{isSuperAdmin ? "Global Master" : "Regional Command"}</span>

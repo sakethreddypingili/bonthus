@@ -262,11 +262,7 @@ export default function Attendance({ userProfile }) {
   return (
     <div className="space-y-8 animate-fast-slide pb-20">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Attendance</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Operational Pulse & Workforce Ledger</p>
-        </div>
+      <div className="flex flex-col md:flex-row md:items-end justify-end gap-6 pb-8 border-b border-gray-100">
 
         {isAdminOrManager && (
           <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-2xl border border-gray-100">

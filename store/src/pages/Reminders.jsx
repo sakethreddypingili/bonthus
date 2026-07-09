@@ -65,11 +65,7 @@ export default function Reminders({ userProfile }) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Board</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Meetings & Operational Scheduling</p>
-        </div>
+      <div className="flex flex-col md:flex-row md:items-end justify-end gap-6 pb-8 border-b border-gray-100">
         <button 
           onClick={() => setShowModal(true)}
           className="flex items-center gap-2 bg-black text-white px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all"

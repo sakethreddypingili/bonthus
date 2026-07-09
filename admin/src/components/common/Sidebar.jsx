@@ -85,6 +85,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
             <div key={to} className="w-full">
               <NavLink
                 to={to}
+                onClick={() => { if (isMobile && !["Products","Inventory","Employees","Board"].includes(label)) setCollapsed(true); }}
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
                   ${isActive
@@ -123,7 +124,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                           }
                           ${collapsed ? "justify-center" : ""}
                         `}
-                        title={collapsed ? sub.label : undefined}
+                        title={collapsed ? sub.label : undefined} onClick={() => { if (isMobile) setCollapsed(true); }}
                       >
                         <SubIcon size={15} className="flex-shrink-0" />
                         {!collapsed && <span>{sub.label}</span>}
@@ -158,7 +159,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                           }
                           ${collapsed ? "justify-center" : ""}
                         `}
-                        title={collapsed ? sub.label : undefined}
+                        title={collapsed ? sub.label : undefined} onClick={() => { if (isMobile) setCollapsed(true); }}
                       >
                         <SubIcon size={15} className="flex-shrink-0" />
                         {!collapsed && <span>{sub.label}</span>}
@@ -190,7 +191,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                           }
                           ${collapsed ? "justify-center" : ""}
                         `}
-                        title={collapsed ? sub.label : undefined}
+                        title={collapsed ? sub.label : undefined} onClick={() => { if (isMobile) setCollapsed(true); }}
                       >
                         <SubIcon size={15} className="flex-shrink-0" />
                         {!collapsed && <span>{sub.label}</span>}
@@ -221,7 +222,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                           }
                           ${collapsed ? "justify-center" : ""}
                         `}
-                        title={collapsed ? sub.label : undefined}
+                        title={collapsed ? sub.label : undefined} onClick={() => { if (isMobile) setCollapsed(true); }}
                       >
                         <SubIcon size={15} className="flex-shrink-0" />
                         {!collapsed && <span>{sub.label}</span>}
@@ -247,7 +248,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 }
                 ${collapsed ? "justify-center" : ""}
               `}
-              title={collapsed ? "Infrastructure" : undefined}
+              title={collapsed ? "Infrastructure" : undefined} onClick={() => { if (isMobile) setCollapsed(true); }}
             >
               <Building2 size={18} className="flex-shrink-0" />
               {!collapsed && <span>Infrastructure</span>}
@@ -262,7 +263,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 }
                 ${collapsed ? "justify-center" : ""}
               `}
-              title={collapsed ? "Email Engine" : undefined}
+              title={collapsed ? "Email Engine" : undefined} onClick={() => { if (isMobile) setCollapsed(true); }}
             >
               <Mail size={18} className="flex-shrink-0" />
               {!collapsed && <span>Email Engine</span>}
@@ -282,7 +283,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
               ${location.pathname.startsWith("/settings") ? "bg-black text-white" : ""}
               ${collapsed ? "justify-center" : ""}
             `}
-            title={collapsed ? "Settings" : undefined}
+            title={collapsed ? "Settings" : undefined} onClick={() => { if (isMobile) setCollapsed(true); }}
           >
             <Settings size={18} className="flex-shrink-0" />
             {!collapsed && <span>Settings</span>}

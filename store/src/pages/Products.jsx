@@ -312,11 +312,7 @@ export default function Products({ userProfile }) {
 
   return (
     <div className="space-y-8 animate-fast-slide pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">{isSuperAdmin ? "Inventory Registry" : "Product Catalogue"}</h1>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">{isSuperAdmin ? "Master Product Catalog & Unit Stock" : "Product Catalogue and related actions"}</p>
-        </div>
+      <div className="flex flex-col md:flex-row md:items-end justify-end gap-6 pb-8 border-b border-gray-100">
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-sm">

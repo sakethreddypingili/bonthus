@@ -337,11 +337,7 @@ export default function Orders({ userProfile }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tighter uppercase mb-2">Orders</h1>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Transaction Ledger & Fulfillment</p>
-        </div>
+      <div className="flex flex-col md:flex-row md:items-end justify-end gap-6 pb-8 border-b border-gray-100">
         <button onClick={() => setShowCustomerModal(true)} className="px-6 py-3 bg-black text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg flex items-center gap-2">
           <Plus size={16} strokeWidth={3} /> New Transaction
         </button>
