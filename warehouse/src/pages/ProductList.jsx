@@ -188,7 +188,7 @@ export default function ProductList({ userProfile }) {
   const [bulkCategoryId, setBulkCategoryId] = useState("");
   const [bulkCascadePath, setBulkCascadePath] = useState([]);
   const [bulkRows, setBulkRows] = useState([
-    { name: '', brand: '', base_price: '', sku: generateSKU(), stock_quantity: '1', low_stock_threshold: '5' }
+    { name: '', brand: '', base_price: '', sku: generateSKU(), stock_quantity: '1', low_stock_threshold: '5', colors: [{ color: '', qty: '1' }] }
   ]);
   const [batchStage, setBatchStage] = useState('details'); // 'details' | 'products' | 'review'
   const [showEditDetailsPopup, setShowEditDetailsPopup] = useState(false);
@@ -712,9 +712,79 @@ export default function ProductList({ userProfile }) {
     setShowEditModal(true);
   };
 
+  const getBatchTotals = () => {
+    const catType = getCategoryType(bulkCategoryId);
+    let totalRows = 0;
+    let totalQty = 0;
+
+    if (catType === 'lens') {
+      const matrixCount = Object.keys(matrixQuantities).length;
+      const matrixSum = Object.values(matrixQuantities).reduce((acc, q) => acc + Number(q || 0), 0);
+      
+      const quickCount = quickAddList.length;
+      const quickSum = quickAddList.reduce((acc, item) => acc + Number(item.qty || 0), 0);
+
+      totalRows = matrixCount + quickCount;
+      totalQty = matrixSum + quickSum;
+    } else if (catType === 'frame') {
+      for (const row of bulkRows) {
+        const colors = row.colors || [];
+        totalRows += colors.length;
+        totalQty += colors.reduce((acc, c) => acc + Number(c.qty || 0), 0);
+      }
+    } else {
+      totalRows = bulkRows.length;
+      totalQty = bulkRows.reduce((acc, row) => acc + Number(row.stock_quantity || 0), 0);
+    }
+
+    return { totalRows, totalQty };
+  };
+
   // Bulk Load Row utilities
   const handleAddBulkRow = () => {
-    setBulkRows(prev => [...prev, { name: '', brand: '', base_price: '', sku: generateSKU(), stock_quantity: '1', low_stock_threshold: '5' }]);
+    setBulkRows(prev => [...prev, { name: '', brand: '', base_price: '', sku: generateSKU(), stock_quantity: '1', low_stock_threshold: '5', colors: [{ color: '', qty: '1' }] }]);
+  };
+
+  const handleAddColorVariant = (rowIdx) => {
+    setBulkRows(prev => prev.map((row, idx) => {
+      if (idx !== rowIdx) return row;
+      const colors = row.colors || [];
+      return { ...row, colors: [...colors, { color: '', qty: '1' }] };
+    }));
+  };
+
+  const handleRemoveColorVariant = (rowIdx, colorIdx) => {
+    setBulkRows(prev => prev.map((row, idx) => {
+      if (idx !== rowIdx) return row;
+      const colors = row.colors || [];
+      if (colors.length === 1) return row;
+      return { ...row, colors: colors.filter((_, cidx) => cidx !== colorIdx) };
+    }));
+  };
+
+  const handleColorVariantChange = (rowIdx, colorIdx, field, value) => {
+    setBulkRows(prev => prev.map((row, idx) => {
+      if (idx !== rowIdx) return row;
+      const colors = (row.colors || []).map((c, cidx) => {
+        if (cidx !== colorIdx) return c;
+        return { ...c, [field]: value };
+      });
+      
+      // Auto-compute frame name based on the first color
+      const catType = getCategoryType(bulkCategoryId);
+      let updatedRow = { ...row, colors };
+      if (catType === 'frame') {
+        const primaryColor = colors[0]?.color || '';
+        const parts = [
+          updatedRow.brand,
+          primaryColor,
+          updatedRow.frame_type,
+          updatedRow.frame_shape
+        ].filter(Boolean);
+        updatedRow.name = parts.join(" ");
+      }
+      return updatedRow;
+    }));
   };
 
   const handleRemoveBulkRow = (index) => {
@@ -723,7 +793,36 @@ export default function ProductList({ userProfile }) {
   };
 
   const handleBulkRowChange = (index, field, value) => {
-    setBulkRows(prev => prev.map((row, idx) => idx === index ? { ...row, [field]: value } : row));
+    setBulkRows(prev => prev.map((row, idx) => {
+      if (idx !== index) return row;
+      let updatedRow = { ...row, [field]: value };
+      
+      // Autofill price based on brand selection for frames
+      if (field === 'brand') {
+        if (value === 'Bonthus') {
+          updatedRow.base_price = '1999';
+        } else if (value === 'Jas Harlon') {
+          updatedRow.base_price = '999';
+        } else if (value === 'Clip-On') {
+          updatedRow.base_price = '499';
+        }
+      }
+
+      // Automatically generate frame product name dynamically
+      const catType = getCategoryType(bulkCategoryId);
+      if (catType === 'frame') {
+        const primaryColor = updatedRow.colors?.[0]?.color || '';
+        const parts = [
+          updatedRow.brand,
+          primaryColor,
+          updatedRow.frame_type,
+          updatedRow.frame_shape
+        ].filter(Boolean);
+        updatedRow.name = parts.join(" ");
+      }
+      
+      return updatedRow;
+    }));
   };
 
   const handleConfirmLensMatrix = () => {
@@ -818,69 +917,111 @@ export default function ProductList({ userProfile }) {
       const records = [];
       for (const row of bulkRows) {
         const catType = getCategoryType(bulkCategoryId);
-        const qty = Math.max(1, Number(row.stock_quantity || 1));
         
-        let baseDescObj = {};
         if (catType === 'frame') {
-          baseDescObj = {
-            type: 'frame',
-            modelNo: row.frame_model_no || '',
-            color: row.frame_color || '',
-            frameType: row.frame_type || '',
-            frameShape: row.frame_shape || '',
-            sizeA: row.frame_size_a || '',
-            sizeB: row.frame_size_b || '',
-            templeLength: row.frame_temple_length || '',
-            dbl: row.frame_dbl || '',
-            rawDescription: row.description || ''
-          };
-        } else if (catType === 'lens') {
-          baseDescObj = {
-            type: 'lens',
-            lensType: row.lens_type || '',
-            index: row.lens_index || '',
-            material: row.lens_material || '',
-            coating: row.lens_coating || '',
-            sph: row.lens_sph || '',
-            cyl: row.lens_cyl || '',
-            axis: row.lens_axis || '',
-            add: row.lens_add || '',
-            rawDescription: row.description || ''
-          };
+          // If the frame row has color variants, process each color
+          const colorsList = row.colors && row.colors.length > 0 ? row.colors : [{ color: '', qty: '1' }];
+          for (const colorItem of colorsList) {
+            const qty = Math.max(1, Number(colorItem.qty || 1));
+            const frameColor = colorItem.color || '';
+            const baseDescObj = {
+              type: 'frame',
+              modelNo: row.frame_model_no || '',
+              color: frameColor,
+              frameType: row.frame_type || '',
+              frameShape: row.frame_shape || '',
+              sizeA: row.frame_size_a || '',
+              sizeB: row.frame_size_b || '',
+              templeLength: row.frame_temple_length || '',
+              dbl: row.frame_dbl || '',
+              rawDescription: row.description || ''
+            };
+            
+            for (let i = 0; i < qty; i++) {
+              const uniqueSku = generateSKU();
+              const uniqueBarcode = generateBarcode();
+              
+              const parts = [
+                row.brand,
+                frameColor,
+                row.frame_type,
+                row.frame_shape
+              ].filter(Boolean);
+              let recordName = parts.join(" ") || "Unnamed Frame";
+              if (qty > 1) {
+                recordName = `${recordName} #${i + 1}`;
+              }
+              
+              const calculatedName = getComputedProductName(recordName, row.brand, {
+                color: frameColor,
+                frameType: row.frame_type,
+                frameShape: row.frame_shape
+              });
+              
+              records.push({
+                checkpoint_name: finalCheckpointName,
+                name: recordName,
+                sku: uniqueSku,
+                product_name: calculatedName,
+                brand: row.brand || null,
+                base_price: Number(row.base_price || 0),
+                category_id: bulkCategoryId,
+                description: JSON.stringify(baseDescObj),
+                stock_quantity: 1,
+                low_stock_threshold: Number(row.low_stock_threshold || 5),
+                unit_price: Number(row.base_price || 0),
+                store_id: selectedStore,
+                status: 'pending',
+                temp_barcode: uniqueBarcode
+              });
+            }
+          }
         } else {
-          baseDescObj = {
-            type: 'generic',
-            rawDescription: row.description || ''
-          };
-        }
-
-        // Loop 'qty' times to generate unique records for quantity > 1
-        for (let i = 0; i < qty; i++) {
-          const uniqueSku = generateSKU();
-          const uniqueBarcode = generateBarcode();
-          const recordName = qty > 1 ? `${row.name} #${i + 1}` : row.name;
-          const calculatedName = catType === 'frame' ? getComputedProductName(recordName, row.brand, {
-            color: row.frame_color,
-            frameType: row.frame_type,
-            frameShape: row.frame_shape
-          }) : null;
-
-          records.push({
-            checkpoint_name: finalCheckpointName,
-            name: recordName,
-            sku: uniqueSku, // unique 5-character SKU
-            product_name: calculatedName,
-            brand: row.brand || null,
-            base_price: Number(row.base_price || 0),
-            category_id: bulkCategoryId,
-            description: JSON.stringify(baseDescObj),
-            stock_quantity: 1, // each individual product has quantity = 1
-            low_stock_threshold: Number(row.low_stock_threshold || 5),
-            unit_price: Number(row.base_price || 0),
-            store_id: selectedStore,
-            status: 'pending',
-            temp_barcode: uniqueBarcode // Temporary property to map to barcodes table below
-          });
+          // Standard / lens / generic logic
+          const qty = Math.max(1, Number(row.stock_quantity || 1));
+          let baseDescObj = {};
+          if (catType === 'lens') {
+            baseDescObj = {
+              type: 'lens',
+              lensType: row.lens_type || '',
+              index: row.lens_index || '',
+              material: row.lens_material || '',
+              coating: row.lens_coating || '',
+              sph: row.lens_sph || '',
+              cyl: row.lens_cyl || '',
+              axis: row.lens_axis || '',
+              add: row.lens_add || '',
+              rawDescription: row.description || ''
+            };
+          } else {
+            baseDescObj = {
+              type: 'generic',
+              rawDescription: row.description || ''
+            };
+          }
+          
+          for (let i = 0; i < qty; i++) {
+            const uniqueSku = generateSKU();
+            const uniqueBarcode = generateBarcode();
+            const recordName = qty > 1 ? `${row.name} #${i + 1}` : row.name;
+            
+            records.push({
+              checkpoint_name: finalCheckpointName,
+              name: recordName,
+              sku: uniqueSku,
+              product_name: null,
+              brand: row.brand || null,
+              base_price: Number(row.base_price || 0),
+              category_id: bulkCategoryId,
+              description: JSON.stringify(baseDescObj),
+              stock_quantity: 1,
+              low_stock_threshold: Number(row.low_stock_threshold || 5),
+              unit_price: Number(row.base_price || 0),
+              store_id: selectedStore,
+              status: 'pending',
+              temp_barcode: uniqueBarcode
+            });
+          }
         }
       }
 
@@ -1547,52 +1688,78 @@ export default function ProductList({ userProfile }) {
       {/* -------------------- 3. BATCH LOAD TAB -------------------- */}
       {activeTab === "batch-load" && (
         <div className="space-y-4">
-          {/* Header Row above the card container */}
-          {(batchStage === 'products' || batchStage === 'review') && (
-            <div className="flex justify-end">
-              {batchStage === 'products' && (
-                <button 
-                  type="button"
-                  onClick={() => {
-                    const catType = getCategoryType(bulkCategoryId);
-                    if (catType === 'lens') {
-                      handleConfirmLensMatrix();
-                      return;
-                    }
-                    let valid = true;
-                    for (const row of bulkRows) {
-                      if (!row.name || !row.stock_quantity || !row.base_price) {
-                        valid = false;
-                      }
-                      if (catType === 'frame') {
-                        if (!row.frame_model_no || !row.frame_color || !row.frame_type || !row.frame_shape || !row.brand) {
-                          valid = false;
+          {/* Sticky Actions & Stats Header Bar */}
+          {(batchStage === 'products' || batchStage === 'review') && (() => {
+            const { totalRows, totalQty } = getBatchTotals();
+            return (
+              <div className="sticky top-[-16px] md:top-[-24px] -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3.5 z-30 bg-white border-b border-gray-200 shadow-sm flex justify-between items-center transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-4 bg-gray-50 border border-gray-150 rounded-xl px-4 py-2 text-black font-extrabold text-xs">
+                    <div>
+                      <span className="text-[8px] font-black text-gray-400 uppercase block tracking-wider">Total Rows</span>
+                      <span className="text-[11px] font-black text-black">{totalRows}</span>
+                    </div>
+                    <div className="border-l border-gray-200 pl-4">
+                      <span className="text-[8px] font-black text-gray-400 uppercase block tracking-wider">Total Qty</span>
+                      <span className="text-[11px] font-black text-black">{totalQty}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  {batchStage === 'products' && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const catType = getCategoryType(bulkCategoryId);
+                        if (catType === 'lens') {
+                          handleConfirmLensMatrix();
+                          return;
                         }
-                      }
-                    }
-                    if (!valid) {
-                      alert("Please fill in all required product fields (including brand name).");
-                      return;
-                    }
-                    setBatchStage('review');
-                  }}
-                  className="px-6 py-3 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,0.15)]"
-                >
-                  Confirm
-                </button>
-              )}
-              {batchStage === 'review' && (
-                <button 
-                  type="button"
-                  onClick={handleSaveBulk}
-                  disabled={saving}
-                  className="px-6 py-3 bg-black hover:bg-neutral-805 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,0.15)] disabled:opacity-50"
-                >
-                  {saving ? "Confirming..." : "Confirm"}
-                </button>
-              )}
-            </div>
-          )}
+                        let valid = true;
+                        for (const row of bulkRows) {
+                          if (catType === 'frame') {
+                            if (!row.brand || !row.base_price || !row.frame_model_no || !row.frame_type || !row.frame_shape) {
+                              valid = false;
+                            }
+                            const colors = row.colors || [];
+                            if (colors.length === 0) valid = false;
+                            for (const c of colors) {
+                              if (!c.color || !c.qty) {
+                                valid = false;
+                              }
+                            }
+                          } else {
+                            if (!row.name || !row.stock_quantity || !row.base_price) {
+                              valid = false;
+                            }
+                          }
+                        }
+                        if (!valid) {
+                          alert("Please fill in all required product fields (including brand name, model, type, shape, and color variants).");
+                          return;
+                        }
+                        setBatchStage('review');
+                      }}
+                      className="px-6 py-2.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,0.15)]"
+                    >
+                      Confirm
+                    </button>
+                  )}
+                  {batchStage === 'review' && (
+                    <button 
+                      type="button"
+                      onClick={handleSaveBulk}
+                      disabled={saving}
+                      className="px-6 py-2.5 bg-black hover:bg-neutral-805 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,0.15)] disabled:opacity-50"
+                    >
+                      {saving ? "Confirming..." : "Confirm"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="w-full bg-white rounded-3xl border border-gray-100 shadow-sm p-8 animate-fast-zoom">
             <div className="mb-6">
@@ -2070,21 +2237,31 @@ export default function ProductList({ userProfile }) {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1 md:col-span-2">
                               <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Name *</label>
-                              <input 
-                                required 
-                                value={row.name} 
-                                onChange={e => handleBulkRowChange(idx, 'name', e.target.value)} 
-                                type="text" 
-                                placeholder="Product Name" 
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
-                              />
+                              {getCategoryType(bulkCategoryId) === 'frame' ? (
+                                <input 
+                                  disabled 
+                                  value={row.name} 
+                                  type="text" 
+                                  placeholder="(Auto-generated from Brand, Model, Color, Type, Shape)" 
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-gray-400 outline-none bg-gray-50/80 cursor-not-allowed" 
+                                />
+                              ) : (
+                                <input 
+                                  required 
+                                  value={row.name} 
+                                  onChange={e => handleBulkRowChange(idx, 'name', e.target.value)} 
+                                  type="text" 
+                                  placeholder="Product Name" 
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                                />
+                              )}
                             </div>
                             <div className="space-y-1">
                               <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Brand *</label>
                               {getCategoryType(bulkCategoryId) === 'frame' ? (
                                 <div className="space-y-1.5">
                                   <select
-                                    value={['Bonthus', 'Jas Harlon'].includes(row.brand) ? row.brand : (row.brand ? 'Custom' : '')}
+                                    value={['Bonthus', 'Jas Harlon', 'Clip-On'].includes(row.brand) ? row.brand : (row.brand ? 'Custom' : '')}
                                     onChange={e => {
                                       const val = e.target.value;
                                       if (val === 'Custom') {
@@ -2100,9 +2277,10 @@ export default function ProductList({ userProfile }) {
                                     <option value="">— Select —</option>
                                     <option value="Bonthus">Bonthus</option>
                                     <option value="Jas Harlon">Jas Harlon</option>
+                                    <option value="Clip-On">Clip-On</option>
                                     <option value="Custom">Custom...</option>
                                   </select>
-                                  {(row._brand_is_custom || (!['Bonthus', 'Jas Harlon', ''].includes(row.brand))) && (
+                                  {(row._brand_is_custom || (!['Bonthus', 'Jas Harlon', 'Clip-On', ''].includes(row.brand))) && (
                                     <input 
                                       required
                                       value={row.brand === 'Custom' ? '' : row.brand} 
@@ -2127,17 +2305,21 @@ export default function ProductList({ userProfile }) {
 
                           <div className="grid grid-cols-2 gap-4 mt-3">
                             <div className="space-y-1">
-                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Stock Qty *</label>
-                              <input 
-                                required 
-                                value={row.stock_quantity} 
-                                onChange={e => handleBulkRowChange(idx, 'stock_quantity', e.target.value)} 
-                                type="number" 
-                                min="1"
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
-                              />
+                              {getCategoryType(bulkCategoryId) !== 'frame' && (
+                                <>
+                                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Stock Qty *</label>
+                                  <input 
+                                    required 
+                                    value={row.stock_quantity} 
+                                    onChange={e => handleBulkRowChange(idx, 'stock_quantity', e.target.value)} 
+                                    type="number" 
+                                    min="1"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[11px] font-bold text-black outline-none focus:border-black" 
+                                  />
+                                </>
+                              )}
                             </div>
-                            <div className="space-y-1">
+                            <div className={`space-y-1 ${getCategoryType(bulkCategoryId) === 'frame' ? 'col-span-2 md:col-span-3' : ''}`}>
                               <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Base Price (₹) *</label>
                               <input 
                                 required 
@@ -2152,14 +2334,10 @@ export default function ProductList({ userProfile }) {
 
                           {/* Conditional Batch Row Custom Fields for Frame */}
                           {getCategoryType(bulkCategoryId) === 'frame' && (
-                            <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 animate-fast-zoom">
+                            <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 grid grid-cols-2 md:grid-cols-3 gap-3 mt-4 animate-fast-zoom">
                               <div className="space-y-1">
                                 <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Model No *</label>
                                 <input required value={row.frame_model_no || ''} onChange={e => handleBulkRowChange(idx, 'frame_model_no', e.target.value)} type="text" placeholder="e.g. 78005" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Color *</label>
-                                <input required value={row.frame_color || ''} onChange={e => handleBulkRowChange(idx, 'frame_color', e.target.value)} type="text" placeholder="e.g. Black" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
                               </div>
                               <div className="space-y-1">
                                 <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Type *</label>
@@ -2199,6 +2377,68 @@ export default function ProductList({ userProfile }) {
                               <div className="space-y-1">
                                 <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">DBL</label>
                                 <input value={row.frame_dbl || ''} onChange={e => handleBulkRowChange(idx, 'frame_dbl', e.target.value)} type="text" placeholder="e.g. 18" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black" />
+                              </div>
+                              
+                              {/* Color variants list section */}
+                              <div className="col-span-2 md:col-span-3 border-t border-gray-100 pt-4 mt-2 space-y-3">
+                                <div className="flex justify-between items-center pb-1">
+                                  <span className="text-[10px] font-black text-black uppercase tracking-wider">Color Variants & Quantities</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddColorVariant(idx)}
+                                    className="text-[9px] font-black uppercase tracking-widest bg-black text-white hover:bg-neutral-800 px-3 py-1.5 rounded-lg transition-all"
+                                  >
+                                    + Add Color
+                                  </button>
+                                </div>
+                                <div className="space-y-2.5 max-h-[250px] overflow-y-auto pr-1">
+                                  {(row.colors || [{ color: '', qty: '1' }]).map((cItem, cIdx) => {
+                                    const previewName = [row.brand, cItem.color, row.frame_type, row.frame_shape]
+                                      .filter(Boolean)
+                                      .join(" ");
+                                    return (
+                                      <div key={cIdx} className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-50/50 border border-gray-150 p-3 rounded-xl items-center">
+                                        <div className="space-y-1">
+                                          <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Color *</label>
+                                          <input
+                                            required
+                                            value={cItem.color}
+                                            onChange={e => handleColorVariantChange(idx, cIdx, 'color', e.target.value)}
+                                            type="text"
+                                            placeholder="e.g. Black"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantity *</label>
+                                          <input
+                                            required
+                                            value={cItem.qty}
+                                            onChange={e => handleColorVariantChange(idx, cIdx, 'qty', e.target.value)}
+                                            type="number"
+                                            min="1"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[10px] font-bold text-black outline-none bg-white focus:border-black"
+                                          />
+                                        </div>
+                                        <div className="space-y-1 md:col-span-2 flex items-center justify-between gap-3 pt-4">
+                                          <div className="flex-1 min-w-0">
+                                            <span className="text-[7px] font-black text-gray-400 block uppercase tracking-widest">Name Preview</span>
+                                            <span className="text-[10px] font-extrabold text-black uppercase truncate block">{previewName || '(Fill attributes to preview)'}</span>
+                                          </div>
+                                          {(row.colors || []).length > 1 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleRemoveColorVariant(idx, cIdx)}
+                                              className="text-red-500 hover:scale-110 transition-transform flex-shrink-0"
+                                            >
+                                              <Trash2 size={15} />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             </div>
                           )}
