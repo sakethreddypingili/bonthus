@@ -78,41 +78,47 @@ export function usePrintQueue() {
    */
   const loadBatchFromSupabase = useCallback(async (checkpointName, categoryPathsMap) => {
     try {
-      // 1. Fetch SKUs for the given checkpointName from pending_products
+      // 1. Fetch categories map
+      const { data: cats } = await supabase.from("categories").select("id, name");
+      const catsMap = { ...categoryPathsMap };
+      if (cats) {
+        cats.forEach(c => {
+          catsMap[c.id] = c.name;
+        });
+      }
+
+      // 2. Fetch pending products matching this checkpoint
       const { data: pendingProds, error: pendingErr } = await supabase
         .from("pending_products")
-        .select("sku")
+        .select("*")
         .eq("checkpoint_name", checkpointName);
 
       if (pendingErr) throw pendingErr;
       if (!pendingProds || pendingProds.length === 0) return 0;
 
-      const skus = pendingProds.map(p => p.sku);
+      const formatted = pendingProds.map((item) => {
+        let desc = {};
+        try {
+          desc = JSON.parse(item.description || "{}");
+        } catch (e) {
+          console.error("Failed to parse description JSON:", e);
+        }
 
-      // 2. Fetch printing data from barcode_printing table matching those SKUs
-      const { data: printData, error: printErr } = await supabase
-        .from("barcode_printing")
-        .select("*")
-        .in("sku", skus)
-        .eq("status", "pending");
+        const categoryName = catsMap[item.category_id] || desc.type || "Eyewear";
 
-      if (printErr) throw printErr;
-      if (!printData || printData.length === 0) return 0;
-
-      const formatted = printData.map((item) => {
         return {
           id: item.id.toString(),
-          barcodeValue: item.barcode || item.sku,
+          barcodeValue: item.temp_barcode || item.sku,
           brandValue: item.brand || "",
-          modelValue: item.model_no || "",
+          modelValue: desc.modelNo || "",
           skuValue: item.sku,
-          categoryId: null,
-          categoryName: item.category_name || "Uncategorized",
-          priceValue: item.price ? item.price.toString() : "1200",
-          sizeA: item.a || "",
-          sizeB: item.b || "",
-          dbl: item.dbl || "",
-          templeLength: item.tem || "",
+          categoryId: item.category_id,
+          categoryName: categoryName,
+          priceValue: item.base_price ? item.base_price.toString() : "1200",
+          sizeA: desc.sizeA || "",
+          sizeB: desc.sizeB || "",
+          dbl: desc.dbl || "",
+          templeLength: desc.templeLength || "",
           quantity: 1, // Default to 1 label per item in the batch
           status: "pending",
           addedAt: new Date().toISOString(),
