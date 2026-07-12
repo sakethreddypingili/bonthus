@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../server/supabase/supabase";
 
+const cleanLensName = (name) => {
+  if (!name) return "";
+  const match = name.match(/^(.*?)\s+(?:lens|lenses|sph|cyl|\d\.\d\d)/i);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  return name.trim();
+};
+
 /**
  * Custom hook for managing the print queue state and actions.
  * Persists state to localStorage.
@@ -137,6 +146,16 @@ export function usePrintQueue() {
           quantity: 1, // Default to 1 label per item in the batch
           status: "pending",
           addedAt: new Date().toISOString(),
+          name: cleanLensName(item.name || ""),
+          lensType: desc.lensType || "",
+          lensIndex: desc.index || "",
+          lensMaterial: desc.material || "",
+          lensCoating: desc.coating || "",
+          lensSph: desc.sph || "",
+          lensCyl: desc.cyl || "",
+          lensAxis: desc.axis || "",
+          lensAdd: desc.add || "",
+          frameColor: desc.frameColor || desc.color || "",
         };
       });
 

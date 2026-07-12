@@ -34,6 +34,19 @@ const DEFAULT_SETTINGS = {
   barcodeTextY: 95,
 };
 
+const isLensCategory = (categoryName) => {
+  return /lens/i.test(categoryName || "");
+};
+
+const cleanLensName = (name) => {
+  if (!name) return "";
+  const match = name.match(/^(.*?)\s+(?:lens|lenses|sph|cyl|\d\.\d\d)/i);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  return name.trim();
+};
+
 export default function BarcodePrinter({ userProfile }) {
   // -- Core state ------------------------------------------------------------ 
   const [barcodeValue, setBarcodeValue] = useState("1414199999");
@@ -49,6 +62,17 @@ export default function BarcodePrinter({ userProfile }) {
   const [printQuantity, setPrintQuantity] = useState(1);
   const [printingStatus, setPrintingStatus] = useState("IDLE");
   const [activePrinterTab, setActivePrinterTab] = useState("single");
+
+  // -- Lens Single Print State ------------------------------------------------
+  const [lensName, setLensName] = useState("Bonthus High Ultra Thin 1.74 (Blue)");
+  const [lensTypeSingle, setLensTypeSingle] = useState("Single Vision");
+  const [lensIndexSingle, setLensIndexSingle] = useState("1.74");
+  const [lensMaterialSingle, setLensMaterialSingle] = useState("Hi-Index");
+  const [lensCoatingSingle, setLensCoatingSingle] = useState("Blue Cut");
+  const [lensSphSingle, setLensSphSingle] = useState("0.0");
+  const [lensCylSingle, setLensCylSingle] = useState("0.0");
+  const [lensAxisSingle, setLensAxisSingle] = useState("0.0");
+  const [lensAddSingle, setLensAddSingle] = useState("0.0");
 
   // -- Label / TSPL settings --------------------------------------------------
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -122,21 +146,24 @@ export default function BarcodePrinter({ userProfile }) {
     return () => { active = false; clearTimeout(tid); };
   }, []);
 
+  const [frameColorValue, setFrameColorValue] = useState("");
+
   // -- Auto-resolve barcode -> category name, brand, SKU, and model no ----------
   useEffect(() => {
     const resolve = async () => {
       if (!barcodeValue?.trim()) return;
       try {
-        const { data: bc } = await supabase.from("product_barcodes").select("product_id").eq("barcode", barcodeValue).maybeSingle();
-        const q = bc?.product_id
-          ? supabase.from("products").select("id, name, sku, brand, category_id, category:categories(name), description, base_price").eq("id", bc.product_id)
-          : supabase.from("products").select("id, name, sku, brand, category_id, category:categories(name), description, base_price").or(`sku.eq.${barcodeValue}`);
+        // Resolve from pending_products & pending_product_barcodes instead of product_barcodes
+        const { data: bc } = await supabase.from("pending_product_barcodes").select("pending_product_id").eq("barcode", barcodeValue).maybeSingle();
+        const q = bc?.pending_product_id
+          ? supabase.from("pending_products").select("id, brand, sku, category_id, category:categories(name), description").eq("id", bc.pending_product_id)
+          : supabase.from("pending_products").select("id, brand, sku, category_id, category:categories(name), description").or(`sku.eq.${barcodeValue}`);
         const { data: prod } = await q.maybeSingle();
         if (prod) {
           if (prod.brand) setBrandValue(prod.brand);
           if (prod.sku) setSkuValue(prod.sku);
           if (prod.category?.name) setCategoryName(prod.category.name);
-          if (prod.base_price) setPriceValue(prod.base_price.toString());
+          setPriceValue("0"); // Default base price for pending items
 
           try {
             const descObj = JSON.parse(prod.description);
@@ -146,10 +173,13 @@ export default function BarcodePrinter({ userProfile }) {
               if (descObj.sizeB) setSizeB(descObj.sizeB.toString());
               if (descObj.dbl) setDbl(descObj.dbl.toString());
               if (descObj.templeLength) setTempleLength(descObj.templeLength.toString());
+
+              const resolvedColor = descObj.frameColor || descObj.color || "";
+              setFrameColorValue(resolvedColor);
             }
           } catch (e) { }
 
-          addLog("INFO", `Resolved "${barcodeValue}" -> "${prod.category?.name || "Uncategorized"}" (${prod.brand || "No Brand"})`);
+          addLog("INFO", `Resolved "${barcodeValue}" from pending_products -> "${prod.category?.name || "Uncategorized"}" (${prod.brand || "No Brand"})`);
         }
       } catch (e) { console.error(e); }
     };
@@ -174,6 +204,16 @@ export default function BarcodePrinter({ userProfile }) {
       quantity: printQuantity,
       status: "pending",
       addedAt: new Date().toISOString(),
+      name: lensName,
+      lensType: lensTypeSingle,
+      lensIndex: lensIndexSingle,
+      lensMaterial: lensMaterialSingle,
+      lensCoating: lensCoatingSingle,
+      lensSph: lensSphSingle,
+      lensCyl: lensCylSingle,
+      lensAxis: lensAxisSingle,
+      lensAdd: lensAddSingle,
+      frameColor: frameColorValue,
     });
     addLog("INFO", `Added "${barcodeValue}" to queue (${printQuantity}x).`);
   };
@@ -200,43 +240,116 @@ export default function BarcodePrinter({ userProfile }) {
   //   TAIL ZONE (avoid):            X = 0-165
   //
   // Y BUDGET (height=15.4mm=123 dots, Y=8-120 usable):
-  const buildItemTspl = (category, brand, model, sku, val, qty, price, sizeAVal, sizeBVal, dblVal, templeLengthVal) => {
-    const truncatedCategory = (category || "").slice(0, 8); // Truncate category to 8 chars to guarantee zero overlap
+  const buildItemTspl = (category, brand, model, sku, val, qty, price, sizeAVal, sizeBVal, dblVal, templeLengthVal, extra = {}) => {
+    const isLens = /lens/i.test(category || "");
     const cmds = [
       `SIZE 101.6 mm, 15 mm`,
       `GAP 20 mm, 0 mm`,
-      `DIRECTION 1,0`, // Keeps the text printing right-side up
+      `DIRECTION 1,0`,
       `CLS`,
-      `REFERENCE 0,0`,
-
-      // ── LEFT FLAP (Shifted down by 10% for vertical centering) ────────
-      `TEXT 110,27,"3",0,1,1,"${brand || ""}"`,
-      `TEXT 80,67,"1",0,1,1,"${truncatedCategory}"`,
-      `TEXT 180,67,"1",0,1,1,"SKU:${sku || ""}"`,
-      `TEXT 80,102,"1",0,1,1,"Rs.${price || ""}"`,
-      `TEXT 180,102,"1",0,1,1,"M:${model || ""}"`,
-
-      // ── RIGHT FLAP (Specs shifted down by 10%) ────────
-      `TEXT 340,30,"1",0,1,1,"A"`,
-      `TEXT 370,30,"1",0,1,1,"B"`,
-      `TEXT 400,30,"1",0,1,1,"DBL"`,
-      `TEXT 445,30,"1",0,1,1,"Tem"`,
-
-      `TEXT 340,46,"1",0,1,1,"${sizeAVal || ""}"`,
-      `TEXT 370,46,"1",0,1,1,"${sizeBVal || ""}"`,
-      `TEXT 400,46,"1",0,1,1,"${dblVal || ""}"`,
-      `TEXT 445,46,"1",0,1,1,"${templeLengthVal || ""}"`,
-
-      // Barcode decreased in height to 32, shifted right to X=350, and down by 5% to Y=62
-      `BARCODE 350,62,"128",32,0,0,1,1,"${val}"`,
-      // Barcode number centered under barcode at Y=100
-      `TEXT 350,100,"1",0,1,1,"${val}"`,
-
-      // ── TAIL ZONE (X = 440 to 812) ────────
-      // Untouched and blank
-
-      `PRINT ${qty},1`
+      `REFERENCE 0,0`
     ];
+
+    if (isLens) {
+      // ── LENS BLUEPRINT ───────────────────────────────────────────────
+      const cleanName = cleanLensName(extra.name || brand || "Lens");
+      const displayType = (extra.lensType || "Single Vision").toLowerCase().includes("single") ? "Single" : (extra.lensType || "Single Vision");
+      const displayIndex = extra.lensIndex || "1.74";
+
+      let coating = extra.lensCoating || "Blue Cut";
+      const coatingWords = coating.trim().split(/\s+/);
+      if (coatingWords.length > 3) {
+        coating = coatingWords.slice(0, 2).join(" ");
+      }
+
+      let coating1 = coating;
+      let coating2 = "";
+      if (coating.length > 10) {
+        const splitIdx = coating.lastIndexOf(" ", 10);
+        if (splitIdx > 0) {
+          coating1 = coating.slice(0, splitIdx);
+          coating2 = coating.slice(splitIdx + 1);
+        } else {
+          coating1 = coating.slice(0, 10);
+          coating2 = coating.slice(10);
+        }
+      }
+
+      cmds.push(
+        // Left Flap (moved down, using font size "0" for better organization)
+        `TEXT 80,24,"1",0,1,1,"${cleanName.slice(0, 32)}"`,
+        `TEXT 80,42,"1",0,1,1,"${sku || ""}"`,
+        `TEXT 80,70,"1",0,1,1,"${displayType}"`,
+        `TEXT 210,70,"1",0,1,1,"${displayIndex}"`,
+        // `TEXT 80,90,"1",0,1,1,"${extra.lensMaterial || "Hi-Index"}"`,
+        // //`TEXT 150,60,"1",0,1,1,"${coating1}"`
+        // `TEXT 210,90,"1",0,1,1,"${coating1}"`
+        `TEXT 330,31,"1",0,1,1,"${extra.lensMaterial || "Hi-Index"}"`,
+        `TEXT 410,31,"1",0,1,1,"${coating1}"`
+      );
+
+      if (coating2) {
+        cmds.push(`TEXT 150,96,"0",0,1,1,"${coating2}"`);
+      }
+
+      cmds.push(
+        // Right Flap (wider column spacing and shifted barcode left)
+        //`TEXT 295,15,"1",0,1,1,"SPH"`,
+        //`TEXT 340,15,"1",0,1,1,"CYL"`,
+        //`TEXT 385,15,"1",0,1,1,"AXIS"`,
+        //`TEXT 430,15,"1",0,1,1,"ADD"`,
+
+        // `TEXT 295,31,"1",0,1,1,"${extra.lensSph || "0.0"}"`,
+        // //`TEXT 340,31,"1",0,1,1,"${extra.lensCyl || "0.0"}"`,
+        // `TEXT 295,15,"1",0,1,1,"${extra.lensCyl || "0.0"}"`,
+        // `TEXT 385,31,"1",0,1,1,"${extra.lensAxis || "0.0"}"`,
+        // //`TEXT 430,31,"1",0,1,1,"${extra.lensAdd || "0.0"}"`,
+        // `TEXT 385,15,"1",0,1,1,"${extra.lensAdd || "0.0"}"`,
+
+        // `TEXT 340,24,"1",0,1,1,"sp:${extra.lensSph || "0.0"}"`,
+        // //`TEXT 340,31,"1",0,1,1,"${extra.lensCyl || "0.0"}"`,
+        // `TEXT 430,24,"1",0,1,1,"cy:${extra.lensCyl || "0.0"}"`,
+        // `TEXT 340,38,"1",0,1,1,"ax:${extra.lensAxis || "0.0"}"`,
+        // //`TEXT 430,31,"1",0,1,1,"${extra.lensAdd || "0.0"}"`,
+        // `TEXT 430,38,"1",0,1,1,"ad:${extra.lensAdd || "0.0"}"`,
+
+        `TEXT 80,95,"1",0,1,1,"${extra.lensSph || "0.0"}"`,
+        `TEXT 145,95,"1",0,1,1,"${extra.lensCyl || "0.0"}"`,
+        `TEXT 210,95,"1",0,1,1,"${extra.lensAxis || "0.0"}"`,
+        `TEXT 275,95,"1",0,1,1,"${extra.lensAdd || "0.0"}"`,
+
+        `BARCODE 350,62,"128",28,0,0,1,1,"${val}"`,
+        `TEXT 350,100,"1",0,1,1,"${val}"`
+      );
+    } else {
+      // ── FRAME BLUEPRINT ──────────────────────────────────────────────
+      const frameColor = extra.frameColor || "";
+      const displayColor = (frameColor || "").slice(0, 10);
+      cmds.push(
+        // Left Flap
+        `TEXT 110,27,"3",0,1,1,"${brand || ""}"`,
+        `TEXT 80,67,"1",0,1,1,"${displayColor}"`,
+        `TEXT 180,102,"1",0,1,1,"SKU:${sku || ""}"`,
+        `TEXT 80,102,"1",0,1,1,"Rs.${price || ""}"`,
+        `TEXT 180,67,"1",0,1,1,"M:${model || ""}"`,
+
+        // Right Flap
+        `TEXT 340,30,"1",0,1,1,"A"`,
+        `TEXT 370,30,"1",0,1,1,"B"`,
+        `TEXT 400,30,"1",0,1,1,"DBL"`,
+        `TEXT 445,30,"1",0,1,1,"Tem"`,
+
+        `TEXT 340,46,"1",0,1,1,"${sizeAVal || ""}"`,
+        `TEXT 370,46,"1",0,1,1,"${sizeBVal || ""}"`,
+        `TEXT 400,46,"1",0,1,1,"${dblVal || ""}"`,
+        `TEXT 445,46,"1",0,1,1,"${templeLengthVal || ""}"`,
+
+        `BARCODE 350,62,"128",32,0,0,1,1,"${val}"`,
+        `TEXT 350,100,"1",0,1,1,"${val}"`
+      );
+    }
+
+    cmds.push(`PRINT ${qty},1`);
     return cmds.join("\r\n");
   };
 
@@ -252,7 +365,19 @@ export default function BarcodePrinter({ userProfile }) {
       sizeA,
       sizeB,
       dbl,
-      templeLength
+      templeLength,
+      {
+        name: lensName,
+        lensType: lensTypeSingle,
+        lensIndex: lensIndexSingle,
+        lensMaterial: lensMaterialSingle,
+        lensCoating: lensCoatingSingle,
+        lensSph: lensSphSingle,
+        lensCyl: lensCylSingle,
+        lensAxis: lensAxisSingle,
+        lensAdd: lensAddSingle,
+        frameColor: frameColorValue
+      }
     );
   };
   const tsplOutput = generateTsplCode();
@@ -412,7 +537,8 @@ export default function BarcodePrinter({ userProfile }) {
         item.sizeA || "",
         item.sizeB || "",
         item.dbl || "",
-        item.templeLength || ""
+        item.templeLength || "",
+        item
       );
 
       try {
@@ -549,11 +675,10 @@ export default function BarcodePrinter({ userProfile }) {
           <button
             key={tab.id}
             onClick={() => setActivePrinterTab(tab.id)}
-            className={`flex-1 text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all ${
-              activePrinterTab === tab.id
-                ? "bg-black text-white shadow-md scale-100"
-                : "text-gray-500 hover:text-black hover:bg-gray-50"
-            }`}
+            className={`flex-1 text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all ${activePrinterTab === tab.id
+              ? "bg-black text-white shadow-md scale-100"
+              : "text-gray-500 hover:text-black hover:bg-gray-50"
+              }`}
           >
             {tab.label}
           </button>
@@ -580,6 +705,13 @@ export default function BarcodePrinter({ userProfile }) {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Category</label>
+                  <input type="text" value={categoryName}
+                    onChange={(e) => setCategoryName(e.target.value)}
+                    placeholder="e.g. Eyeglasses"
+                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                </div>
+                <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Barcode Value</label>
                   <input type="text" value={barcodeValue}
                     onChange={(e) => setBarcodeValue(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
@@ -601,35 +733,88 @@ export default function BarcodePrinter({ userProfile }) {
                     className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Model No</label>
-                  <input type="text" value={modelValue}
-                    onChange={(e) => setModelValue(e.target.value)}
-                    placeholder="e.g. RB3025"
-                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Category</label>
-                  <input type="text" value={categoryName}
-                    onChange={(e) => setCategoryName(e.target.value)}
-                    placeholder="e.g. Eyeglasses"
-                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
-                </div>
-                <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Price (Rs.)</label>
                   <input type="text" value={priceValue}
                     onChange={(e) => setPriceValue(e.target.value)}
                     placeholder="e.g. 1200"
                     className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
                 </div>
-                <div className="col-span-1 sm:col-span-2">
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Frame Dimensions (A / B / DBL / Temple)</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    <input type="text" value={sizeA} onChange={(e) => setSizeA(e.target.value)} placeholder="A" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
-                    <input type="text" value={sizeB} onChange={(e) => setSizeB(e.target.value)} placeholder="B" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
-                    <input type="text" value={dbl} onChange={(e) => setDbl(e.target.value)} placeholder="DBL" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
-                    <input type="text" value={templeLength} onChange={(e) => setTempleLength(e.target.value)} placeholder="Tem" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
-                  </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Frame Color</label>
+                  <input type="text" value={frameColorValue}
+                    onChange={(e) => setFrameColorValue(e.target.value)}
+                    placeholder="e.g. Black, Gold"
+                    className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
                 </div>
+
+                {isLensCategory(categoryName) ? (
+                  <>
+                    <div className="col-span-1 sm:col-span-2">
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Lens Name</label>
+                      <input type="text" value={lensName}
+                        onChange={(e) => setLensName(e.target.value)}
+                        placeholder="Bonthus High Ultra Thin 1.74 (Blue)"
+                        className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Lens Type</label>
+                      <input type="text" value={lensTypeSingle}
+                        onChange={(e) => setLensTypeSingle(e.target.value)}
+                        placeholder="Single Vision"
+                        className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Refractive Index</label>
+                      <input type="text" value={lensIndexSingle}
+                        onChange={(e) => setLensIndexSingle(e.target.value)}
+                        placeholder="1.74"
+                        className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Lens Material</label>
+                      <input type="text" value={lensMaterialSingle}
+                        onChange={(e) => setLensMaterialSingle(e.target.value)}
+                        placeholder="Hi-Index"
+                        className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Coating</label>
+                      <input type="text" value={lensCoatingSingle}
+                        onChange={(e) => setLensCoatingSingle(e.target.value)}
+                        placeholder="Blue Cut"
+                        className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                    </div>
+                    <div className="col-span-1 sm:col-span-2">
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Power Values (SPH / CYL / AXIS / ADD)</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        <input type="text" value={lensSphSingle} onChange={(e) => setLensSphSingle(e.target.value)} placeholder="SPH" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                        <input type="text" value={lensCylSingle} onChange={(e) => setLensCylSingle(e.target.value)} placeholder="CYL" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                        <input type="text" value={lensAxisSingle} onChange={(e) => setLensAxisSingle(e.target.value)} placeholder="AXIS" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                        <input type="text" value={lensAddSingle} onChange={(e) => setLensAddSingle(e.target.value)} placeholder="ADD" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Model No</label>
+                      <input type="text" value={modelValue}
+                        onChange={(e) => setModelValue(e.target.value)}
+                        placeholder="e.g. RB3025"
+                        className="w-full border-2 border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                    </div>
+                    <div className="col-span-1 sm:col-span-2">
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Frame Dimensions (A / B / DBL / Temple)</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        <input type="text" value={sizeA} onChange={(e) => setSizeA(e.target.value)} placeholder="A" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                        <input type="text" value={sizeB} onChange={(e) => setSizeB(e.target.value)} placeholder="B" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                        <input type="text" value={dbl} onChange={(e) => setDbl(e.target.value)} placeholder="DBL" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                        <input type="text" value={templeLength} onChange={(e) => setTempleLength(e.target.value)} placeholder="Tem" className="w-full border-2 border-gray-200 rounded-xl py-2 text-center text-xs font-semibold focus:outline-none focus:border-black transition-all" />
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <div className="col-span-1 sm:col-span-2">
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Print Quantity</label>
                   <input type="number" min="1" max="100" value={printQuantity}
@@ -667,11 +852,10 @@ export default function BarcodePrinter({ userProfile }) {
                 <button
                   onClick={handleAgentPrint}
                   disabled={agentStatus !== "ONLINE" || printingStatus.includes("SENDING")}
-                  className={`flex items-center justify-center gap-2 border-2 font-black py-3 rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95 ${
-                    agentStatus === "ONLINE"
-                      ? "bg-white hover:bg-gray-50 border-black text-black"
-                      : "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
-                  }`}
+                  className={`flex items-center justify-center gap-2 border-2 font-black py-3 rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95 ${agentStatus === "ONLINE"
+                    ? "bg-white hover:bg-gray-50 border-black text-black"
+                    : "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
+                    }`}
                 >
                   <Settings className="w-3.5 h-3.5" /> Agent Print Single
                 </button>
@@ -691,22 +875,74 @@ export default function BarcodePrinter({ userProfile }) {
               <h2 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Live Label Preview</h2>
               <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl p-4 flex items-center justify-center min-h-[140px]">
                 <svg id="preview-label-svg" viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full h-auto shadow-md border border-gray-150 rounded-lg bg-white" style={{ maxHeight: 160 }} xmlns="http://www.w3.org/2000/svg">
-                  <path d="M 10,15 H 310 A 10,10 0 0,1 320,25 V 42 H 390 A 8,8 0 0,1 390,58 H 320 V 75 A 10,10 0 0,1 310,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z" fill="white" stroke="#e5e7eb" strokeWidth="1.5" />
-                  <text x={Math.round((65 / 440) * 320)} y={32} fontFamily="'Inter', sans-serif" fontWeight="800" fontSize={8} fill="#111" textAnchor="middle">{brandValue || "No Brand"}</text>
-                  <text x={Math.round((15 / 440) * 320)} y={54} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#555">{categoryName || "Uncategorized"}</text>
-                  <text x={Math.round((130 / 440) * 320)} y={54} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">SKU:{skuValue || ""}</text>
-                  <text x={Math.round((15 / 440) * 320)} y={74} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#444">price:Rs.{priceValue || ""}</text>
-                  <text x={Math.round((130 / 440) * 320)} y={74} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">M:{modelValue || ""}</text>
-                  <text x={Math.round((240 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">A</text>
-                  <text x={Math.round((240 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeA || ""}</text>
-                  <text x={Math.round((290 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">B</text>
-                  <text x={Math.round((290 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeB || ""}</text>
-                  <text x={Math.round((340 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">DBL</text>
-                  <text x={Math.round((340 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{dbl || ""}</text>
-                  <text x={Math.round((390 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">Tem</text>
-                  <text x={Math.round((390 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{templeLength || ""}</text>
-                  {renderMockBars(Math.round((230 / 440) * 320), Math.round((200 / 440) * 320), 48, 26)}
-                  <text x={Math.round((270 / 440) * 320)} y={82} fontFamily="monospace" fontSize="6" fill="#333" textAnchor="middle">{barcodeValue}</text>
+                  {isLensCategory(categoryName) ? (
+                    <>
+                      {(() => {
+                        const displayType = (lensTypeSingle || "Single Vision").toLowerCase().includes("single") ? "Single" : lensTypeSingle;
+                        const displayIndex = lensIndexSingle || "1.74";
+                        let coating = lensCoatingSingle || "Blue Cut";
+                        const coatingWords = coating.trim().split(/\s+/);
+                        if (coatingWords.length > 3) {
+                          coating = coatingWords.slice(0, 2).join(" ");
+                        }
+                        let coating1 = coating;
+                        let coating2 = "";
+                        if (coating.length > 10) {
+                          const splitIdx = coating.lastIndexOf(" ", 10);
+                          if (splitIdx > 0) {
+                            coating1 = coating.slice(0, splitIdx);
+                            coating2 = coating.slice(splitIdx + 1);
+                          } else {
+                            coating1 = coating.slice(0, 10);
+                            coating2 = coating.slice(10);
+                          }
+                        }
+                        return (
+                          <>
+                            <path d="M 10,15 H 310 A 10,10 0 0,1 320,25 V 42 H 390 A 8,8 0 0,1 390,58 H 320 V 75 A 10,10 0 0,1 310,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z" fill="white" stroke="#e5e7eb" strokeWidth="1.5" />
+                            <text x={Math.round((15 / 440) * 320)} y={34} fontFamily="'Inter', sans-serif" fontWeight="800" fontSize={5.5} fill="#111">{cleanLensName(lensName || brandValue || "Lens").slice(0, 32)}</text>
+                            <text x={Math.round((15 / 440) * 320)} y={46} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#444">{skuValue || ""}</text>
+                            <text x={Math.round((15 / 440) * 320)} y={58} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#555">{displayType}</text>
+                            <text x={Math.round((210 / 440) * 320)} y={58} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#444">{displayIndex}</text>
+                            <text x={Math.round((15 / 440) * 320)} y={70} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#444">{lensMaterialSingle}</text>
+                            <text x={Math.round((95 / 440) * 320)} y={70} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#444">{coating1}</text>
+                            {coating2 && <text x={Math.round((95 / 440) * 320)} y={80} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#444">{coating2}</text>}
+
+                            <text x={Math.round((295 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">SPH</text>
+                            <text x={Math.round((295 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{lensSphSingle}</text>
+                            <text x={Math.round((340 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">CYL</text>
+                            <text x={Math.round((340 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{lensCylSingle}</text>
+                            <text x={Math.round((385 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">AXIS</text>
+                            <text x={Math.round((385 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{lensAxisSingle}</text>
+                            <text x={Math.round((430 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">ADD</text>
+                            <text x={Math.round((430 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{lensAddSingle}</text>
+
+                            {renderMockBars(Math.round((300 / 440) * 320), Math.round((200 / 440) * 320), 48, 26)}
+                            <text x={Math.round((310 / 440) * 320)} y={82} fontFamily="monospace" fontSize="6" fill="#333" textAnchor="middle">{barcodeValue}</text>
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <>
+                      <path d="M 10,15 H 310 A 10,10 0 0,1 320,25 V 42 H 390 A 8,8 0 0,1 390,58 H 320 V 75 A 10,10 0 0,1 310,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z" fill="white" stroke="#e5e7eb" strokeWidth="1.5" />
+                      <text x={Math.round((65 / 440) * 320)} y={32} fontFamily="'Inter', sans-serif" fontWeight="800" fontSize={8} fill="#111" textAnchor="middle">{brandValue || "No Brand"}</text>
+                      <text x={Math.round((15 / 440) * 320)} y={54} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#555">{frameColorValue || "No Color"}</text>
+                      <text x={Math.round((130 / 440) * 320)} y={54} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">SKU:{skuValue || ""}</text>
+                      <text x={Math.round((15 / 440) * 320)} y={74} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#444">price:Rs.{priceValue || ""}</text>
+                      <text x={Math.round((130 / 440) * 320)} y={74} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">M:{modelValue || ""}</text>
+                      <text x={Math.round((240 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">A</text>
+                      <text x={Math.round((240 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeA || ""}</text>
+                      <text x={Math.round((290 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">B</text>
+                      <text x={Math.round((290 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeB || ""}</text>
+                      <text x={Math.round((340 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">DBL</text>
+                      <text x={Math.round((340 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{dbl || ""}</text>
+                      <text x={Math.round((390 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">Tem</text>
+                      <text x={Math.round((390 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{templeLength || ""}</text>
+                      {renderMockBars(Math.round((230 / 440) * 320), Math.round((200 / 440) * 320), 48, 26)}
+                      <text x={Math.round((270 / 440) * 320)} y={82} fontFamily="monospace" fontSize="6" fill="#333" textAnchor="middle">{barcodeValue}</text>
+                    </>
+                  )}
                 </svg>
               </div>
             </div>
@@ -816,7 +1052,7 @@ export default function BarcodePrinter({ userProfile }) {
               <h2 className="text-sm font-black text-black uppercase tracking-widest">TSPL Calibrator</h2>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Fine-tune label metrics and offsets</p>
             </div>
-            
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-1">Label size</p>
@@ -856,22 +1092,74 @@ export default function BarcodePrinter({ userProfile }) {
               <h2 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Calibration Preview</h2>
               <div className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-4 flex items-center justify-center min-h-[140px]">
                 <svg id="preview-label-svg" viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full h-auto shadow border border-gray-105 bg-white" style={{ maxHeight: 140 }} xmlns="http://www.w3.org/2000/svg">
-                  <path d="M 10,15 H 310 A 10,10 0 0,1 320,25 V 42 H 390 A 8,8 0 0,1 390,58 H 320 V 75 A 10,10 0 0,1 310,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z" fill="white" stroke="#e5e7eb" strokeWidth="1.5" />
-                  <text x={Math.round((65 / 440) * 320)} y={32} fontFamily="'Inter', sans-serif" fontWeight="800" fontSize={8} fill="#111" textAnchor="middle">{brandValue || "No Brand"}</text>
-                  <text x={Math.round((15 / 440) * 320)} y={54} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#555">{categoryName || "Uncategorized"}</text>
-                  <text x={Math.round((130 / 440) * 320)} y={54} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">SKU:{skuValue || ""}</text>
-                  <text x={Math.round((15 / 440) * 320)} y={74} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#444">price:Rs.{priceValue || ""}</text>
-                  <text x={Math.round((130 / 440) * 320)} y={74} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">M:{modelValue || ""}</text>
-                  <text x={Math.round((240 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">A</text>
-                  <text x={Math.round((240 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeA || ""}</text>
-                  <text x={Math.round((290 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">B</text>
-                  <text x={Math.round((290 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeB || ""}</text>
-                  <text x={Math.round((340 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">DBL</text>
-                  <text x={Math.round((340 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{dbl || ""}</text>
-                  <text x={Math.round((390 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">Tem</text>
-                  <text x={Math.round((390 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{templeLength || ""}</text>
-                  {renderMockBars(Math.round((230 / 440) * 320), Math.round((200 / 440) * 320), 48, 26)}
-                  <text x={Math.round((270 / 440) * 320)} y={82} fontFamily="monospace" fontSize="6" fill="#333" textAnchor="middle">{barcodeValue}</text>
+                  {isLensCategory(categoryName) ? (
+                    <>
+                      {(() => {
+                        const displayType = (lensTypeSingle || "Single Vision").toLowerCase().includes("single") ? "Single" : lensTypeSingle;
+                        const displayIndex = lensIndexSingle || "1.74";
+                        let coating = lensCoatingSingle || "Blue Cut";
+                        const coatingWords = coating.trim().split(/\s+/);
+                        if (coatingWords.length > 3) {
+                          coating = coatingWords.slice(0, 2).join(" ");
+                        }
+                        let coating1 = coating;
+                        let coating2 = "";
+                        if (coating.length > 10) {
+                          const splitIdx = coating.lastIndexOf(" ", 10);
+                          if (splitIdx > 0) {
+                            coating1 = coating.slice(0, splitIdx);
+                            coating2 = coating.slice(splitIdx + 1);
+                          } else {
+                            coating1 = coating.slice(0, 10);
+                            coating2 = coating.slice(10);
+                          }
+                        }
+                        return (
+                          <>
+                            <path d="M 10,15 H 310 A 10,10 0 0,1 320,25 V 42 H 390 A 8,8 0 0,1 390,58 H 320 V 75 A 10,10 0 0,1 310,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z" fill="white" stroke="#e5e7eb" strokeWidth="1.5" />
+                            <text x={Math.round((15 / 440) * 320)} y={34} fontFamily="'Inter', sans-serif" fontWeight="800" fontSize={5.5} fill="#111">{cleanLensName(lensName || brandValue || "Lens").slice(0, 32)}</text>
+                            <text x={Math.round((15 / 440) * 320)} y={46} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#444">{skuValue || ""}</text>
+                            <text x={Math.round((15 / 440) * 320)} y={58} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#555">{displayType}</text>
+                            <text x={Math.round((210 / 440) * 320)} y={58} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#444">{displayIndex}</text>
+                            <text x={Math.round((15 / 440) * 320)} y={70} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#444">{lensMaterialSingle}</text>
+                            <text x={Math.round((95 / 440) * 320)} y={70} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#444">{coating1}</text>
+                            {coating2 && <text x={Math.round((95 / 440) * 320)} y={80} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={5} fill="#444">{coating2}</text>}
+
+                            <text x={Math.round((295 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">SPH</text>
+                            <text x={Math.round((295 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{lensSphSingle}</text>
+                            <text x={Math.round((340 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">CYL</text>
+                            <text x={Math.round((340 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{lensCylSingle}</text>
+                            <text x={Math.round((385 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">AXIS</text>
+                            <text x={Math.round((385 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{lensAxisSingle}</text>
+                            <text x={Math.round((430 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">ADD</text>
+                            <text x={Math.round((430 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{lensAddSingle}</text>
+
+                            {renderMockBars(Math.round((300 / 440) * 320), Math.round((200 / 440) * 320), 48, 26)}
+                            <text x={Math.round((310 / 440) * 320)} y={82} fontFamily="monospace" fontSize="6" fill="#333" textAnchor="middle">{barcodeValue}</text>
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <>
+                      <path d="M 10,15 H 310 A 10,10 0 0,1 320,25 V 42 H 390 A 8,8 0 0,1 390,58 H 320 V 75 A 10,10 0 0,1 310,85 H 10 A 10,10 0 0,1 0,75 V 25 A 10,10 0 0,1 10,15 Z" fill="white" stroke="#e5e7eb" strokeWidth="1.5" />
+                      <text x={Math.round((65 / 440) * 320)} y={32} fontFamily="'Inter', sans-serif" fontWeight="800" fontSize={8} fill="#111" textAnchor="middle">{brandValue || "No Brand"}</text>
+                      <text x={Math.round((15 / 440) * 320)} y={54} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#555">{categoryName || "Uncategorized"}</text>
+                      <text x={Math.round((130 / 440) * 320)} y={54} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">SKU:{skuValue || ""}</text>
+                      <text x={Math.round((15 / 440) * 320)} y={74} fontFamily="'Inter', sans-serif" fontWeight="700" fontSize={6} fill="#444">price:Rs.{priceValue || ""}</text>
+                      <text x={Math.round((130 / 440) * 320)} y={74} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#444">M:{modelValue || ""}</text>
+                      <text x={Math.round((240 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">A</text>
+                      <text x={Math.round((240 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeA || ""}</text>
+                      <text x={Math.round((290 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">B</text>
+                      <text x={Math.round((290 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{sizeB || ""}</text>
+                      <text x={Math.round((340 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">DBL</text>
+                      <text x={Math.round((340 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{dbl || ""}</text>
+                      <text x={Math.round((390 / 440) * 320)} y={28} fontFamily="monospace" fontWeight="700" fontSize={5} fill="#777" textAnchor="middle">Tem</text>
+                      <text x={Math.round((390 / 440) * 320)} y={38} fontFamily="monospace" fontWeight="700" fontSize={6} fill="#111" textAnchor="middle">{templeLength || ""}</text>
+                      {renderMockBars(Math.round((230 / 440) * 320), Math.round((200 / 440) * 320), 48, 26)}
+                      <text x={Math.round((270 / 440) * 320)} y={82} fontFamily="monospace" fontSize="6" fill="#333" textAnchor="middle">{barcodeValue}</text>
+                    </>
+                  )}
                 </svg>
               </div>
             </div>

@@ -808,28 +808,57 @@ export default function Visualise({ userProfile }) {
         setLoadingUploaded(true);
         setErrorMessage("");
         try {
-            const { data, error } = await supabase
+            const { data: prods, error: dbError } = await supabase
                 .from("pending_products")
                 .select("*")
                 .order("created_at", { ascending: false });
 
-            if (error) throw error;
+            if (dbError) throw dbError;
 
-            // Filter products that contain uploaded imageUrls in their description
-            const withImages = (data || []).filter((prod) => {
+            // List folders in imagine-uploads storage bucket root
+            const { data: folders, error: storageError } = await supabase.storage
+                .from("imagine-uploads")
+                .list("");
+
+            if (storageError) {
+                console.warn("[fetchUploadedProducts] Storage list failed:", storageError);
+            }
+
+            const folderNames = new Set((folders || []).map((f) => f.name));
+
+            const mapped = (prods || []).map((prod) => {
+                const idStr = prod.id.toString();
+                const hasFolder = folderNames.has(idStr);
+                
+                // Get public URLs directly for the positions
+                const frontUrl = supabase.storage.from("imagine-uploads").getPublicUrl(`${idStr}/front.webp`).data.publicUrl;
+                const sideUrl = supabase.storage.from("imagine-uploads").getPublicUrl(`${idStr}/side.webp`).data.publicUrl;
+                const coverUrl = supabase.storage.from("imagine-uploads").getPublicUrl(`${idStr}/cover.webp`).data.publicUrl;
+
+                return {
+                    ...prod,
+                    hasFolder,
+                    bucketUrls: {
+                        front: frontUrl,
+                        side: sideUrl,
+                        cover: coverUrl
+                    }
+                };
+            }).filter((prod) => {
                 try {
                     const parsed = safeJsonParse(prod.description);
                     return (
+                        prod.hasFolder ||
                         (parsed.imageUrls && Object.keys(parsed.imageUrls).length > 0) ||
                         parsed.coverUrl ||
                         prod.image_url
                     );
                 } catch (_) {
-                    return false;
+                    return prod.hasFolder;
                 }
             });
 
-            setUploadedProducts(withImages);
+            setUploadedProducts(mapped);
         } catch (err) {
             console.error("[fetchUploadedProducts] error:", err);
             setErrorMessage("Failed to load uploaded products list.");
@@ -1100,7 +1129,7 @@ export default function Visualise({ userProfile }) {
                                 {filteredProducts.map((prod) => {
                                 let parsed = {};
                                 try { parsed = safeJsonParse(prod.description); } catch (_) {}
-                                const urls = parsed.imageUrls || {};
+                                const urls = prod.bucketUrls || parsed.imageUrls || {};
                                 return (
                                     <div key={prod.id} className="bg-white border-2 border-black rounded-2xl p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                                         <div className="flex items-start gap-4">

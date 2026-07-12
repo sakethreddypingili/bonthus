@@ -21,7 +21,9 @@ import {
   FolderSync,
   FilePlus,
   PackagePlus,
-  FlaskConical
+  FlaskConical,
+  Globe,
+  FolderOpen
 } from"lucide-react";
 import { useState } from"react";
 const logoImg = '/assets/images/logo.webp';
@@ -40,6 +42,8 @@ const navItems = [
   { to:"/reminders", label:"Board", role: ["admin","super_admin","store_manager","employee"], icon: Layout },
   { to:"/store-intelligence", label:"Store Intelligence", role: ["admin","super_admin","store_manager"], icon: Store },
   { to:"/analytics", label:"Analytics", role: ["admin","super_admin","store_manager"], icon: BarChart2 },
+  { to:"/lens-stock", label:"Lens Stock", role: ["admin","super_admin","store_manager"], icon: FolderOpen },
+  { to:"/ecom", label:"Ecom", role: ["admin","super_admin","store_manager"], icon: Globe },
   { to:"/attendance", label:"Attendance", role: ["admin","super_admin","store_manager","employee"], icon: ClipboardCheck },
 ];
 
@@ -92,7 +96,10 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                                     ? (location.pathname ==="/shipments" || location.pathname ==="/shipment-overview" || location.pathname ==="/vendors" || location.pathname ==="/provisioning")
                                     : (to ==="/labs"
                                         ? location.pathname ==="/labs"
-                                        : location.pathname.startsWith(to)
+                                        : (to === "/ecom"
+                                            ? location.pathname.startsWith("/ecom")
+                                            : location.pathname.startsWith(to)
+                                          )
                                       )
                                   )
                               )
@@ -105,7 +112,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
             <div key={to} className="w-full">
               <NavLink
                 to={to}
-                onClick={() => { if (isMobile && !["Products","Intake","Labels","Visualise","Shipments","Labs","Board"].includes(label)) setCollapsed(true); }}
+                onClick={() => { if (isMobile && !["Products","Intake","Labels","Visualise","Shipments","Labs","Board","Ecom"].includes(label)) setCollapsed(true); }}
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium 
                   ${isActive
@@ -339,6 +346,41 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                         title={collapsed ? sub.label : undefined} onClick={() => { if (isMobile) setCollapsed(true); }}
                       >
                         <SubIcon size={15} className="flex-shrink-0" />
+                        {!collapsed && <span>{sub.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Sub-menu for Ecom */}
+              {label ==="Ecom" && isActive && (
+                <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
+                  {[
+                    { to:"/ecom?tab=catalog", label:"Ecom Catalog" },
+                    { to:"/ecom?tab=promotions", label:"Promotions" },
+                    { to:"/ecom?tab=policies", label:"Policy Center" },
+                    { to:"/ecom?tab=support", label:"Customer Support" },
+                    { to:"/ecom?tab=specifications", label:"Product Specs" }
+                  ].map((sub) => {
+                    const isSubActive = location.pathname === "/ecom" && (
+                      location.search.includes(sub.to.split("=")[1]) ||
+                      (sub.to === "/ecom?tab=catalog" && (!location.search || location.search === "" || location.search.includes("tab=catalog")))
+                    );
+                    return (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={`
+                          flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold w-full
+                          ${isSubActive
+                            ?"bg-black text-white shadow-sm"
+                            :"text-gray-500 hover:text-black hover:bg-gray-50"
+                          }
+                          ${collapsed ?"justify-center" :""}
+                        `}
+                        title={collapsed ? sub.label : undefined} onClick={() => { if (isMobile) setCollapsed(true); }}
+                      >
                         {!collapsed && <span>{sub.label}</span>}
                       </NavLink>
                     );

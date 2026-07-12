@@ -27,6 +27,8 @@ import Visualise from "./pages/Visualise";
 import VisualIngest from "./pages/VisualIngest";
 import Labs from "./pages/Labs";
 import ErrorBoundary from "./components/common/ErrorBoundary";
+import LensStock from "./pages/LensStock";
+import Ecom from "./pages/Ecom";
 
 function App() {
   const location = useLocation();
@@ -356,6 +358,8 @@ function App() {
       <Route path="/settings" element={<Settings userProfile={userProfile} />} />
       <Route path="/barcode-printer" element={<BarcodePrinter userProfile={userProfile} />} />
       <Route path="/visualise" element={<ErrorBoundary><Visualise userProfile={userProfile} /></ErrorBoundary>} />
+      <Route path="/lens-stock" element={<LensStock userProfile={userProfile} />} />
+      <Route path="/ecom" element={<Ecom userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

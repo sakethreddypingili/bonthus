@@ -182,6 +182,9 @@ export default function ProductList({ userProfile }) {
   const [pendingItems, setPendingItems] = useState([]);
   const [loadingPending, setLoadingPending] = useState(false);
   const [selectedPendingIds, setSelectedPendingIds] = useState(new Set());
+  const [checkpointBatches, setCheckpointBatches] = useState([]);
+  const [selectedBatchItems, setSelectedBatchItems] = useState([]);
+  const [loadingBatchItems, setLoadingBatchItems] = useState(false);
   
   // Batch Load state
   const [bulkCheckpointName, setBulkCheckpointName] = useState("");
@@ -248,20 +251,197 @@ export default function ProductList({ userProfile }) {
       if (paths[id]) return paths[id];
       const cat = map[id];
       if (!cat) return '';
-      if (!cat.parent_id) {
-        paths[id] = cat.name;
-        return cat.name;
+      const parent = map[cat.parent_id];
+      if (parent) {
+        return getPath(parent.id) + ' / ' + cat.name;
       }
-      const parentPath = getPath(cat.parent_id);
-      paths[id] = parentPath ? `${parentPath} > ${cat.name}` : cat.name;
-      return paths[id];
+      return cat.name;
     };
-    
+
     categories.forEach(c => {
-      getPath(c.id);
+      paths[c.id] = getPath(c.id);
     });
     return paths;
   }, [categories]);
+
+  const fetchPendingQueue = useCallback(async () => {
+    setLoadingPending(true);
+    try {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+      const { data, error } = await supabase
+        .from("intake_checkpoints")
+        .select(`
+          id,
+          checkpoint_name,
+          item_count,
+          submitted_at
+        `)
+        .gte("submitted_at", ninetyDaysAgo.toISOString())
+        .order("submitted_at", { ascending: false })
+        .limit(5000);
+
+      if (error) throw error;
+      setCheckpointBatches(data || []);
+    } catch (err) {
+      console.error("Error fetching pending queue checkpoints:", err.message);
+    } finally {
+      setLoadingPending(false);
+    }
+  }, []);
+
+  const fetchBatchItems = useCallback(async (batchName) => {
+    if (!batchName) {
+      setSelectedBatchItems([]);
+      return;
+    }
+    setLoadingBatchItems(true);
+    try {
+      const { data, error } = await supabase
+        .from("pending_products")
+        .select(`
+          id,
+          checkpoint_name,
+          name,
+          sku,
+          brand,
+          base_price,
+          description,
+          category_id,
+          stock_quantity,
+          low_stock_threshold,
+          unit_price,
+          store_id,
+          status,
+          created_at,
+          category:categories (
+            id,
+            name
+          ),
+          pending_product_barcodes (
+            barcode
+          )
+        `)
+        .eq("checkpoint_name", batchName)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setSelectedBatchItems(data || []);
+      setPendingItems(prev => {
+        const filtered = prev.filter(item => item.checkpoint_name !== batchName);
+        return [...filtered, ...(data || [])];
+      });
+    } catch (err) {
+      console.error("Error fetching batch items:", err.message);
+    } finally {
+      setLoadingBatchItems(false);
+    }
+  }, []);
+
+  const fetchInventory = useCallback(async () => {
+    if (!selectedStore) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("store_inventory")
+        .select(`
+          id,
+          stock_quantity,
+          unit_price,
+          low_stock_threshold,
+          product:products (
+            id,
+            name,
+            sku,
+            brand,
+            description,
+            category:categories (
+              id,
+              name
+            ),
+            product_barcodes (
+              barcode
+            )
+          )
+        `)
+        .eq('store_id', selectedStore);
+
+      if (error) throw error;
+
+      const mapped = data.map(item => ({
+        id: item.product?.id,
+        inventory_id: item.id,
+        name: item.product?.name,
+        sku: item.product?.sku,
+        barcode: item.product?.product_barcodes?.[0]?.barcode || "-",
+        brand: item.product?.brand,
+        description: item.product?.description,
+        category: item.product?.category ? categoryPaths[item.product.category.id] || item.product.category.name : "",
+        category_id: item.product?.category?.id,
+        price: item.unit_price || item.product?.base_price || 0,
+        stock: item.stock_quantity,
+        minStock: item.low_stock_threshold,
+        status: item.stock_quantity === 0 ? "Out of Stock" : item.stock_quantity <= item.low_stock_threshold ? "Low Stock" : "Active"
+      }));
+
+      setInventory(mapped);
+    } catch (err) {
+      console.error("Error fetching inventory:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedStore, categoryPaths]);
+
+  useEffect(() => {
+    fetchInventory();
+    fetchPendingQueue();
+  }, [fetchInventory, fetchPendingQueue]);
+
+  useEffect(() => {
+    fetchBatchItems(selectedBatch);
+  }, [selectedBatch, fetchBatchItems]);
+
+  const reviewStats = useMemo(() => {
+    return {
+      totalBatches: checkpointBatches.length,
+      pendingCount: checkpointBatches.reduce((acc, curr) => acc + (curr.item_count || 0), 0),
+      confirmedCount: 0,
+      batchBreakdown: checkpointBatches.map(b => ({
+        name: b.checkpoint_name,
+        pending: b.item_count || 0,
+        confirmed: 0,
+        total: b.item_count || 0
+      }))
+    };
+  }, [checkpointBatches]);
+
+  const selectedBatchStats = useMemo(() => {
+    const items = selectedBatchItems;
+    const total = items.length;
+    const confirmed = items.filter(i => i.status === 'confirmed').length;
+    const pending = items.filter(i => i.status === 'pending').length;
+    const percent = total > 0 ? Math.round((confirmed / total) * 100) : 0;
+    return { total, confirmed, pending, percent };
+  }, [selectedBatchItems]);
+
+  const filteredSelectedBatchItems = useMemo(() => {
+    return selectedBatchItems.filter(item => {
+      // Status Filter
+      if (detailFilter === "pending" && item.status !== "pending") return false;
+      if (detailFilter === "confirmed" && item.status !== "confirmed") return false;
+
+      // Search Filter
+      if (detailSearch.trim() !== "") {
+        const query = detailSearch.toLowerCase();
+        const nameMatch = item.name?.toLowerCase().includes(query);
+        const skuMatch = item.sku?.toLowerCase().includes(query);
+        const brandMatch = item.brand?.toLowerCase().includes(query);
+        return nameMatch || skuMatch || brandMatch;
+      }
+      return true;
+    });
+  }, [selectedBatchItems, detailFilter, detailSearch]);
 
   const [frameFields, setFrameFields] = useState({
     modelNo: '',
@@ -364,193 +544,6 @@ export default function ProductList({ userProfile }) {
     setBulkCascadePath(newPath);
     setBulkCategoryId(selectedId);
   };
-
-  const fetchInventory = useCallback(async () => {
-    if (!selectedStore) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("store_inventory")
-        .select(`
-          id,
-          stock_quantity,
-          unit_price,
-          low_stock_threshold,
-          product:products (
-            id,
-            name,
-            sku,
-            brand,
-            base_price,
-            description,
-            category:categories (
-              id,
-              name,
-              parent_id
-            ),
-            product_barcodes (
-              barcode
-            )
-          )
-        `)
-        .eq('store_id', selectedStore);
-
-      if (error) throw error;
-
-      const mapped = data.map(item => ({
-        id: item.product?.id,
-        inventory_id: item.id,
-        name: item.product?.name,
-        sku: item.product?.sku,
-        barcode: item.product?.product_barcodes?.[0]?.barcode || "-",
-        brand: item.product?.brand,
-        description: item.product?.description,
-        category: item.product?.category ? categoryPaths[item.product.category.id] || item.product.category.name : "",
-        category_id: item.product?.category?.id,
-        price: item.unit_price || item.product?.base_price || 0,
-        stock: item.stock_quantity,
-        minStock: item.low_stock_threshold,
-        status: item.stock_quantity === 0 ? "Out of Stock" : item.stock_quantity <= item.low_stock_threshold ? "Low Stock" : "Active"
-      }));
-
-      setInventory(mapped);
-    } catch (err) {
-      console.error("Error fetching inventory:", err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedStore, categoryPaths]);
-
-  const fetchPendingQueue = useCallback(async () => {
-    setLoadingPending(true);
-    try {
-      let allData = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from("pending_products")
-          .select(`
-            *,
-            category:categories (
-              id,
-              name
-            ),
-            store:stores (
-              id,
-              name
-            ),
-            pending_product_barcodes (
-              barcode
-            )
-          `)
-          .order("created_at", { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          allData = [...allData, ...data];
-          if (data.length < pageSize) {
-            hasMore = false;
-          } else {
-            page++;
-          }
-        } else {
-          hasMore = false;
-        }
-      }
-
-      setPendingItems(allData);
-    } catch (err) {
-      console.error("Error fetching pending queue:", err.message);
-    } finally {
-      setLoadingPending(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchInventory();
-    fetchPendingQueue();
-  }, [fetchInventory, fetchPendingQueue]);
-
-  const pendingByCheckpoint = useMemo(() => {
-    const groups = {};
-    pendingItems.forEach(item => {
-      const cp = item.checkpoint_name || "Uncategorized Batch";
-      if (!groups[cp]) groups[cp] = [];
-      groups[cp].push(item);
-    });
-    return groups;
-  }, [pendingItems]);
-
-  const reviewStats = useMemo(() => {
-    const batches = new Set();
-    let pendingCount = 0;
-    let confirmedCount = 0;
-    const batchMap = {};
-
-    pendingItems.forEach(item => {
-      const cp = item.checkpoint_name || "Uncategorized Batch";
-      batches.add(cp);
-      if (item.status === 'pending') {
-        pendingCount++;
-      } else if (item.status === 'confirmed') {
-        confirmedCount++;
-      }
-
-      if (!batchMap[cp]) {
-        batchMap[cp] = { pending: 0, confirmed: 0, total: 0 };
-      }
-      batchMap[cp].total++;
-      if (item.status === 'pending') batchMap[cp].pending++;
-      if (item.status === 'confirmed') batchMap[cp].confirmed++;
-    });
-
-    return {
-      totalBatches: batches.size,
-      pendingCount,
-      confirmedCount,
-      batchBreakdown: Object.entries(batchMap).map(([name, counts]) => ({
-        name,
-        ...counts
-      }))
-    };
-  }, [pendingItems]);
-
-  const selectedBatchItems = useMemo(() => {
-    if (!selectedBatch) return [];
-    return pendingByCheckpoint[selectedBatch] || [];
-  }, [selectedBatch, pendingByCheckpoint]);
-
-  const selectedBatchStats = useMemo(() => {
-    const items = selectedBatchItems;
-    const total = items.length;
-    const confirmed = items.filter(i => i.status === 'confirmed').length;
-    const pending = items.filter(i => i.status === 'pending').length;
-    const percent = total > 0 ? Math.round((confirmed / total) * 100) : 0;
-    return { total, confirmed, pending, percent };
-  }, [selectedBatchItems]);
-
-  const filteredSelectedBatchItems = useMemo(() => {
-    return selectedBatchItems.filter(item => {
-      // Status Filter
-      if (detailFilter === "pending" && item.status !== "pending") return false;
-      if (detailFilter === "confirmed" && item.status !== "confirmed") return false;
-
-      // Search Filter
-      if (detailSearch.trim() !== "") {
-        const query = detailSearch.toLowerCase();
-        const nameMatch = item.name?.toLowerCase().includes(query);
-        const skuMatch = item.sku?.toLowerCase().includes(query);
-        const brandMatch = item.brand?.toLowerCase().includes(query);
-        return nameMatch || skuMatch || brandMatch;
-      }
-      return true;
-    });
-  }, [selectedBatchItems, detailFilter, detailSearch]);
 
   const handleSaveProduct = async (e) => {
     e.preventDefault();
@@ -1124,63 +1117,80 @@ export default function ProductList({ userProfile }) {
     }
     setSaving(true);
     try {
-      for (const item of toIngest) {
-        // 1. Insert into products
-        const { data: pData, error: pError } = await supabase
-          .from("products")
-          .insert([{
-            name: item.name,
-            sku: item.sku,
-            brand: item.brand,
-            base_price: Number(item.base_price),
-            category_id: item.category_id,
-            description: item.description
-          }])
-          .select()
-          .single();
+      // 1. Bulk insert into products
+      const productRecords = toIngest.map(item => ({
+        name: item.name,
+        sku: item.sku,
+        brand: item.brand,
+        base_price: Number(item.base_price),
+        category_id: item.category_id,
+        description: item.description
+      }));
 
-        if (pError) throw pError;
+      const { data: insertedProducts, error: pError } = await supabase
+        .from("products")
+        .insert(productRecords)
+        .select("id, sku");
 
-        // 1b. Insert the barcode record
-        const parsedBarcode = item.pending_product_barcodes?.[0]?.barcode;
+      if (pError) throw pError;
 
-        if (parsedBarcode) {
-          const { error: pbError } = await supabase
-            .from("product_barcodes")
-            .insert([{
-              product_id: pData.id,
+      // 1b. Map inserted IDs to build barcodes and store_inventory records
+      const barcodeRecordsToInsert = [];
+      const inventoryRecordsToInsert = [];
+
+      insertedProducts.forEach(prod => {
+        const matchingPending = toIngest.find(item => item.sku === prod.sku);
+        if (matchingPending) {
+          const parsedBarcode = matchingPending.pending_product_barcodes?.[0]?.barcode;
+          if (parsedBarcode) {
+            barcodeRecordsToInsert.push({
+              product_id: prod.id,
               barcode: parsedBarcode,
               status: 'active'
-            }]);
-          if (pbError) console.error("Error inserting product_barcode:", pbError);
+            });
+          }
+          inventoryRecordsToInsert.push({
+            store_id: matchingPending.store_id || selectedStore,
+            product_id: prod.id,
+            stock_quantity: Number(matchingPending.stock_quantity),
+            unit_price: Number(matchingPending.unit_price || matchingPending.base_price),
+            low_stock_threshold: Number(matchingPending.low_stock_threshold)
+          });
         }
+      });
 
-        // 2. Insert into store_inventory
+      // 2. Bulk insert barcodes if any exist
+      if (barcodeRecordsToInsert.length > 0) {
+        const { error: pbError } = await supabase
+          .from("product_barcodes")
+          .insert(barcodeRecordsToInsert);
+        if (pbError) throw pbError;
+      }
+
+      // 3. Bulk insert inventory records
+      if (inventoryRecordsToInsert.length > 0) {
         const { error: iError } = await supabase
           .from("store_inventory")
-          .insert([{
-            store_id: item.store_id || selectedStore,
-            product_id: pData.id,
-            stock_quantity: Number(item.stock_quantity),
-            unit_price: Number(item.unit_price || item.base_price),
-            low_stock_threshold: Number(item.low_stock_threshold)
-          }]);
-
+          .insert(inventoryRecordsToInsert);
         if (iError) throw iError;
-
-        // 3. Delete from pending_products
-        const { error: dError } = await supabase
-          .from("pending_products")
-          .delete()
-          .eq('id', item.id);
-
-        if (dError) throw dError;
       }
+
+      // 4. Bulk delete from pending_products
+      const pendingIdsToDelete = toIngest.map(item => item.id);
+      const { error: dError } = await supabase
+        .from("pending_products")
+        .delete()
+        .in('id', pendingIdsToDelete);
+
+      if (dError) throw dError;
 
       setSelectedPendingIds(new Set());
       setSuccessMessage(`Successfully ingested ${toIngest.length} confirmed products to catalog.`);
       await fetchInventory();
       await fetchPendingQueue();
+      if (selectedBatch) {
+        await fetchBatchItems(selectedBatch);
+      }
     } catch (err) {
       alert("Ingestion failed: " + err.message);
     } finally {
