@@ -745,14 +745,34 @@
     background-size: 16px 16px;
   }
 
-  /* Input (Login only) */
+  /* ─────────────────────────────────────────
+     LOGIN SCREEN IMPROVEMENTS
+  ───────────────────────────────────────── */
+
+  /* Input (Login) */
   .input-field {
-    @apply w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium bg-white text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 transition-all placeholder-gray-400;
+    @apply w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-sm font-medium bg-white text-gray-900 focus:outline-none focus:border-black focus:ring-0 transition-all duration-150 placeholder-gray-400;
+  }
+  .input-field:hover {
+    border-color: #9ca3af;
+  }
+  .input-field:focus {
+    box-shadow: 4px 4px 0px 0px rgba(0,0,0,1);
+    transform: translate(-1px, -1px);
   }
 
-  /* Buttons for Login (kept from old system) */
+  /* Buttons for Login */
   .btn-primary-login {
-    @apply w-full bg-gray-900 text-white border border-gray-900 px-5 py-3 rounded-lg font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-100 flex items-center justify-center gap-2 hover:bg-gray-700;
+    @apply w-full bg-gray-900 text-white border-2 border-gray-900 px-5 py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-100 flex items-center justify-center gap-2;
+  }
+  .btn-primary-login:hover:not(:disabled) {
+    background: #1f2937;
+    box-shadow: 3px 3px 0px 0px rgba(0,0,0,1);
+    transform: translate(-1px, -1px);
+  }
+  .btn-primary-login:active:not(:disabled) {
+    box-shadow: none;
+    transform: translate(2px, 2px);
   }
 }
 

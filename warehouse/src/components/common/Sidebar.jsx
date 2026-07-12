@@ -358,6 +358,7 @@ export default function Sidebar({ collapsed, setCollapsed, userProfile, isMobile
                 <div className={`flex flex-col mt-1 mb-2 ${collapsed ? 'items-center pl-0' : 'pl-4 border-l border-gray-200 ml-5'} space-y-1`}>
                   {[
                     { to:"/ecom?tab=catalog", label:"Ecom Catalog" },
+                    { to:"/ecom?tab=products", label:"Products" },
                     { to:"/ecom?tab=promotions", label:"Promotions" },
                     { to:"/ecom?tab=policies", label:"Policy Center" },
                     { to:"/ecom?tab=support", label:"Customer Support" },

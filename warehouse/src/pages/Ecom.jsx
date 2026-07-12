@@ -50,6 +50,135 @@ export default function Ecom({ userProfile }) {
   const [calcBasePrice, setCalcBasePrice] = useState("1000");
   const [calcMargin, setCalcMargin] = useState("45"); // percentage margin
 
+  // "Add Product" Stock Sourcing Modal States
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [sourceType, setSourceType] = useState("warehouse"); // 'warehouse' | 'stores' | 'labs'
+  const [storesList, setStoresList] = useState([]);
+  const [labsList, setLabsList] = useState([]);
+  const [selectedSourceId, setSelectedSourceId] = useState("");
+  const [showStockList, setShowStockList] = useState(false);
+  const [availableStock, setAvailableStock] = useState([]);
+  const [loadingStock, setLoadingStock] = useState(false);
+
+  const handleOpenAddProduct = async () => {
+    setIsAddProductOpen(true);
+    setSourceType("warehouse");
+    setSelectedSourceId("");
+    setShowStockList(false);
+    setAvailableStock([]);
+
+    try {
+      const { data: stores } = await supabase.from("stores").select("id, name").order("name");
+      const { data: labs } = await supabase.from("labs").select("id, name").order("name");
+      setStoresList(stores || []);
+      setLabsList(labs || []);
+      if (stores && stores.length > 0) setSelectedSourceId(stores[0].id);
+      else if (labs && labs.length > 0) setSelectedSourceId(labs[0].id);
+    } catch (err) {
+      console.error("Failed to load stores/labs:", err.message);
+    }
+  };
+
+  const handleProceedStock = async () => {
+    setLoadingStock(true);
+    setShowStockList(true);
+    setAvailableStock([]);
+
+    try {
+      if (sourceType === "warehouse") {
+        // Fetch warehouse master products
+        const { data: prods, error } = await supabase
+          .from("products")
+          .select("id, sku, name, brand, base_price, description")
+          .order("name");
+        
+        if (error) throw error;
+        setAvailableStock(prods || []);
+      } else if (sourceType === "stores") {
+        // Fetch store_inventory joined with products
+        const { data: inventory, error } = await supabase
+          .from("store_inventory")
+          .select(`
+            stock_quantity,
+            product:products (
+              id,
+              sku,
+              name,
+              brand,
+              base_price,
+              description
+            )
+          `)
+          .eq("store_id", selectedSourceId);
+        
+        if (error) throw error;
+
+        const formatted = (inventory || [])
+          .filter(inv => inv.product)
+          .map(inv => ({
+            ...inv.product,
+            stock_quantity: inv.stock_quantity
+          }));
+        setAvailableStock(formatted);
+      } else if (sourceType === "labs") {
+        // Fetch master products as lab stock list fallback
+        const { data: prods, error } = await supabase
+          .from("products")
+          .select("id, sku, name, brand, base_price, description")
+          .order("name");
+        
+        if (error) throw error;
+        setAvailableStock(prods || []);
+      }
+    } catch (err) {
+      alert("Failed to load stock: " + err.message);
+    } finally {
+      setLoadingStock(false);
+    }
+  };
+
+  const handlePublishStockItem = async (prod) => {
+    setSaving(true);
+    try {
+      let descObj = {};
+      if (prod.description && prod.description.startsWith("{")) {
+        try {
+          descObj = JSON.parse(prod.description);
+        } catch {}
+      }
+
+      descObj.isOnline = true;
+      const { error } = await supabase
+        .from("products")
+        .update({
+          description: JSON.stringify({
+            ...prod.ecomData,
+            ...descObj,
+            isOnline: true
+          })
+        })
+        .eq("id", prod.id);
+
+      if (error) throw error;
+      alert(`"${prod.name}" has been published online successfully!`);
+      await fetchCatalogProducts();
+      // Keep stock list updated by setting published state locally
+      setAvailableStock(prev => prev.map(item => {
+        if (item.id === prod.id) {
+          return {
+            ...item,
+            description: JSON.stringify({ ...descObj, isOnline: true })
+          };
+        }
+        return item;
+      }));
+    } catch (err) {
+      alert("Failed to publish item online: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const fetchCatalogProducts = useCallback(async () => {
     setLoading(true);
     try {
@@ -298,6 +427,7 @@ export default function Ecom({ userProfile }) {
   const activeTitle = useMemo(() => {
     const map = {
       catalog: "Ecom Catalog",
+      products: "Online Products List",
       promotions: "Promotions & Discounts Dashboard",
       policies: "Policy Center (Shipping & Returns)",
       support: "Customer Support & Warranties",
@@ -364,7 +494,96 @@ export default function Ecom({ userProfile }) {
         </div>
       </div>
 
-      {/* 2. ECOM CATALOG VIEW */}
+      {/* 2. ONLINE PRODUCTS VIEW */}
+      {activeTab === "products" && (
+        <>
+          <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <div className="relative flex-1 w-full max-w-lg">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+              <input
+                type="text"
+                placeholder="Search online products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-xs font-semibold focus:border-black focus:ring-0 outline-none"
+              />
+            </div>
+            <button
+              onClick={handleOpenAddProduct}
+              className="bg-black text-white px-5 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:scale-105 transition-all shadow-md w-full sm:w-auto"
+            >
+              + Add Product
+            </button>
+          </div>
+
+          <div className="bg-white rounded-3xl border-2 border-black overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center p-20 gap-3 text-gray-400">
+                <Loader2 className="w-8 h-8 animate-spin text-black" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Loading online products...</span>
+              </div>
+            ) : filteredProducts.filter(p => p.ecomData.isOnline).length === 0 ? (
+              <div className="p-20 text-center text-xs font-black text-gray-400 uppercase tracking-widest">
+                No products are currently listed online. Click "+ Add Product" to publish from stores, labs, or warehouse.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 border-b-2 border-black text-left text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                      <th className="px-6 py-4">Publish State</th>
+                      <th className="px-6 py-4">Product Name</th>
+                      <th className="px-6 py-4">SKU</th>
+                      <th className="px-6 py-4">Badges & Specs</th>
+                      <th className="px-6 py-4 text-right">Settings</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {filteredProducts.filter(p => p.ecomData.isOnline).map(item => (
+                      <tr key={item.id} className="hover:bg-gray-50/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center text-[8px] font-black bg-green-50 text-green-700 border border-green-150 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                            Online
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-xs font-black text-black uppercase tracking-tight">{item.name}</td>
+                        <td className="px-6 py-4 text-xs font-mono font-bold text-black uppercase tracking-wider">{item.sku}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1">
+                            {item.ecomData.isFeatured && (
+                              <span className="inline-flex items-center text-[7px] bg-yellow-400 text-black px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+                                ★ Featured
+                              </span>
+                            )}
+                            {item.ecomData.customBadge && (
+                              <span className="inline-flex items-center text-[7px] bg-black text-white px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+                                {item.ecomData.customBadge}
+                              </span>
+                            )}
+                            <span className="inline-flex items-center text-[7px] bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded-full font-bold uppercase">
+                              {item.ecomData.lensMaterial}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => handleEditEcom(item)}
+                            className="text-[9px] font-black bg-black text-white px-4 py-2 rounded-xl uppercase tracking-widest hover:scale-105 transition-all shadow-sm"
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* 3. ECOM CATALOG VIEW */}
       {activeTab === "catalog" && (
         <>
           <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm flex flex-col sm:flex-row gap-4 items-center">
@@ -945,6 +1164,192 @@ export default function Ecom({ userProfile }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* "Add Product" Stock Sourcing Central Modal */}
+      {isAddProductOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/60 backdrop-blur-sm">
+          <div className="relative bg-white border-2 border-black rounded-[24px] p-6 shadow-2xl max-w-3xl w-full my-8 space-y-6">
+            
+            {!showStockList ? (
+              // Step 1: Select Stock Source
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-base font-black text-black uppercase tracking-tight">Select Stock Source</h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">
+                    Choose where to fetch available stock items from to list online
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { id: "warehouse", name: "Warehouse" },
+                    { id: "stores", name: "Stores" },
+                    { id: "labs", name: "Labs" }
+                  ].map(src => (
+                    <button
+                      key={src.id}
+                      type="button"
+                      onClick={() => {
+                        setSourceType(src.id);
+                        if (src.id === "stores" && storesList.length > 0) setSelectedSourceId(storesList[0].id);
+                        else if (src.id === "labs" && labsList.length > 0) setSelectedSourceId(labsList[0].id);
+                        else setSelectedSourceId("");
+                      }}
+                      className={`p-4 border-2 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all ${sourceType === src.id
+                        ? "border-black bg-neutral-50 scale-102 shadow-sm font-black"
+                        : "border-gray-200 hover:border-gray-300 font-bold text-gray-500"
+                      }`}
+                    >
+                      <span className="text-xs uppercase tracking-wider">{src.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Conditional Dropdown for Stores or Labs */}
+                {sourceType === "stores" && (
+                  <div className="space-y-2">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block ml-1">Select Store</label>
+                    <select
+                      value={selectedSourceId}
+                      onChange={(e) => setSelectedSourceId(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-xs font-bold outline-none focus:border-black bg-white"
+                    >
+                      {storesList.map(st => (
+                        <option key={st.id} value={st.id}>{st.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {sourceType === "labs" && (
+                  <div className="space-y-2">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block ml-1">Select Lab</label>
+                    <select
+                      value={selectedSourceId}
+                      onChange={(e) => setSelectedSourceId(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-xs font-bold outline-none focus:border-black bg-white"
+                    >
+                      {labsList.map(lb => (
+                        <option key={lb.id} value={lb.id}>{lb.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddProductOpen(false)}
+                    className="flex-1 py-3.5 text-[10px] font-black uppercase border border-neutral-200 rounded-xl hover:bg-neutral-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleProceedStock}
+                    className="flex-1 py-3.5 bg-black text-white text-[10px] font-black uppercase rounded-xl hover:bg-neutral-800"
+                  >
+                    Proceed
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Step 2: Available Stock List View
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-black uppercase tracking-tight">Available Stock</h3>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">
+                      Sourced from: <span className="text-black font-black">{sourceType.toUpperCase()}</span> 
+                      {selectedSourceId && ` (ID: ${selectedSourceId.slice(0, 8)})`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowStockList(false)}
+                    className="text-[9px] font-black text-gray-500 hover:text-black uppercase tracking-wider border border-gray-200 px-3 py-1.5 rounded-lg"
+                  >
+                    ← Back
+                  </button>
+                </div>
+
+                <div className="max-h-[350px] overflow-y-auto border-2 border-black rounded-2xl">
+                  {loadingStock ? (
+                    <div className="flex flex-col items-center justify-center p-20 gap-3 text-gray-400">
+                      <Loader2 className="w-6 h-6 animate-spin text-black" />
+                      <span className="text-[9px] font-black uppercase tracking-widest">Loading available stock...</span>
+                    </div>
+                  ) : availableStock.length === 0 ? (
+                    <div className="p-20 text-center text-xs font-black text-gray-400 uppercase tracking-widest">
+                      No stock items found in this source.
+                    </div>
+                  ) : (
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-gray-50 border-b-2 border-black text-[8px] font-black text-gray-400 uppercase tracking-widest">
+                          <th className="px-4 py-3">Product Info</th>
+                          <th className="px-4 py-3">SKU</th>
+                          <th className="px-4 py-3">Stock Available</th>
+                          <th className="px-4 py-3 text-right">Publish</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {availableStock.map(stockItem => {
+                          let isItemOnline = false;
+                          if (stockItem.description && stockItem.description.startsWith("{")) {
+                            try {
+                              const parsed = JSON.parse(stockItem.description);
+                              isItemOnline = parsed.isOnline || false;
+                            } catch {}
+                          }
+
+                          return (
+                            <tr key={stockItem.id} className="hover:bg-gray-50/40 text-xs">
+                              <td className="px-4 py-3">
+                                <span className="font-black text-black uppercase block">{stockItem.name}</span>
+                                <span className="text-[8px] font-bold text-gray-400 block uppercase">{stockItem.brand}</span>
+                              </td>
+                              <td className="px-4 py-3 font-mono font-bold">{stockItem.sku}</td>
+                              <td className="px-4 py-3 font-bold">
+                                {stockItem.stock_quantity !== undefined ? `${stockItem.stock_quantity} Units` : "Catalog Base"}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {isItemOnline ? (
+                                  <span className="text-[8px] font-black text-green-700 uppercase tracking-wider bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                                    Online
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePublishStockItem(stockItem)}
+                                    className="bg-black text-white px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wider hover:bg-neutral-800"
+                                  >
+                                    Publish Online
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddProductOpen(false)}
+                    className="px-6 py-3 bg-neutral-100 hover:bg-neutral-200 text-[10px] font-black uppercase rounded-xl"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}

@@ -505,14 +505,6 @@ export const MainPage: React.FC = () => {
             </div>
             <div className="product-strip-actions">
               <button
-                id="batch-toggle-btn"
-                onClick={() => setBatchOpen(o => !o)}
-                className="btn btn-ghost"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                {batchOpen ? 'Close Batch' : 'Batch Mode'}
-              </button>
-              <button
                 id="save-assets-btn"
                 onClick={handleSave}
                 disabled={saving}
